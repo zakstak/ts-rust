@@ -17,7 +17,7 @@ stages = ["pre-commit"]
 [[repos.hooks]]
 id = "lint"
 # Fixtures exercise invalid syntax; the shipped libraries mirror pinned Go input.
-exclude = '^crates/ts_goport/(libs/|tests/(fixtures|effect_fixtures)/)'
+exclude = '^(crates/ts_goport/(libs/|tests/(fixtures|effect_fixtures)/)|docs/probes/|scripts/goport/gen/unicode/)'
 name = "lint"
 entry = ".pragma-hooks/lint.sh"
 language = "script"

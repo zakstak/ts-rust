@@ -35,3 +35,9 @@ fixtures, codegen specification inputs, vendored license text and saved
 accountability evidence. Fixture syntax is also excluded from generic language
 linting; Rust crate linting still checks the implementation and Rust test
 targets.
+
+Go probe fragments and Unicode oracle generators are compiled in the pinned Go
+source checkout rather than a Go module in this Rust repository. Generic
+standalone `golangci-lint` excludes `docs/probes/` and
+`scripts/goport/gen/unicode/`; their pinned-Go validation remains in the
+compiler workflow.
