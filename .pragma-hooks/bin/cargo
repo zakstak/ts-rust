@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Route Pragma's Cargo commands through the repository's protected resource caps.
+set -euo pipefail
+repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+# Remove this adapter from PATH before the capped runner invokes real Cargo.
+adapter_dir="$repo/.pragma-hooks/bin"
+IFS=: read -r -a path_entries <<<"$PATH"
+clean_path=()
+for path_entry in "${path_entries[@]}"; do
+	[[ "$path_entry" == "$adapter_dir" ]] || clean_path+=("$path_entry")
+done
+PATH=$(
+	IFS=:
+	echo "${clean_path[*]}"
+)
+export PATH
+export TS_CARGO_NIGHTLY=0
+export TS_CARGO_INCREMENTAL=0
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.93.0}"
+command=${1:?missing Cargo command}
+shift
+case "$command" in
+test) exec "$repo/scripts/run-cargo-capped.sh" test --release --locked --workspace "$@" ;;
+clippy) exec "$repo/scripts/run-cargo-capped.sh" clippy --release --locked "$@" ;;
+*) exec "$repo/scripts/run-cargo-capped.sh" "$command" "$@" ;;
+esac
