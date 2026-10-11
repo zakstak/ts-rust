@@ -7,7 +7,7 @@ repo = "local"
 [[repos.hooks]]
 id = "format"
 # Keep pinned upstream input bytes, deliberate compiler fixtures and saved evidence intact.
-exclude = '^(crates/ts_goport/(libs/|tests/(fixtures|effect_fixtures)/)|docs/typechecker-(state|batches)/|tools/[^/]+/spec/|licenses/)'
+exclude = '^(crates/ts_goport/(libs/|tests/(fixtures|effect_fixtures)/)|docs/typechecker-(state|batches)/|docs/typechecker-wave[^/]*-checkpoint\.(json|md)$|docs/probes/[^/]+\.json$|tools/[^/]+/spec/|licenses/)'
 name = "format"
 entry = ".pragma-hooks/format.sh"
 language = "script"

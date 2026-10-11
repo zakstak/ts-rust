@@ -8,8 +8,12 @@
 # full run's times.
 # Time on a quiet machine: the numbers are noise while something else uses the CPU.
 set -uo pipefail
-[[ $# -ge 1 ]] || { sed -n '4p' "$0" >&2; exit 2; }
-work=$(cd "$1" && pwd); shift
+[[ $# -ge 1 ]] || {
+  sed -n '4p' "$0" >&2
+  exit 2
+}
+work=$(cd "$1" && pwd)
+shift
 # app, repo dir, tsconfig
 APPS='vscode vscode src/tsconfig.json
 sentry sentry tsconfig.json
@@ -34,11 +38,12 @@ while read -r app dir cfg; do
   [[ $# == 0 || " $* " == *" $app "* ]] || continue
   flags="-p $cfg --noEmit --incremental false"
   cmds=("$TS6 $flags --pretty false" "$GO $flags --pretty false" "$RS $flags --pretty false"
-        "$BUN check $flags --no-pretty --all")
-  cd "$work/repos/$dir"
+    "$BUN check $flags --no-pretty --all")
+  cd "$work/repos/$dir" || exit
   : >"$work/results/$app$tag.errors"
   for i in "${sel[@]}"; do
-    out=$(${cmds[$i]} 2>&1); rc=$?
+    out=$(${cmds[$i]} 2>&1)
+    rc=$?
     grep 'error TS' <<<"$out" | sort >"$work/results/$app.${names[$i]}.diag"
     echo "${names[$i]} rc=$rc errors=$(wc -l <"$work/results/$app.${names[$i]}.diag" | tr -d ' ')" >>"$work/results/$app$tag.errors"
   done

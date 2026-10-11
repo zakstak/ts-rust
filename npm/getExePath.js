@@ -9,22 +9,33 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export default function getExePath() {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const { name } = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
-    const platformPackageName = `@${name}/${process.platform}-${process.arch}`;
-    let exeDir;
-    try {
-        const packageJson = typeof import.meta.resolve === "function"
-            ? fileURLToPath(import.meta.resolve(`${platformPackageName}/package.json`))
-            : module.createRequire(import.meta.url).resolve(`${platformPackageName}/package.json`);
-        exeDir = path.join(path.dirname(packageJson), "lib");
-    }
-    catch {
-        throw new Error(`Unable to resolve ${platformPackageName}. Either your platform is unsupported, or you are missing the package on disk.`);
-    }
-    const exe = path.join(exeDir, process.platform === "win32" ? "tsc.exe" : "tsc");
-    if (!fs.existsSync(exe)) {
-        throw new Error(`Executable not found: ${exe}`);
-    }
-    return exe;
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const { name } = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
+  );
+  const platformPackageName = `@${name}/${process.platform}-${process.arch}`;
+  let exeDir;
+  try {
+    const packageJson =
+      typeof import.meta.resolve === "function"
+        ? fileURLToPath(
+            import.meta.resolve(`${platformPackageName}/package.json`),
+          )
+        : module
+            .createRequire(import.meta.url)
+            .resolve(`${platformPackageName}/package.json`);
+    exeDir = path.join(path.dirname(packageJson), "lib");
+  } catch {
+    throw new Error(
+      `Unable to resolve ${platformPackageName}. Either your platform is unsupported, or you are missing the package on disk.`,
+    );
+  }
+  const exe = path.join(
+    exeDir,
+    process.platform === "win32" ? "tsc.exe" : "tsc",
+  );
+  if (!fs.existsSync(exe)) {
+    throw new Error(`Executable not found: ${exe}`);
+  }
+  return exe;
 }

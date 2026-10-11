@@ -31,7 +31,7 @@ jq -n --arg upstream "$upstream" --arg probes "$worktree/docs/probes" '{Replace:
   ($upstream+"/internal/ast/zz_wave150_type_name_symbol.go"):($probes+"/type_name_symbol_ast.go"),
   ($upstream+"/internal/checker/zz_wave150_type_name_symbol.go"):($probes+"/type_name_symbol_checker.go"),
   ($upstream+"/internal/checker/zz_wave150_type_name_symbol_test.go"):($probes+"/type_name_symbol_semantics_test.go")
-}}' > "$out/overlay.json"
+}}' >"$out/overlay.json"
 env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOWORK=off GOFLAGS= GOTELEMETRY=off \
   GOMAXPROCS=1 GOMEMLIMIT=12582912KiB \
   GOCACHE="$target/go-cache" GOMODCACHE="$module_cache" GOTMPDIR="$target/go-tmp" \

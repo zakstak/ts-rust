@@ -20,7 +20,10 @@
 # target/bench/, so a clean build is a real cold build. sccache is off.
 # Output: <out-dir>/results.tsv (one row per build), <out-dir>/logs/<label>.{log,time,html}.
 set -uo pipefail
-[[ $# -ge 5 ]] || { sed -n '2,19p' "$0"; exit 2; }
+[[ $# -ge 5 ]] || {
+  sed -n '2,19p' "$0"
+  exit 2
+}
 OUT=$1 LABEL=$2 TC=$3 PROFILE=$4 ACTION=$5 FLAGS=${6:-}
 WT=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$WT" || exit 2
@@ -35,9 +38,20 @@ EDIT_ANCHOR='    pub fn has_empty_object_intersection(&mut self, t: TypeId) -> b
 case $ACTION in
   clean) rm -rf "$TDIR" ;;
   build) ;;
-  touch:*) f=${ACTION#touch:}; [[ -f $f ]] || { echo "no file $f" >&2; exit 2; }; touch "$f" ;;
+  touch:*)
+    f=${ACTION#touch:}
+    [[ -f $f ]] || {
+      echo "no file $f" >&2
+      exit 2
+    }
+    touch "$f"
+    ;;
   edit:*)
-    f=${ACTION#edit:}; [[ $f == "$EDIT_FILE" ]] || { echo "edit only supports $EDIT_FILE" >&2; exit 2; }
+    f=${ACTION#edit:}
+    [[ $f == "$EDIT_FILE" ]] || {
+      echo "edit only supports $EDIT_FILE" >&2
+      exit 2
+    }
     cp "$f" "$OUT/logs/$LABEL.orig.rs"
     python3 - "$f" "$EDIT_ANCHOR" <<'EOF' || exit 2
 import sys
@@ -47,12 +61,16 @@ assert s.count(anchor + "\n") == 1, "anchor not unique"
 open(p, "w").write(s.replace(anchor + "\n", anchor + "\n        std::hint::black_box(());\n"))
 EOF
     ;;
-  *) echo "unknown action $ACTION" >&2; exit 2 ;;
+  *)
+    echo "unknown action $ACTION" >&2
+    exit 2
+    ;;
 esac
 
 load_before=$(cut -d' ' -f1-3 /proc/loadavg)
 ver=$(rustc "+$TC" --version 2>&1)
-prof_arg=(--release); [[ $PROFILE == release ]] || prof_arg=(--profile "$PROFILE")
+prof_arg=(--release)
+[[ $PROFILE == release ]] || prof_arg=(--profile "$PROFILE")
 rm -rf "$TDIR/cargo-timings"
 # RUSTUP_TOOLCHAIN and RUSTFLAGS turn off run-cargo-capped.sh's own nightly choice.
 env RUSTC_WRAPPER= SCCACHE_DISABLE=1 TS_CARGO_SCCACHE=0 RUSTUP_TOOLCHAIN="$TC" RUSTFLAGS="$FLAGS" \
@@ -60,13 +78,14 @@ env RUSTC_WRAPPER= SCCACHE_DISABLE=1 TS_CARGO_SCCACHE=0 RUSTUP_TOOLCHAIN="$TC" R
   TS_CARGO_INCREMENTAL="$INCR" TS_CARGO_SEPARATE_TARGET=1 CARGO_TARGET_DIR="$TDIR" \
   /usr/bin/time -f '%e %U %S %M %P' -o "$OUT/logs/$LABEL.time" \
   scripts/run-cargo-capped.sh build "${prof_arg[@]}" -p ts_goport --bins --timings \
-  > "$OUT/logs/$LABEL.log" 2>&1
+  >"$OUT/logs/$LABEL.log" 2>&1
 rc=$?
 if [[ $ACTION == edit:* ]]; then cp "$OUT/logs/$LABEL.orig.rs" "${ACTION#edit:}"; fi
 cp "$TDIR"/cargo-timings/cargo-timing.html "$OUT/logs/$LABEL.html" 2>/dev/null
 read -r wall user sys rss cpu < <(tail -1 "$OUT/logs/$LABEL.time")
 # ts_goport lib compile time from the cargo timing data (0 when the unit did not build).
-lib=$(python3 - "$OUT/logs/$LABEL.html" <<'EOF'
+lib=$(
+  python3 - "$OUT/logs/$LABEL.html" <<'EOF'
 import json, re, sys
 try:
     html = open(sys.argv[1]).read()
@@ -76,8 +95,8 @@ except Exception:
     print("-")
 EOF
 )
-[[ -s $OUT/results.tsv ]] || printf 'label\thost\ttoolchain\tprofile\trustflags\tincr\taction\trc\twall_s\tuser_s\tsys_s\tmaxrss_kib\tcpu\tts_goport_lib_s\tload_before\trustc\n' > "$OUT/results.tsv"
+[[ -s $OUT/results.tsv ]] || printf 'label\thost\ttoolchain\tprofile\trustflags\tincr\taction\trc\twall_s\tuser_s\tsys_s\tmaxrss_kib\tcpu\tts_goport_lib_s\tload_before\trustc\n' >"$OUT/results.tsv"
 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$LABEL" "$(hostname)" "$TC" "$PROFILE" "${FLAGS:--}" "$INCR" \
-  "$ACTION" "$rc" "$wall" "$user" "$sys" "$rss" "$cpu" "$lib" "$load_before" "$ver" >> "$OUT/results.tsv"
+  "$ACTION" "$rc" "$wall" "$user" "$sys" "$rss" "$cpu" "$lib" "$load_before" "$ver" >>"$OUT/results.tsv"
 echo "$LABEL rc=$rc wall=${wall}s user=${user}s sys=${sys}s maxrss=${rss}KiB cpu=$cpu lib=${lib}s"
 exit $rc

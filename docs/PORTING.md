@@ -1,7 +1,7 @@
 # Porting plan
 
-The port follows the upstream dependency spine rather than translating files
-in arbitrary order:
+The port follows the upstream dependency spine rather than translating files in
+arbitrary order:
 
 1. Core source positions, JavaScript strings, diagnostics, paths, and VFS.
 2. Schema-generated syntax kinds and arena-owned AST nodes.
@@ -14,19 +14,18 @@ in arbitrary order:
 9. Language service, project service, LSP, and native API protocols.
 
 Every phase retains an executable vertical slice. The first compatibility gate
-is a legitimate syntax-only invocation (`--noCheck --noEmit --noLib
---ignoreConfig`) with exact scanner/parser diagnostics; ordinary compilation
-must not silently omit semantic checking.
+is a legitimate syntax-only invocation
+(`--noCheck --noEmit --noLib --ignoreConfig`) with exact scanner/parser
+diagnostics; ordinary compilation must not silently omit semantic checking.
 
 ## Verification strategy
 
-The Go test runner invokes Go packages directly, so replacing
-`built/local/tsgo` does not reuse the compiler baselines. The Rust port needs a
-native baseline runner that reads the same directive-based cases and produces
-the same `.errors.txt`, `.js`, `.types`, `.symbols`, source-map, and trace
-artifacts. The native-preview API suite is the first upstream suite with an
-existing process boundary and can run against a Rust binary once `--api` is
-implemented.
+The Go test runner invokes Go packages directly, so replacing `built/local/tsgo`
+does not reuse the compiler baselines. The Rust port needs a native baseline
+runner that reads the same directive-based cases and produces the same
+`.errors.txt`, `.js`, `.types`, `.symbols`, source-map, and trace artifacts. The
+native-preview API suite is the first upstream suite with an existing process
+boundary and can run against a Rust binary once `--api` is implemented.
 
 Near-term gates are:
 

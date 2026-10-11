@@ -23,13 +23,13 @@ equivalent method references. Strict Clippy passed after those style changes.
 
 The semantic smoke report compares diagnostics, `.types`, and `.symbols`:
 
-| Outcome | Variants |
-| --- | ---: |
-| Executed | 95 |
-| Exact | 40 |
-| Unsupported | 50 |
-| Artifact mismatch | 5 |
-| Fatal invariant | 0 |
+| Outcome           | Variants |
+| ----------------- | -------: |
+| Executed          |       95 |
+| Exact             |       40 |
+| Unsupported       |       50 |
+| Artifact mismatch |        5 |
+| Fatal invariant   |        0 |
 
 One upstream skip remains. These three cases became exact, with no exact losses:
 
@@ -49,16 +49,19 @@ object typedef names. Its callback type still prints as a function rather than
 
 - Generic references retain cross-file defaults and skip unused default work.
 - Signature positions preserve fixed tuple and tuple-union argument rules.
-- Namespace preparation retains source identity and rejects cycles before writes.
+- Namespace preparation retains source identity and rejects cycles before
+  writes.
 - Computed binding keys keep diagnostics and cached annotations consistent.
-- JSDoc overload grouping uses decoded tag names without changing source offsets.
+- JSDoc overload grouping uses decoded tag names without changing source
+  offsets.
 - Canonical project config loading handles empty roots and explicit boundaries.
-- `tsgo --check-canonical PROJECT` checks an on-disk config through the canonical
-  checker. It does not emit or fall back to the legacy checker. Unsupported
-  checking and `noCheck` return nonzero status. Normal compile, build, and watch
-  behavior is unchanged.
+- `tsgo --check-canonical PROJECT` checks an on-disk config through the
+  canonical checker. It does not emit or fall back to the legacy checker.
+  Unsupported checking and `noCheck` return nonzero status. Normal compile,
+  build, and watch behavior is unchanged.
 - Location-aware display uses visible aliases and package routes from the
-  containing file. Failed queries do not retain alias or synthetic namespace writes.
+  containing file. Failed queries do not retain alias or synthetic namespace
+  writes.
 - Qualified JSDoc object typedefs retain distinct identities. Warm reuse and
   display validate their full member graphs without depending on output limits.
 - Generic union aliases print their stored type arguments. JSX symbol queries
@@ -105,10 +108,11 @@ Structured diagnostics must not be counted as that artifact.
 ## Build rules
 
 Use a worktree-exclusive target directory under the main workspace's
-`target/worktrees`. Keep absolute manifest paths and the shared Cargo lock.
-Use `TS_CARGO_MEMORY_LIMIT_KIB=16777216` and `RUST_MIN_STACK=16777216` with
-`scripts/run-cargo-capped.sh`. New production APIs need a non-test library check.
+`target/worktrees`. Keep absolute manifest paths and the shared Cargo lock. Use
+`TS_CARGO_MEMORY_LIMIT_KIB=16777216` and `RUST_MIN_STACK=16777216` with
+`scripts/run-cargo-capped.sh`. New production APIs need a non-test library
+check.
 
 New source worktrees belong under the main workspace's `target/agent-worktrees`,
-not the nearly full `/tmp` filesystem. Each writer owns named files or functions.
-Root owns integration, full verification, and fixed upstream reports.
+not the nearly full `/tmp` filesystem. Each writer owns named files or
+functions. Root owns integration, full verification, and fixed upstream reports.

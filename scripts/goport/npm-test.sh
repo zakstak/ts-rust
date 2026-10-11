@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016 # Embedded child programs intentionally expand in the child interpreter.
 # Installs an npm-pack.sh package set into a fresh project and checks that tsc through npm gives
 # the same output as the native tsc run directly.
 #
@@ -23,9 +24,16 @@
 # Prints one line per check and ends with "npm-test: PASS" or "npm-test: FAIL (<n>)".
 set -uo pipefail
 repo=/home/theo/Code/sandbox/ts-rust
-usage() { sed -n '5,9p' "$0" >&2; exit 2; }
+usage() {
+  sed -n '5,9p' "$0" >&2
+  exit 2
+}
 name=typescript
-if [[ ${1:-} == --name ]]; then [[ $# -ge 2 ]] || usage; name=$2; shift 2; fi
+if [[ ${1:-} == --name ]]; then
+  [[ $# -ge 2 ]] || usage
+  name=$2
+  shift 2
+fi
 case $name in
   typescript) plat=@typescript/typescript-linux-x64 bin=tsc ;;
   tsc-rs) plat=@tsc-rs/linux-x64 bin=tsc-rs ;;
@@ -38,13 +46,22 @@ rm -rf "$work"
 mkdir -p "$proj" "$out"
 plat_tgz=${plat#@}
 tgz=("$pkg/${plat_tgz/\//-}"-*.tgz "$pkg/$name"-[0-9]*.tgz)
-[[ ${#tgz[@]} == 2 && -f ${tgz[0]} && -f ${tgz[1]} ]] || { echo "no package set in $pkg" >&2; exit 2; }
-echo '{"name":"npm-test","private":true}' > "$proj/package.json"
-(cd "$proj" && npm install --offline --no-audit --no-fund --silent "${tgz[@]}") || { echo "npm install failed" >&2; exit 1; }
+[[ ${#tgz[@]} == 2 && -f ${tgz[0]} && -f ${tgz[1]} ]] || {
+  echo "no package set in $pkg" >&2
+  exit 2
+}
+echo '{"name":"npm-test","private":true}' >"$proj/package.json"
+(cd "$proj" && npm install --offline --no-audit --no-fund --silent "${tgz[@]}") || {
+  echo "npm install failed" >&2
+  exit 1
+}
 
 fails=0
 check() { # check <name> <ok 0|1> [detail]
-  if [[ $2 == 0 ]]; then echo "ok   $1"; else echo "FAIL $1${3:+: $3}"; fails=$((fails + 1)); fi
+  if [[ $2 == 0 ]]; then echo "ok   $1"; else
+    echo "FAIL $1${3:+: $3}"
+    fails=$((fails + 1))
+  fi
 }
 nm="$proj/node_modules"
 direct="$nm/$plat/lib/tsc"
@@ -53,80 +70,82 @@ declare -A ways=([direct]="$direct" [npm]="$nm/.bin/$bin" [node]="node $nm/$name
 want=$("$direct" --version)
 native=0
 grep -q '"postinstall"' "$nm/$name/package.json" && native=1
-echo > "$out/a.ts"
+echo >"$out/a.ts"
 
 # bins <tag> <node_modules>: the bin checks, for npm-test's npm project and the pnpm project.
 bins() {
-  local tag=$1 nm=$2 lib_dir listed v env=() how=""
+  local tag=$1 nm=$2 lib_dir listed v status env=() how=""
   local b=$nm/$name/bin/$bin
   if ((native)); then
-    [[ -f $b && ! -L $b && -x $b && $(sed -n '1p;3p' "$b") == $'#!/bin/sh\nimport "../lib/tsc.js";' ]]
-    check "$tag bin/$bin is the sh and JS polyglot" $? "$(ls -l "$b")"
+    if [[ -f $b && ! -L $b && -x $b && $(sed -n '1p;3p' "$b") == $'#!/bin/sh\nimport "../lib/tsc.js";' ]]; then status=0; else status=1; fi
+    check "$tag bin/$bin is the sh and JS polyglot" "$status" "$(ls -l "$b")"
     # Node fails to start with this NODE_OPTIONS; the native tsc ignores it.
     env=(NODE_OPTIONS=--require=/npm-test/no-node) how=" without Node"
   else
-    [[ ! -L $b ]] && head -1 "$b" | grep -q node
-    check "$tag bin/$bin is Go's JS launcher" $?
+    if [[ ! -L $b ]] && head -1 "$b" | grep -q node; then status=0; else status=1; fi
+    check "$tag bin/$bin is Go's JS launcher" "$status"
   fi
   for x in "$b" "$nm/.bin/$bin"; do
-    [[ $(env "${env[@]}" "$x" --version 2>&1) == "$want" ]]
-    check "$tag ${x#"$nm"/} --version$how: $want" $?
+    if [[ $(env "${env[@]}" "$x" --version 2>&1) == "$want" ]]; then status=0; else status=1; fi
+    check "$tag ${x#"$nm"/} --version$how: $want" "$status"
   done
   v=$(node "$b" --version 2>&1)
-  [[ $v == "$want" ]]
-  check "$tag node $name/bin/$bin --version: $want" $? "$(grep -m1 Error <<< "$v" || head -1 <<< "$v")"
+  if [[ $v == "$want" ]]; then status=0; else status=1; fi
+  check "$tag node $name/bin/$bin --version: $want" "$status" "$(grep -m1 Error <<<"$v" || head -1 <<<"$v")"
   # The platform package is a sibling of the main package (npm hoists both; pnpm links both into
   # the main package's .pnpm/<pkg>/node_modules).
   lib_dir=$(realpath "$(dirname "$(realpath "$nm/$name")")/$plat/lib")
   for x in "$nm/.bin/$bin" "node $b"; do
     listed=$(cd "$out" && $x --listFilesOnly --lib es5 a.ts 2>&1)
-    grep -q "^$lib_dir/lib.es5.d.ts$" <<< "$listed"
-    check "$tag ${x//"$nm/"/} lists $lib_dir/lib.es5.d.ts" $? "$(head -1 <<< "$listed")"
+    grep -q "^$lib_dir/lib.es5.d.ts$" <<<"$listed"
+    status=$?
+    check "$tag ${x//"$nm/"/} lists $lib_dir/lib.es5.d.ts" "$status" "$(head -1 <<<"$listed")"
   done
 }
 
 bins npm "$nm"
 # A failed chmod in the postinstall leaves no bin/<bin>.<pid>.tmp and does not change the bin.
 if ((native)); then
-  b=$nm/$name/bin/$bin before=$(sha256sum < "$nm/$name/bin/$bin")
+  b=$nm/$name/bin/$bin before=$(sha256sum <"$nm/$name/bin/$bin")
   printf '%s\n' 'const fs = require("node:fs");' \
     'fs.chmodSync = () => { throw Object.assign(new Error("EPERM: chmod"), { code: "EPERM" }); };' \
-    > "$work/chmod-fails.cjs"
+    >"$work/chmod-fails.cjs"
   warn=$(node --require "$work/chmod-fails.cjs" "$nm/$name/lib/install.js" 2>&1)
   tmps=$(find "$nm/$name/bin" -name "$bin.*.tmp")
-  [[ -z $tmps && $(sha256sum < "$b") == "$before" && $warn == *EPERM* ]]
-  check "a failed chmod in the postinstall leaves no temp file and keeps bin/$bin" $? "${tmps:-$warn}"
+  if [[ -z $tmps && $(sha256sum <"$b") == "$before" && $warn == *EPERM* ]]; then status=0; else status=1; fi
+  check "a failed chmod in the postinstall leaves no temp file and keeps bin/$bin" "$status" "${tmps:-$warn}"
   # A native path that names no file (pnpm's side-effects cache in another layout): the bin runs
   # Go's launcher with Node.
   cp -p "$b" "$work/bin.keep"
   sed -i '2s|t="${p%/\*}/[^"]*"|t="${p%/*}/../no-such-dir/tsc"|' "$b"
   v=$("$nm/.bin/$bin" --version 2>&1)
-  [[ $v == "$want" ]] && grep -q no-such-dir "$b"
-  check "a bin whose native path names no file runs Go's launcher: $want" $? "$v"
+  if [[ $v == "$want" ]] && grep -q no-such-dir "$b"; then status=0; else status=1; fi
+  check "a bin whose native path names no file runs Go's launcher: $want" "$status" "$v"
   cp -p "$work/bin.keep" "$b"
 fi
-[[ $(${ways[js]} --version) == "$want" ]]
-check "js --version: $want" $?
+if [[ $(${ways[js]} --version) == "$want" ]]; then status=0; else status=1; fi
+check "js --version: $want" "$status"
 lib_dir=$(realpath "$(dirname "$direct")")
 for w in direct js; do
   listed=$(cd "$out" && ${ways[$w]} --listFilesOnly --lib es5 a.ts)
-  grep -q "^$lib_dir/lib.es5.d.ts$" <<< "$listed"
-  check "$w lists $lib_dir/lib.es5.d.ts" $? "$(head -1 <<< "$listed")"
+  grep -q "^$lib_dir/lib.es5.d.ts$" <<<"$listed"
+  status=$?
+  check "$w lists $lib_dir/lib.es5.d.ts" "$status" "$(head -1 <<<"$listed")"
 done
 
 P=$repo/target/project-inputs
 declare -A cfgs=([query]=$P/query/source/packages/query-core/tsconfig.prod.json [hono]=$P/hono/source/tsconfig.build.json)
 for p in query hono; do
   for w in direct npm node js; do
-    (cd "$out" && ${ways[$w]} -p "${cfgs[$p]}" --outDir "$out/$p-$w" --pretty false > "$out/$p-$w.stdout" 2>&1)
-    echo "exit $?" >> "$out/$p-$w.stdout"
+    (cd "$out" && ${ways[$w]} -p "${cfgs[$p]}" --outDir "$out/$p-$w" --pretty false >"$out/$p-$w.stdout" 2>&1)
+    echo "exit $?" >>"$out/$p-$w.stdout"
   done
   # Take each status before the label: a $(...) in the label would reset $?.
   for w in npm node js; do
     cmp -s "$out/$p-direct.stdout" "$out/$p-$w.stdout"
     r=$?
-    check "$p $w stdout and exit code equal direct ($(tail -1 "$out/$p-direct.stdout"), $(($(wc -l < "$out/$p-direct.stdout") - 1)) lines)" $r
-    diff -rq "$out/$p-direct" "$out/$p-$w" > /dev/null 2>&1
+    check "$p $w stdout and exit code equal direct ($(tail -1 "$out/$p-direct.stdout"), $(($(wc -l <"$out/$p-direct.stdout") - 1)) lines)" $r
+    diff -rq "$out/$p-direct" "$out/$p-$w" >/dev/null 2>&1
     r=$?
     check "$p $w emit equals direct ($(find "$out/$p-direct" -type f | wc -l) files)" $r
   done
@@ -137,12 +156,12 @@ mv "$proj" "$work/moved"
 bins moved "$work/moved/node_modules"
 mv "$work/moved" "$proj"
 
-if command -v pnpm > /dev/null; then
+if command -v pnpm >/dev/null; then
   pp="$work/pnpm"
   mkdir -p "$pp"
-  echo "{\"name\":\"npm-test-pnpm\",\"private\":true,\"dependencies\":{\"$name\":\"file:${tgz[1]}\"}}" > "$pp/package.json"
-  printf 'overrides:\n  "%s": "file:%s"\ndangerouslyAllowAllBuilds: true\n' "$plat" "${tgz[0]}" > "$pp/pnpm-workspace.yaml"
-  if (cd "$pp" && pnpm install --offline --silent --store-dir "$work/pnpm-store" > "$work/pnpm.log" 2>&1); then
+  echo "{\"name\":\"npm-test-pnpm\",\"private\":true,\"dependencies\":{\"$name\":\"file:${tgz[1]}\"}}" >"$pp/package.json"
+  printf 'overrides:\n  "%s": "file:%s"\ndangerouslyAllowAllBuilds: true\n' "$plat" "${tgz[0]}" >"$pp/pnpm-workspace.yaml"
+  if (cd "$pp" && pnpm install --offline --silent --store-dir "$work/pnpm-store" >"$work/pnpm.log" 2>&1); then
     bins pnpm "$pp/node_modules"
   else
     check "pnpm install" 1 "$(tail -3 "$work/pnpm.log")"
@@ -151,5 +170,8 @@ else
   echo "skip pnpm (not on PATH)"
 fi
 
-if ((fails)); then echo "npm-test: FAIL ($fails)"; exit 1; fi
+if ((fails)); then
+  echo "npm-test: FAIL ($fails)"
+  exit 1
+fi
 echo "npm-test: PASS"

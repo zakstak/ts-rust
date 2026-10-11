@@ -1,7 +1,7 @@
 # Namespace alias view invariant review
 
-No further source-level invariant issue was found in follow-up `3a336ec7`.
-It closes the parent check missed by `c05d045c`. Root's follow-up gate remains
+No further source-level invariant issue was found in follow-up `3a336ec7`. It
+closes the parent check missed by `c05d045c`. Root's follow-up gate remains
 pending. The added public scope probe passed on `c05d045c`. These results are
 separate. No production code was authored in this review.
 
@@ -16,12 +16,12 @@ without that check.
 
 Root's unchanged new test,
 `namespace_wrapper_symbol_chains_keep_source_ownership`, fails at
-`formatter.rs:11703` in its combined run. The source trace identifies the
-second mutation, which gives the source export `value` a wrapper parent. The
-artifact helper passes `SymbolFlags::NONE`, so the local value parameter does
-not force qualification. The source module's accessible export returns before
-the guard. Giving the wrapper itself a parent is already rejected by the exact
-wrapper proof.
+`formatter.rs:11703` in its combined run. The source trace identifies the second
+mutation, which gives the source export `value` a wrapper parent. The artifact
+helper passes `SymbolFlags::NONE`, so the local value parameter does not force
+qualification. The source module's accessible export returns before the guard.
+Giving the wrapper itself a parent is already rejected by the exact wrapper
+proof.
 
 Root's `3a336ec7e033a4f0faef83715efbdf84e6908997` moves the same rejection into
 `validate_symbol`, before any accessible-chain lookup. The genuine-wrapper
@@ -39,20 +39,21 @@ check does not reject any of those valid owners.
 
 - Candidate: `c05d045c4a5351d796da1be9951d1e76e62b9445`.
 - Follow-up reviewed: `3a336ec7e033a4f0faef83715efbdf84e6908997`.
-- Before-fix source and original probe: `03c26a34be2c0dad44140b5d424f975bd7d2639e`.
+- Before-fix source and original probe:
+  `03c26a34be2c0dad44140b5d424f975bd7d2639e`.
 - Added probe: `768242ba787ae7b2710cd799bb15f489fce6ea30`.
 - Branch: `agent/wave147-namespace-alias-view-invariants`.
 - Worktree: `target/agent-worktrees/wave147/namespace-alias-view-invariants`.
 
-The probe worktree kept `c05d045c` production code for the entire test run.
-The follow-up was reviewed from its exact Git diff and root's fixed worktree.
-The quote-flags test from `3b956761` is unchanged. Both original public probes
-have the same Git blobs in their original commits and both candidates:
+The probe worktree kept `c05d045c` production code for the entire test run. The
+follow-up was reviewed from its exact Git diff and root's fixed worktree. The
+quote-flags test from `3b956761` is unchanged. Both original public probes have
+the same Git blobs in their original commits and both candidates:
 
-| Probe | Original commit | Git blob |
-| --- | --- | --- |
+| Probe                                 | Original commit                    | Git blob                                   |
+| ------------------------------------- | ---------------------------------- | ------------------------------------------ |
 | Cross-source wrapped and bare display | `0049d737`, imported as `592b5b75` | `a9d24b4afcc49653aad61bc7705728f945d9ed0f` |
-| Renamed alias for the same wrapper | `03c26a34` | `fe8d3f8ebeda0c2cf2cbffe2d4784181fda0a704` |
+| Renamed alias for the same wrapper    | `03c26a34`                         | `fe8d3f8ebeda0c2cf2cbffe2d4784181fda0a704` |
 
 ## Identity and ownership
 
@@ -85,9 +86,9 @@ checkpoint after an error. Existing tests cover changed origins, aliases,
 owners, cached types, and cold visible or nested aliases.
 
 The private `artifact_symbol_chain` helper has no separate transaction. Its new
-root test runs after alias warm-up. This review does not claim that a cold direct
-call to that helper leaves alias caches unchanged. The public caller owns that
-guarantee, and this commit does not change that boundary.
+root test runs after alias warm-up. This review does not claim that a cold
+direct call to that helper leaves alias caches unchanged. The public caller owns
+that guarantee, and this commit does not change that boundary.
 
 ## Added probe
 
@@ -111,18 +112,20 @@ public test.
 
 ## Evidence
 
-Root's saved baseline log, `target/wave147-namespace-alias-before.log`, shows the
-unchanged `03c26a34` probe failing on the before-fix source. It reports missing
-module specifiers in the caller without a direct import and import spelling
-instead of `typeof routed` in the caller with a direct import.
+Root's saved baseline log, `target/wave147-namespace-alias-before.log`, shows
+the unchanged `03c26a34` probe failing on the before-fix source. It reports
+missing module specifiers in the caller without a direct import and import
+spelling instead of `typeof routed` in the caller with a direct import.
 
 Root collected combined session `81496` with 4,411 passes and one failure across
 18 binaries. Only the new ownership unit failed. All 4,410 prior controls and
 the new same-owner alias public test passed. The log is
-`target/wave147-namespace-alias-fixed.log`. This review did not repeat the batch.
+`target/wave147-namespace-alias-fixed.log`. This review did not repeat the
+batch.
 
 Root's follow-up session `94249` is queued on `3a336ec7`. Its log is
-`target/wave147-namespace-alias-parent-fixed.log`. The result is not yet claimed.
+`target/wave147-namespace-alias-parent-fixed.log`. The result is not yet
+claimed.
 
 The new probe passed in session `29338` on `c05d045c` plus test-only commit
 `768242ba`. The session is collected with exit code 0. It ran one test, with no
@@ -139,13 +142,20 @@ Changed-file rustfmt and the candidate-range whitespace check pass.
 
 SHA-256 values:
 
-- `formatter.rs`: `8206de83ecfdae8fa852bfc47413612f1052a5c2e2b91cc6f1f5e74b76dc20c4`.
-- `symbol_display.rs`: `ed0b3deac7171b4dc992f5a18e67495df88453296dfc1e5c054c4e64091ce4f1`.
-- Follow-up `symbol_display.rs`: `716816ac578702dc1752b40856fced36b6c92e5bc2feb3c5359159a5aa2eed67`.
-- New scope probe: `96dfe88a1353696e7ef872be2c030a457e5d6d6913d2cbbd4b70dfbfd4a76d3c`.
-- Before-fix log: `2b5e91f4339f1ae860748d45b4016bc5b9c41387486a5afb727fdcaacf8fce66`.
-- First candidate combined log: `12eed3191732c8d0327400ee67564436c2f9c9a7b2e4237a7c004ea67b0d6e62`.
-- New scope probe log: `d16085f40546eadc4ebd759d89aae415574be2f3dcbdff9f083d1a7b0bf45b74`.
+- `formatter.rs`:
+  `8206de83ecfdae8fa852bfc47413612f1052a5c2e2b91cc6f1f5e74b76dc20c4`.
+- `symbol_display.rs`:
+  `ed0b3deac7171b4dc992f5a18e67495df88453296dfc1e5c054c4e64091ce4f1`.
+- Follow-up `symbol_display.rs`:
+  `716816ac578702dc1752b40856fced36b6c92e5bc2feb3c5359159a5aa2eed67`.
+- New scope probe:
+  `96dfe88a1353696e7ef872be2c030a457e5d6d6913d2cbbd4b70dfbfd4a76d3c`.
+- Before-fix log:
+  `2b5e91f4339f1ae860748d45b4016bc5b9c41387486a5afb727fdcaacf8fce66`.
+- First candidate combined log:
+  `12eed3191732c8d0327400ee67564436c2f9c9a7b2e4237a7c004ea67b0d6e62`.
+- New scope probe log:
+  `d16085f40546eadc4ebd759d89aae415574be2f3dcbdff9f083d1a7b0bf45b74`.
 
 ## Limits
 
@@ -153,5 +163,5 @@ This is a scoped invariant review. It does not claim a new Go oracle result,
 full workspace coverage, strict Clippy, full parity, whole-root approval, or
 primary promotion. The new 48-call probe was not rerun on `3a336ec7`. Root's
 follow-up gate is still required. The separate f265 class/enum hold and the
-missing-specifier naming limit remain open. No earlier evidence or baseline
-was changed.
+missing-specifier naming limit remain open. No earlier evidence or baseline was
+changed.

@@ -42,7 +42,7 @@ XTEXT="${GOMODCACHE:-$HOME/go/pkg/mod}/golang.org/x/text@v0.42.0"
 GO="${GO:-go}"
 mkdir -p "$WORK"
 
-export GOTOOLCHAIN=local GOFLAGS= GO111MODULE=on GOPROXY=off GOWORK=off
+export GOTOOLCHAIN=local GOFLAGS='' GO111MODULE=on GOPROXY=off GOWORK=off
 "$GO" version | grep -q 'go1.27.1 ' || {
   echo "gen.sh: $GO is not go1.27.1 (set GO=<path to a go1.27.1 go>)" >&2
   exit 1

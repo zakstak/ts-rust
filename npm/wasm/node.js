@@ -17,8 +17,10 @@ let modulePromise;
 
 /** The compiled module, compiled on first use. */
 export function loadModule() {
-    modulePromise ??= readFile(wasmUrl).then(bytes => WebAssembly.compile(bytes));
-    return modulePromise;
+  modulePromise ??= readFile(wasmUrl).then((bytes) =>
+    WebAssembly.compile(bytes),
+  );
+  return modulePromise;
 }
 
 /**
@@ -35,53 +37,55 @@ export function loadModule() {
  * `diagnostics` and does not print them.
  */
 export async function tsc(args, options = {}) {
-    const module = await loadModule();
-    const files = options.files === undefined
-        ? undefined
-        : options.files instanceof Map
+  const module = await loadModule();
+  const files =
+    options.files === undefined
+      ? undefined
+      : options.files instanceof Map
         ? options.files
         : new Map(Object.entries(options.files));
-    const request = {
-        module,
-        args,
-        cwd: toPosix(options.cwd ?? getwd()),
-        files,
-        env: options.env ?? {},
-        diagnosticsJson: options.diagnostics === "json",
-        tty: options.tty ?? false,
-        stream: options.stream ?? false,
-    };
-    // Bun ignores `stackSizeMb`, and its workers have less stack than its
-    // main thread, so the run stays on this thread there.
-    if (process.versions.bun) {
-        const { runRequest } = await import("./node-run.js");
-        return settle(runRequest(request));
-    }
-    const worker = new Worker(new URL("./node-worker.js", import.meta.url), {
-        workerData: request,
-        resourceLimits: { stackSizeMb: options.stackSizeMb ?? STACK_SIZE_MB },
-        stdout: !options.stream,
-        stderr: !options.stream,
+  const request = {
+    module,
+    args,
+    cwd: toPosix(options.cwd ?? getwd()),
+    files,
+    env: options.env ?? {},
+    diagnosticsJson: options.diagnostics === "json",
+    tty: options.tty ?? false,
+    stream: options.stream ?? false,
+  };
+  // Bun ignores `stackSizeMb`, and its workers have less stack than its
+  // main thread, so the run stays on this thread there.
+  if (process.versions.bun) {
+    const { runRequest } = await import("./node-run.js");
+    return settle(runRequest(request));
+  }
+  const worker = new Worker(new URL("./node-worker.js", import.meta.url), {
+    workerData: request,
+    resourceLimits: { stackSizeMb: options.stackSizeMb ?? STACK_SIZE_MB },
+    stdout: !options.stream,
+    stderr: !options.stream,
+  });
+  return new Promise((resolve, reject) => {
+    let result;
+    worker.on("message", (message) => (result = message));
+    worker.on("error", reject);
+    worker.on("exit", () => {
+      try {
+        if (!result) throw new Error("ts-rust worker ended without a result");
+        resolve(settle(result));
+      } catch (error) {
+        reject(error);
+      }
     });
-    return new Promise((resolve, reject) => {
-        let result;
-        worker.on("message", message => (result = message));
-        worker.on("error", reject);
-        worker.on("exit", () => {
-            try {
-                if (!result) throw new Error("ts-rust worker ended without a result");
-                resolve(settle(result));
-            } catch (error) {
-                reject(error);
-            }
-        });
-    });
+  });
 }
 
 /** The result of `runRequest`, or its crash as a thrown error. */
 function settle(result) {
-    if (result.error) throw Object.assign(new Error(result.error), { stderr: result.stderr });
-    return result;
+  if (result.error)
+    throw Object.assign(new Error(result.error), { stderr: result.stderr });
+  return result;
 }
 
 /**
@@ -92,19 +96,20 @@ function settle(result) {
  * would print other paths than the native tsgo.
  */
 function getwd() {
-    const cwd = process.cwd();
-    const pwd = process.env.PWD;
-    if (process.platform === "win32" || !pwd?.startsWith("/") || pwd === cwd) return cwd;
-    try {
-        const dot = statSync(".");
-        const dir = statSync(pwd);
-        return dot.dev === dir.dev && dot.ino === dir.ino ? pwd : cwd;
-    } catch {
-        return cwd;
-    }
+  const cwd = process.cwd();
+  const pwd = process.env.PWD;
+  if (process.platform === "win32" || !pwd?.startsWith("/") || pwd === cwd)
+    return cwd;
+  try {
+    const dot = statSync(".");
+    const dir = statSync(pwd);
+    return dot.dev === dir.dev && dot.ino === dir.ino ? pwd : cwd;
+  } catch {
+    return cwd;
+  }
 }
 
 /** `C:\a\b` to `C:/a/b`: tsc paths use `/`. */
 function toPosix(path) {
-    return path.replaceAll("\\", "/");
+  return path.replaceAll("\\", "/");
 }

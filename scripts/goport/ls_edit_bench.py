@@ -81,12 +81,24 @@ PINNED = bool(shutil.which("taskset") and shutil.which("setpriv"))
 # root: server cwd and rootUri. main: the edited file. dep: a second open file that main can import
 # (imports scenario). spec: the import specifier for dep as written in main's module style.
 PROJECTS = {
-    "query-core": {"root": f"{INPUTS}/query/source/packages/query-core", "main": "src/queryObserver.ts",
-                   "dep": "src/utils.ts", "spec": "'./utils'"},
-    "hono": {"root": f"{INPUTS}/hono/source", "main": "src/hono-base.ts", "dep": "src/utils/url.ts",
-             "spec": "'./utils/url'"},
-    "effect": {"root": f"{INPUTS}/effect/source/packages/effect", "main": "src/Option.ts",
-               "dep": "src/Predicate.ts", "spec": '"./Predicate.ts"'},
+    "query-core": {
+        "root": f"{INPUTS}/query/source/packages/query-core",
+        "main": "src/queryObserver.ts",
+        "dep": "src/utils.ts",
+        "spec": "'./utils'",
+    },
+    "hono": {
+        "root": f"{INPUTS}/hono/source",
+        "main": "src/hono-base.ts",
+        "dep": "src/utils/url.ts",
+        "spec": "'./utils/url'",
+    },
+    "effect": {
+        "root": f"{INPUTS}/effect/source/packages/effect",
+        "main": "src/Option.ts",
+        "dep": "src/Predicate.ts",
+        "spec": '"./Predicate.ts"',
+    },
 }
 
 # VS Code-like settings (same as the lsmem editor-mix repro). Auto-imports on; inlay hints on so the
@@ -97,7 +109,10 @@ CONFIG = {
         "suggest": {"autoImports": True, "includeCompletionsForImportStatements": True},
         "preferences": {"includePackageJsonAutoImports": "auto"},
         "inlayHints": {
-            "parameterNames": {"enabled": "all", "suppressWhenArgumentMatchesName": False},
+            "parameterNames": {
+                "enabled": "all",
+                "suppressWhenArgumentMatchesName": False,
+            },
             "parameterTypes": {"enabled": True},
             "variableTypes": {"enabled": True, "suppressWhenTypeMatchesName": False},
             "propertyDeclarationTypes": {"enabled": True},
@@ -118,32 +133,88 @@ CAPABILITIES = {
     "experimental": {"hoverVerbosityLevel": True},
     "textDocument": {
         "completion": {
-            "completionItem": {"snippetSupport": True, "commitCharactersSupport": True, "preselectSupport": True,
-                               "labelDetailsSupport": True, "insertReplaceSupport": True,
-                               "documentationFormat": MARKDOWN_PLAIN},
+            "completionItem": {
+                "snippetSupport": True,
+                "commitCharactersSupport": True,
+                "preselectSupport": True,
+                "labelDetailsSupport": True,
+                "insertReplaceSupport": True,
+                "documentationFormat": MARKDOWN_PLAIN,
+            },
             "completionList": {"itemDefaults": ["commitCharacters", "editRange"]},
         },
         "diagnostic": {"relatedInformation": True, "tagSupport": DIAG_TAGS},
         "publishDiagnostics": {"relatedInformation": True, "tagSupport": DIAG_TAGS},
         "semanticTokens": {
             "requests": {"full": True},
-            "tokenTypes": ["namespace", "class", "enum", "interface", "struct", "typeParameter", "type", "parameter",
-                           "variable", "property", "enumMember", "decorator", "event", "function", "method", "macro",
-                           "label", "comment", "string", "keyword", "number", "regexp", "operator"],
-            "tokenModifiers": ["declaration", "definition", "readonly", "static", "deprecated", "abstract", "async",
-                               "modification", "documentation", "defaultLibrary", "local"],
+            "tokenTypes": [
+                "namespace",
+                "class",
+                "enum",
+                "interface",
+                "struct",
+                "typeParameter",
+                "type",
+                "parameter",
+                "variable",
+                "property",
+                "enumMember",
+                "decorator",
+                "event",
+                "function",
+                "method",
+                "macro",
+                "label",
+                "comment",
+                "string",
+                "keyword",
+                "number",
+                "regexp",
+                "operator",
+            ],
+            "tokenModifiers": [
+                "declaration",
+                "definition",
+                "readonly",
+                "static",
+                "deprecated",
+                "abstract",
+                "async",
+                "modification",
+                "documentation",
+                "defaultLibrary",
+                "local",
+            ],
             "formats": ["relative"],
         },
         "definition": {"linkSupport": True},
         "hover": {"contentFormat": MARKDOWN_PLAIN},
-        "signatureHelp": {"signatureInformation": {"documentationFormat": MARKDOWN_PLAIN,
-                                                   "parameterInformation": {"labelOffsetSupport": True},
-                                                   "activeParameterSupport": True},
-                          "contextSupport": True},
+        "signatureHelp": {
+            "signatureInformation": {
+                "documentationFormat": MARKDOWN_PLAIN,
+                "parameterInformation": {"labelOffsetSupport": True},
+                "activeParameterSupport": True,
+            },
+            "contextSupport": True,
+        },
         "documentSymbol": {"hierarchicalDocumentSymbolSupport": True},
-        "codeAction": {"codeActionLiteralSupport": {"codeActionKind": {"valueSet": [
-            "", "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source",
-            "source.organizeImports"]}}, "resolveSupport": {"properties": ["edit"]}},
+        "codeAction": {
+            "codeActionLiteralSupport": {
+                "codeActionKind": {
+                    "valueSet": [
+                        "",
+                        "quickfix",
+                        "refactor",
+                        "refactor.extract",
+                        "refactor.inline",
+                        "refactor.rewrite",
+                        "source",
+                        "source.organizeImports",
+                    ]
+                }
+            },
+            "resolveSupport": {"properties": ["edit"]},
+        },
     },
     "workspace": {"workspaceEdit": {"documentChanges": True}, "configuration": True},
 }
@@ -155,13 +226,42 @@ CAPABILITIES = {
 # 9 of 24 such checks). Shorter sessions report growth without judging it.
 GROWTH_MIN_EDITS = 100
 LIMITS = [
-    ("growth", "growthMiBPerEdit", 2, 1, "MiB/edit",
-     f"RSS growth per edit (least-squares slope over the second half of the edits; sessions of "
-     f"{GROWTH_MIN_EDITS}+ edits) <= 2 x Go + 1 MiB"),
-    ("rss", "rssAdded", 2, 256, "MiB", "RSS added by the edits (last edit minus edit 0) <= 2 x Go + 256 MiB"),
-    ("editMedian", "editMedianMs", 1.5, 5, "ms", "median edit latency <= 1.5 x Go + 5 ms"),
+    (
+        "growth",
+        "growthMiBPerEdit",
+        2,
+        1,
+        "MiB/edit",
+        (
+            f"RSS growth per edit (least-squares slope over the second half of the edits; sessions of "
+            f"{GROWTH_MIN_EDITS}+ edits) <= 2 x Go + 1 MiB"
+        ),
+    ),
+    (
+        "rss",
+        "rssAdded",
+        2,
+        256,
+        "MiB",
+        "RSS added by the edits (last edit minus edit 0) <= 2 x Go + 256 MiB",
+    ),
+    (
+        "editMedian",
+        "editMedianMs",
+        1.5,
+        5,
+        "ms",
+        "median edit latency <= 1.5 x Go + 5 ms",
+    ),
     ("editP95", "editP95Ms", 2, 20, "ms", "p95 edit latency <= 2 x Go + 20 ms"),
-    ("roundMedian", "roundMedianMs", 2, 10, "ms", "median round latency <= 2 x Go + 10 ms"),
+    (
+        "roundMedian",
+        "roundMedianMs",
+        2,
+        10,
+        "ms",
+        "median round latency <= 2 x Go + 10 ms",
+    ),
 ]
 CHECKPOINTS = (0, 20, 40, 200)
 
@@ -194,14 +294,26 @@ class Doc:
 
     def pos(self, off):
         start = self.text.rfind("\n", 0, off) + 1
-        return {"line": self.text.count("\n", 0, off), "character": utf16_len(self.text[start:off])}
+        return {
+            "line": self.text.count("\n", 0, off),
+            "character": utf16_len(self.text[start:off]),
+        }
 
     def rng(self, a, b):
         return {"start": self.pos(a), "end": self.pos(b)}
 
     def open(self):
-        return ["textDocument/didOpen", {"textDocument": {"uri": self.uri, "languageId": "typescript",
-                                                          "version": self.version, "text": self.text}}]
+        return [
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": self.uri,
+                    "languageId": "typescript",
+                    "version": self.version,
+                    "text": self.text,
+                }
+            },
+        ]
 
     def change(self, *edits):
         """didChange with one range change per (start, end, new). Each edit is against the text after
@@ -217,14 +329,27 @@ class Doc:
                 elif m > a:
                     self.marks[k] = a
         self.version += 1
-        return ["textDocument/didChange", {"textDocument": {"uri": self.uri, "version": self.version},
-                                           "contentChanges": changes}]
+        return [
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": self.uri, "version": self.version},
+                "contentChanges": changes,
+            },
+        ]
 
     def boundaries(self):
         """Offsets where a new top-level statement can go: the newline that ends a blank line
         before a top-level declaration."""
         out, off, prev = [], 0, None
-        starts = ("export ", "/**", "function ", "const ", "class ", "interface ", "type ")
+        starts = (
+            "export ",
+            "/**",
+            "function ",
+            "const ",
+            "class ",
+            "interface ",
+            "type ",
+        )
         for line in self.text.split("\n"):
             if prev == "" and line.startswith(starts):
                 out.append(off - 1)
@@ -238,13 +363,26 @@ def diag(doc):
 
 
 def code_action(doc, rng, diagnostics):
-    return ["textDocument/codeAction", {"textDocument": {"uri": doc.uri}, "range": rng,
-                                        "context": {"diagnostics": diagnostics, "triggerKind": 2}}]
+    return [
+        "textDocument/codeAction",
+        {
+            "textDocument": {"uri": doc.uri},
+            "range": rng,
+            "context": {"diagnostics": diagnostics, "triggerKind": 2},
+        },
+    ]
 
 
 def completion(doc, pos, trigger=None):
-    ctx = {"triggerKind": 2, "triggerCharacter": trigger} if trigger else {"triggerKind": 1}
-    return ["textDocument/completion", {"textDocument": {"uri": doc.uri}, "position": pos, "context": ctx}]
+    ctx = (
+        {"triggerKind": 2, "triggerCharacter": trigger}
+        if trigger
+        else {"triggerKind": 1}
+    )
+    return [
+        "textDocument/completion",
+        {"textDocument": {"uri": doc.uri}, "position": pos, "context": ctx},
+    ]
 
 
 def mix_requests(doc, off, typed=""):
@@ -261,12 +399,22 @@ def mix_requests(doc, off, typed=""):
     last = doc.text.count("\n")
     reqs += [
         code_action(doc, {"start": cur, "end": cur}, []),
-        ["textDocument/inlayHint", {"textDocument": tdoc, "range": {
-            "start": {"line": max(0, cur["line"] - 30), "character": 0},
-            "end": {"line": min(last, cur["line"] + 30), "character": 0}}}],
+        [
+            "textDocument/inlayHint",
+            {
+                "textDocument": tdoc,
+                "range": {
+                    "start": {"line": max(0, cur["line"] - 30), "character": 0},
+                    "end": {"line": min(last, cur["line"] + 30), "character": 0},
+                },
+            },
+        ],
         ["textDocument/semanticTokens/full", {"textDocument": tdoc}],
         ["textDocument/documentSymbol", {"textDocument": tdoc}],
-        ["textDocument/hover", {"textDocument": tdoc, "position": doc.pos(max(0, off - 1))}],
+        [
+            "textDocument/hover",
+            {"textDocument": tdoc, "position": doc.pos(max(0, off - 1))},
+        ],
     ]
     return reqs
 
@@ -281,15 +429,21 @@ class Plan:
         # near 40% and 70% of the file when the file has them.
         b = self.main.boundaries()
         if len(b) < 2:
-            raise SystemExit(f"ls_edit_bench: {p['main']} has fewer than 2 top-level boundaries")
+            raise SystemExit(
+                f"ls_edit_bench: {p['main']} has fewer than 2 top-level boundaries"
+            )
         n = len(self.main.text)
         a1 = next((x for x in b if x >= 0.4 * n), b[-1])
         later = [x for x in b if x > a1]
-        a2 = next((x for x in later if x >= 0.7 * n), later[0] if later else [x for x in b if x < a1][-1])
+        a2 = next(
+            (x for x in later if x >= 0.7 * n),
+            later[0] if later else [x for x in b if x < a1][-1],
+        )
         self.main.marks.update(a1=a1, a2=a2)
 
 
 # Each generator yields one round per edit: (notifications, requests).
+
 
 def gen_typing(plan):
     doc = plan.main
@@ -311,8 +465,13 @@ def gen_errfix(plan):
         note = doc.change((a, a, line))
         doc.marks["errv"] = a + line.index(bad)
         n = a + line.index(name)
-        d = {"range": doc.rng(n, n + len(name)), "severity": 1, "code": 2322, "source": "ts",
-             "message": "Type 'string' is not assignable to type 'number'."}
+        d = {
+            "range": doc.rng(n, n + len(name)),
+            "severity": 1,
+            "code": 2322,
+            "source": "ts",
+            "message": "Type 'string' is not assignable to type 'number'.",
+        }
         yield [note], [diag(doc), code_action(doc, d["range"], [d])]
         v = doc.marks.pop("errv")
         yield [doc.change((v, v + len(bad), str(k)))], [diag(doc)]
@@ -336,7 +495,13 @@ def gen_imports(plan):
         a.marks["use"] = p
         s = p + use.index(name)
         r = a.rng(s, s + len(name))
-        d = {"range": r, "severity": 1, "code": 2304, "source": "ts", "message": f"Cannot find name '{name}'."}
+        d = {
+            "range": r,
+            "severity": 1,
+            "code": 2304,
+            "source": "ts",
+            "message": f"Cannot find name '{name}'.",
+        }
         yield [note], [diag(a), code_action(a, r, [d]), completion(a, r["end"])]
 
         imp = f"import {{ {name} }} from {plan.spec}\n"
@@ -362,8 +527,12 @@ def gen_mix(plan):
 
 
 def gen_long(plan):
-    gens = {"typing": gen_typing(plan), "errfix": gen_errfix(plan), "imports": gen_imports(plan),
-            "mix": gen_mix(plan)}
+    gens = {
+        "typing": gen_typing(plan),
+        "errfix": gen_errfix(plan),
+        "imports": gen_imports(plan),
+        "mix": gen_mix(plan),
+    }
     pattern = ["typing"] * 10 + ["errfix"] * 2 + ["imports"] * 5 + ["mix"] * 3
     i = 0
     while True:
@@ -392,13 +561,19 @@ def build_plan(project, scenario, edits):
     gen, _, with_dep, open_mix, _ = SCENARIOS[scenario]
     plan = Plan(project)
     docs = [plan.main, plan.dep] if with_dep else [plan.main]
-    reqs = mix_requests(plan.main, plan.main.marks["a2"]) if open_mix else [diag(plan.main)]
+    reqs = (
+        mix_requests(plan.main, plan.main.marks["a2"])
+        if open_mix
+        else [diag(plan.main)]
+    )
     reqs += [diag(d) for d in docs[1:]]
     rounds = [([d.open() for d in docs], reqs)]
     it = gen(plan)
     rounds += [next(it) for _ in range(edits)]
     root = PROJECTS[project]["root"]
-    digest = hashlib.sha256(json.dumps(rounds, sort_keys=True).replace(root, "@ROOT@").encode()).hexdigest()[:12]
+    digest = hashlib.sha256(
+        json.dumps(rounds, sort_keys=True).replace(root, "@ROOT@").encode()
+    ).hexdigest()[:12]
     return rounds, digest
 
 
@@ -416,14 +591,26 @@ class Server:
     taskset and dies with the harness (setpriv); elsewhere (macOS) it runs unpinned."""
 
     def __init__(self, binary, cwd, cpus, home, cap_mib, extra_env):
-        env = dict(os.environ, HOME=home, XDG_CACHE_HOME=f"{home}/.cache", XDG_CONFIG_HOME=f"{home}/.config",
-                   XDG_DATA_HOME=f"{home}/.local/share", **extra_env)
+        env = dict(
+            os.environ,
+            HOME=home,
+            XDG_CACHE_HOME=f"{home}/.cache",
+            XDG_CONFIG_HOME=f"{home}/.config",
+            XDG_DATA_HOME=f"{home}/.local/share",
+            **extra_env,
+        )
         argv = [binary, "--lsp", "--stdio"]
         if PINNED:
             argv = ["setpriv", "--pdeathsig", "KILL", "taskset", "-c", cpus, *argv]
         self.peak = 0
-        self.proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE)
+        self.proc = subprocess.Popen(
+            argv,
+            cwd=cwd,
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         self.inbox = queue.Queue()
         self.stderr = []
         self.capped = False
@@ -455,7 +642,9 @@ class Server:
 
     def _drain_stderr(self):
         for line in self.proc.stderr:
-            self.stderr = (self.stderr + [line.decode("utf-8", "replace").rstrip()[:300]])[-20:]
+            self.stderr = (
+                self.stderr + [line.decode("utf-8", "replace").rstrip()[:300]]
+            )[-20:]
 
     def _watch_rss(self):
         while self.proc.poll() is None:
@@ -476,11 +665,18 @@ class Server:
                     for line in f:
                         k, _, v = line.partition(":")
                         if k in ("VmRSS", "VmHWM"):
-                            out["rss" if k == "VmRSS" else "hwm"] = int(v.split()[0]) // 1024
+                            out["rss" if k == "VmRSS" else "hwm"] = (
+                                int(v.split()[0]) // 1024
+                            )
             except OSError:
                 pass
             return out
-        ps = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True).stdout.split()
+        ps = subprocess.run(
+            ["ps", "-o", "rss=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.split()
         if not ps:
             return {}
         self.peak = max(self.peak, int(ps[0]) // 1024)
@@ -502,7 +698,11 @@ class Server:
         if m == "workspace/configuration":
             items = (req.get("params") or {}).get("items") or []
             reply = {"result": [CONFIG.get(it.get("section")) for it in items]}
-        elif m in ("client/registerCapability", "client/unregisterCapability", "window/workDoneProgress/create"):
+        elif m in (
+            "client/registerCapability",
+            "client/unregisterCapability",
+            "window/workDoneProgress/create",
+        ):
             reply = {"result": None}
         else:
             reply = {"error": {"code": -32601, "message": f"Unknown method: {m}"}}
@@ -641,9 +841,16 @@ def run_session(args, project, rounds, binary, pace_ms, extra_env=None):
     server = Server(binary, root, args.cpus, home, args.rss_cap_mib, extra_env or {})
     rows, answers, error, init_ms = [], [], None, None
     try:
-        init = {"processId": None, "rootUri": "file://" + urllib.parse.quote(root), "locale": "en-US",
-                "capabilities": CAPABILITIES,
-                "initializationOptions": {"disablePushDiagnostics": True, "logVerbosity": 0}}
+        init = {
+            "processId": None,
+            "rootUri": "file://" + urllib.parse.quote(root),
+            "locale": "en-US",
+            "capabilities": CAPABILITIES,
+            "initializationOptions": {
+                "disablePushDiagnostics": True,
+                "logVerbosity": 0,
+            },
+        }
         t0 = time.monotonic()
         server.burst([["initialize", init]], args.timeout)
         server.notify("initialized", {})
@@ -658,7 +865,9 @@ def run_session(args, project, rounds, binary, pace_ms, extra_env=None):
             got = []
             for (method, _), (rms, msg) in zip(reqs, res):
                 norm = normalize(method, msg)
-                row["req"].append([method, round(rms, 2), "error" if "error" in norm else "ok"])
+                row["req"].append(
+                    [method, round(rms, 2), "error" if "error" in norm else "ok"]
+                )
                 got.append(zlib.compress(canon(norm).encode(), 1))
             rows.append(row)
             answers.append(got)
@@ -670,8 +879,15 @@ def run_session(args, project, rounds, binary, pace_ms, extra_env=None):
         idle = server.mem()
         code = server.close()
         shutil.rmtree(home, ignore_errors=True)
-    rec = {"binary": binary, "sha256": sha256_12(binary), "initMs": init_ms and round(init_ms, 1),
-           "error": error, "exit": code, "idle": idle, "rows": rows}
+    rec = {
+        "binary": binary,
+        "sha256": sha256_12(binary),
+        "initMs": init_ms and round(init_ms, 1),
+        "error": error,
+        "exit": code,
+        "idle": idle,
+        "rows": rows,
+    }
     return rec, answers
 
 
@@ -681,7 +897,7 @@ def median(xs):
 
 def p95(xs):
     xs = sorted(xs)
-    return xs[min(len(xs) - 1, int(round(0.95 * (len(xs) - 1))))] if xs else None
+    return xs[min(len(xs) - 1, round(0.95 * (len(xs) - 1)))] if xs else None
 
 
 def slope(points):
@@ -697,9 +913,17 @@ def slope(points):
 def summarize(rec, edits):
     rows = rec["rows"]
     done = [r for r in rows if r["edit"] >= 1]
-    edit_ms = [r["req"][0][1] for r in done]  # every round starts with the edited file's diagnostics
+    edit_ms = [
+        r["req"][0][1] for r in done
+    ]  # every round starts with the edited file's diagnostics
     round_ms = [r["ms"] for r in done]
-    growth = slope([(r["edit"], r["rss"]) for r in rows if r["edit"] >= max(1, edits // 2) and "rss" in r])
+    growth = slope(
+        [
+            (r["edit"], r["rss"])
+            for r in rows
+            if r["edit"] >= max(1, edits // 2) and "rss" in r
+        ]
+    )
     by_method = {}
     for r in done:
         for method, rms, _ in r["req"]:
@@ -709,13 +933,19 @@ def summarize(rec, edits):
         "edits": len(done),
         "rssAt": {str(c): rows[c].get("rss") for c in CHECKPOINTS if c < len(rows)},
         "rssEnd": rows[-1].get("rss") if rows else None,
-        "rssAdded": rows[-1]["rss"] - rows[0]["rss"] if rows and "rss" in rows[0] and "rss" in rows[-1] else None,
+        "rssAdded": rows[-1]["rss"] - rows[0]["rss"]
+        if rows and "rss" in rows[0] and "rss" in rows[-1]
+        else None,
         "hwm": rows[-1].get("hwm") if rows else None,
         "growthMiBPerEdit": None if growth is None else round(growth, 3),
-        "editMedianMs": median(edit_ms), "editP95Ms": p95(edit_ms),
-        "roundMedianMs": median(round_ms), "roundP95Ms": p95(round_ms),
-        "methods": {m: {"n": len(v), "medianMs": round(median(v), 2), "p95Ms": round(p95(v), 2)}
-                    for m, v in sorted(by_method.items())},
+        "editMedianMs": median(edit_ms),
+        "editP95Ms": p95(edit_ms),
+        "roundMedianMs": median(round_ms),
+        "roundP95Ms": p95(round_ms),
+        "methods": {
+            m: {"n": len(v), "medianMs": round(median(v), 2), "p95Ms": round(p95(v), 2)}
+            for m, v in sorted(by_method.items())
+        },
         "errors": sum(1 for r in rows for _, _, st in r["req"] if st == "error"),
     }
 
@@ -737,8 +967,15 @@ def compare(rounds, go_answers, rust_answers):
             m["differ"] += 1
             if len(m["examples"]) < 3:
                 path = first_diff(gv, rv)
-                m["examples"].append({"edit": n, "request": i, "path": path,
-                                      "go": value_at(gv, path), "rust": value_at(rv, path)})
+                m["examples"].append(
+                    {
+                        "edit": n,
+                        "request": i,
+                        "path": path,
+                        "go": value_at(gv, path),
+                        "rust": value_at(rv, path),
+                    }
+                )
     return out
 
 
@@ -753,8 +990,12 @@ def check_limits(go, rust, go_rec, rust_rec):
         g, r = go[field], rust[field]
         lim = factor * max(g, 0) + extra
         out[key] = [r <= lim, f"{r:.2f} {unit} (limit {lim:.2f}, Go {g:.2f})"]
-    extra = sum(1 for gr, rr in zip(go_rec["rows"], rust_rec["rows"])
-                for (_, _, gs), (_, _, rs) in zip(gr["req"], rr["req"]) if rs == "error" and gs == "ok")
+    extra = sum(
+        1
+        for gr, rr in zip(go_rec["rows"], rust_rec["rows"])
+        for (_, _, gs), (_, _, rs) in zip(gr["req"], rr["req"])
+        if rs == "error" and gs == "ok"
+    )
     out["answers"] = [extra == 0, f"{extra} Rust errors where Go answered"]
     return out
 
@@ -770,49 +1011,92 @@ def session_name(s):
 
 
 def report_md(result):
-    lines = ["# ls_edit_bench", "", f"Date {result['date']}, host {result['host']}, CPUs {result['cpus']}. "
-             f"Go `{result['go']['binary']}` sha256 `{result['go']['sha256']}`"
-             f"{' (GOPORT_PIN ' + result['pin'] + ')' if result['pin'] else ''}.", ""]
+    lines = [
+        "# ls_edit_bench",
+        "",
+        (
+            f"Date {result['date']}, host {result['host']}, CPUs {result['cpus']}. "
+            f"Go `{result['go']['binary']}` sha256 `{result['go']['sha256']}`"
+            f"{' (GOPORT_PIN ' + result['pin'] + ')' if result['pin'] else ''}."
+        ),
+        "",
+    ]
     for label, b in result["rust"].items():
         lines.append(f"- Rust `{label}`: `{b['binary']}` sha256 `{b['sha256']}`")
     if result.get("rustEnv"):
-        lines.append(f"- Rust environment: `{' '.join(f'{k}={v}' for k, v in result['rustEnv'].items())}`")
-    lines += ["", "Limits (Rust against Go):", ""] + [f"- {name}: {text}" for name, *_, text in LIMITS]
-    lines += ["- answers: no Rust error, crash, timeout or RSS-cap kill where Go answered", "",
-              "Edit latency: didChange to the diagnostics of the edited file. Round: didChange to the last answer.", "",
-              "Pace: the pause after each round's answers.", "",
-              "| project | scenario | pace ms | side | RSS 0/20/40/200 MiB | end | added | HWM | growth MiB/edit "
-              "| edit median ms | edit p95 ms | round median ms | answers same/differ | verdict |",
-              "|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|"]
+        lines.append(
+            f"- Rust environment: `{' '.join(f'{k}={v}' for k, v in result['rustEnv'].items())}`"
+        )
+    lines += ["", "Limits (Rust against Go):", ""] + [
+        f"- {name}: {text}" for name, *_, text in LIMITS
+    ]
+    lines += [
+        "- answers: no Rust error, crash, timeout or RSS-cap kill where Go answered",
+        "",
+        "Edit latency: didChange to the diagnostics of the edited file. Round: didChange to the last answer.",
+        "",
+        "Pace: the pause after each round's answers.",
+        "",
+        (
+            "| project | scenario | pace ms | side | RSS 0/20/40/200 MiB | end | added | HWM | growth MiB/edit "
+            "| edit median ms | edit p95 ms | round median ms | answers same/differ | verdict |"
+        ),
+        "|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|",
+    ]
     for s in result["sessions"]:
         for side, v in [("go", s["go"])] + list(s["rust"].items()):
             sm = v["summary"]
             rss = "/".join(fmt(sm["rssAt"].get(str(c))) for c in CHECKPOINTS)
             if side == "go":
-                eq, verdict = "", "" if v["error"] is None else f"Go failed: {v['error']}"
+                eq, verdict = (
+                    "",
+                    "" if v["error"] is None else f"Go failed: {v['error']}",
+                )
             else:
                 c = v["compare"]
                 eq = f"{sum(m['same'] for m in c.values())}/{sum(m['differ'] for m in c.values())}"
                 bad = [k for k, (ok, _) in v["limits"].items() if not ok]
                 verdict = "pass" if not bad else "FAIL " + ", ".join(bad)
-            lines.append(f"| {s['project']} | {s['scenario']} | {s.get('paceMs', 0)} | {side} | {rss} | {fmt(sm['rssEnd'])} | {fmt(sm['rssAdded'])} | {fmt(sm['hwm'])} "
-                         f"| {fmt(sm['growthMiBPerEdit'], 2)} | {fmt(sm['editMedianMs'])} | {fmt(sm['editP95Ms'])} "
-                         f"| {fmt(sm['roundMedianMs'])} | {eq} | {verdict} |")
+            lines.append(
+                f"| {s['project']} | {s['scenario']} | {s.get('paceMs', 0)} | {side} | {rss} | {fmt(sm['rssEnd'])} | {fmt(sm['rssAdded'])} | {fmt(sm['hwm'])} "
+                f"| {fmt(sm['growthMiBPerEdit'], 2)} | {fmt(sm['editMedianMs'])} | {fmt(sm['editP95Ms'])} "
+                f"| {fmt(sm['roundMedianMs'])} | {eq} | {verdict} |"
+            )
     lines += ["", "## Failed limits", ""]
-    fails = [(s, side, k, text) for s in result["sessions"] for side, v in s["rust"].items()
-             for k, (ok, text) in v["limits"].items() if not ok]
-    lines += [f"- {session_name(s)} {side}: {k} {text}" for s, side, k, text in fails] or ["None."]
+    fails = [
+        (s, side, k, text)
+        for s in result["sessions"]
+        for side, v in s["rust"].items()
+        for k, (ok, text) in v["limits"].items()
+        if not ok
+    ]
+    lines += [
+        f"- {session_name(s)} {side}: {k} {text}" for s, side, k, text in fails
+    ] or ["None."]
     lines += ["", "## Answer differences", ""]
-    diffs = [(s, side, m, c) for s in result["sessions"] for side, v in s["rust"].items()
-             for m, c in v["compare"].items() if c["differ"]]
-    lines += [f"- {session_name(s)} {side} `{m}`: {c['differ']} differ, first at "
-              + ", ".join(f"edit {e['edit']} `{e['path']}` (Go `{e.get('go')}`, Rust `{e.get('rust')}`)"
-                          for e in c["examples"]) for s, side, m, c in diffs] or ["None."]
+    diffs = [
+        (s, side, m, c)
+        for s in result["sessions"]
+        for side, v in s["rust"].items()
+        for m, c in v["compare"].items()
+        if c["differ"]
+    ]
+    lines += [
+        f"- {session_name(s)} {side} `{m}`: {c['differ']} differ, first at "
+        + ", ".join(
+            f"edit {e['edit']} `{e['path']}` (Go `{e.get('go')}`, Rust `{e.get('rust')}`)"
+            for e in c["examples"]
+        )
+        for s, side, m, c in diffs
+    ] or ["None."]
     lines += ["", "## Median ms per method (Go / Rust)", ""]
     for s in result["sessions"]:
         parts = []
         for m, g in s["go"]["summary"]["methods"].items():
-            rs = " / ".join(fmt(v["summary"]["methods"].get(m, {}).get("medianMs")) for v in s["rust"].values())
+            rs = " / ".join(
+                fmt(v["summary"]["methods"].get(m, {}).get("medianMs"))
+                for v in s["rust"].values()
+            )
             parts.append(f"{m.split('/')[-1]} {g['medianMs']} / {rs}")
         lines.append(f"- {session_name(s)}: " + "; ".join(parts))
     return "\n".join(lines) + "\n"
@@ -829,21 +1113,35 @@ def evaluate(sess):
 
 def status_of(result):
     """0 within limits, 1 a limit failed, 2 a Go session failed."""
-    if any(s["go"]["error"] or not s["go"]["summary"]["complete"] for s in result["sessions"]):
+    if any(
+        s["go"]["error"] or not s["go"]["summary"]["complete"]
+        for s in result["sessions"]
+    ):
         return 2
-    return int(any(not ok for s in result["sessions"] for rec in s["rust"].values() for ok, _ in rec["limits"].values()))
+    return int(
+        any(
+            not ok
+            for s in result["sessions"]
+            for rec in s["rust"].values()
+            for ok, _ in rec["limits"].values()
+        )
+    )
 
 
 def print_line(sess, label, rec):
     sm = rec["summary"]
-    text = (f"{session_name(sess)} {label}: RSS {sm['rssAt']} growth {sm['growthMiBPerEdit']} MiB/edit, edit median "
-            f"{fmt(sm['editMedianMs'])} p95 {fmt(sm['editP95Ms'])} ms, round median {fmt(sm['roundMedianMs'])} ms")
+    text = (
+        f"{session_name(sess)} {label}: RSS {sm['rssAt']} growth {sm['growthMiBPerEdit']} MiB/edit, edit median "
+        f"{fmt(sm['editMedianMs'])} p95 {fmt(sm['editP95Ms'])} ms, round median {fmt(sm['roundMedianMs'])} ms"
+    )
     if rec["error"]:
         text += f", ERROR {rec['error']}"
     if "limits" in rec:
         failed = [f"{k} {t}" for k, (ok, t) in rec["limits"].items() if not ok]
         differ = sum(m["differ"] for m in rec["compare"].values())
-        text += f", {differ} answers differ, " + ("pass" if not failed else "FAIL " + "; ".join(failed))
+        text += f", {differ} answers differ, " + (
+            "pass" if not failed else "FAIL " + "; ".join(failed)
+        )
     print(text, flush=True)
 
 
@@ -859,29 +1157,75 @@ def parse_rust(values):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--rust", action="append", default=[], help="[LABEL=]BIN, repeatable")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--rust", action="append", default=[], help="[LABEL=]BIN, repeatable"
+    )
     ap.add_argument("--go", default=GO)
-    ap.add_argument("--rust-env", action="append", default=[],
-                    help="KEY=VAL for the Rust servers only, repeatable (for example _RJEM_MALLOC_CONF=narenas:48 "
-                         "for jemalloc defaults on a 12-core Mac)")
-    ap.add_argument("--projects", help="default query-core,hono,effect (--sweep: query-core)")
-    ap.add_argument("--scenarios", help="default all, the paced ones only on " + ",".join(PACED_PROJECTS)
-                    + " (--sweep: typing,errfix)")
-    ap.add_argument("--edits", type=int, default=0, help="edits for the short scenarios (default 40; --sweep 20)")
-    ap.add_argument("--pace-ms", type=int, default=0,
-                    help="pause after each round's answers, for the scenarios without their own (not *-paced)")
-    ap.add_argument("--sweep", nargs="?", const=SWEEP_MS, type=lambda v: [int(x) for x in v.split(",")],
-                    metavar="MS,...", help="run each scenario once per pause in the list (default "
-                    + ",".join(map(str, SWEEP_MS)) + "), in place of its own pause")
-    ap.add_argument("--long-edits", type=int, default=0, help="edits for the long scenario (default 200)")
+    ap.add_argument(
+        "--rust-env",
+        action="append",
+        default=[],
+        help="KEY=VAL for the Rust servers only, repeatable (for example _RJEM_MALLOC_CONF=narenas:48 "
+        "for jemalloc defaults on a 12-core Mac)",
+    )
+    ap.add_argument(
+        "--projects", help="default query-core,hono,effect (--sweep: query-core)"
+    )
+    ap.add_argument(
+        "--scenarios",
+        help="default all, the paced ones only on "
+        + ",".join(PACED_PROJECTS)
+        + " (--sweep: typing,errfix)",
+    )
+    ap.add_argument(
+        "--edits",
+        type=int,
+        default=0,
+        help="edits for the short scenarios (default 40; --sweep 20)",
+    )
+    ap.add_argument(
+        "--pace-ms",
+        type=int,
+        default=0,
+        help="pause after each round's answers, for the scenarios without their own (not *-paced)",
+    )
+    ap.add_argument(
+        "--sweep",
+        nargs="?",
+        const=SWEEP_MS,
+        type=lambda v: [int(x) for x in v.split(",")],
+        metavar="MS,...",
+        help="run each scenario once per pause in the list (default "
+        + ",".join(map(str, SWEEP_MS))
+        + "), in place of its own pause",
+    )
+    ap.add_argument(
+        "--long-edits",
+        type=int,
+        default=0,
+        help="edits for the long scenario (default 200)",
+    )
     ap.add_argument("--cpus", default="8,10,12,14")
     ap.add_argument("--rss-cap-mib", type=int, default=12288)
-    ap.add_argument("--timeout", type=float, default=300.0, help="seconds per request burst")
-    ap.add_argument("--out", default=os.path.join(REPO, "target/ls-edit-bench",
-                                                  datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
-    ap.add_argument("--recheck", action="store_true",
-                    help="no servers: apply the current limits to --out/result.json again")
+    ap.add_argument(
+        "--timeout", type=float, default=300.0, help="seconds per request burst"
+    )
+    ap.add_argument(
+        "--out",
+        default=os.path.join(
+            REPO,
+            "target/ls-edit-bench",
+            datetime.datetime.now().strftime("%Y%m%d-%H%M%S"),
+        ),
+    )
+    ap.add_argument(
+        "--recheck",
+        action="store_true",
+        help="no servers: apply the current limits to --out/result.json again",
+    )
     args = ap.parse_args()
     if args.recheck:
         with open(os.path.join(args.out, "result.json")) as f:
@@ -890,7 +1234,9 @@ def main():
             evaluate(sess)
             for label, rec in sess["rust"].items():
                 print_line(sess, label, rec)
-        with open(os.path.join(args.out, "result.json"), "w") as f:  # rows unchanged, verdicts updated
+        with open(
+            os.path.join(args.out, "result.json"), "w"
+        ) as f:  # rows unchanged, verdicts updated
             json.dump(result, f)
     else:
         rust = parse_rust(args.rust)
@@ -901,33 +1247,61 @@ def main():
             args.edits = args.edits or 20
         projects = (args.projects or ",".join(PROJECTS)).split(",")
         named = args.scenarios.split(",") if args.scenarios else []
-        bad = [p for p in projects if p not in PROJECTS] + [s for s in named if s not in SCENARIOS]
+        bad = [p for p in projects if p not in PROJECTS] + [
+            s for s in named if s not in SCENARIOS
+        ]
         missing = [b for b in [args.go, *rust.values()] if not os.access(b, os.X_OK)]
         if bad or missing or not rust:
-            print(f"ls_edit_bench: need --rust; unknown {bad}; missing binaries {missing}", file=sys.stderr)
+            print(
+                f"ls_edit_bench: need --rust; unknown {bad}; missing binaries {missing}",
+                file=sys.stderr,
+            )
             return 2
         os.makedirs(args.out, exist_ok=True)
-        result = {"date": datetime.datetime.now().isoformat(timespec="seconds"), "host": socket.gethostname(),
-                  "cpus": args.cpus if PINNED else "unpinned", "pin": os.environ.get("GOPORT_PIN_ACTIVE"),
-                  "go": {"binary": args.go, "sha256": sha256_12(args.go)},
-                  "rust": {k: {"binary": v, "sha256": sha256_12(v)} for k, v in rust.items()},
-                  "rustEnv": rust_env, "sessions": []}
+        result = {
+            "date": datetime.datetime.now().isoformat(timespec="seconds"),
+            "host": socket.gethostname(),
+            "cpus": args.cpus if PINNED else "unpinned",
+            "pin": os.environ.get("GOPORT_PIN_ACTIVE"),
+            "go": {"binary": args.go, "sha256": sha256_12(args.go)},
+            "rust": {k: {"binary": v, "sha256": sha256_12(v)} for k, v in rust.items()},
+            "rustEnv": rust_env,
+            "sessions": [],
+        }
         plans = []  # (project, scenario, pace ms)
         for project in projects:
-            for scenario in named or [s for s, v in SCENARIOS.items() if v[4] is None or project in PACED_PROJECTS]:
+            for scenario in named or [
+                s
+                for s, v in SCENARIOS.items()
+                if v[4] is None or project in PACED_PROJECTS
+            ]:
                 own = SCENARIOS[scenario][4]
-                plans += [(project, scenario, pace) for pace in args.sweep or [args.pace_ms if own is None else own]]
+                plans += [
+                    (project, scenario, pace)
+                    for pace in args.sweep or [args.pace_ms if own is None else own]
+                ]
         for project, scenario, pace in plans:
-            edits = (args.long_edits if scenario == "long" else args.edits) or SCENARIOS[scenario][1]
+            edits = (
+                args.long_edits if scenario == "long" else args.edits
+            ) or SCENARIOS[scenario][1]
             rounds, digest = build_plan(project, scenario, edits)
-            sess = {"project": project, "scenario": scenario, "paceMs": pace, "edits": edits, "plan": digest,
-                    "load": round(os.getloadavg()[0], 1), "rust": {}}
+            sess = {
+                "project": project,
+                "scenario": scenario,
+                "paceMs": pace,
+                "edits": edits,
+                "plan": digest,
+                "load": round(os.getloadavg()[0], 1),
+                "rust": {},
+            }
             sess["go"], go_answers = run_session(args, project, rounds, args.go, pace)
             sess["go"]["summary"] = summarize(sess["go"], edits)
             print_line(sess, "go", sess["go"])
             if sess["go"]["summary"]["complete"]:
                 for label, binary in rust.items():
-                    rec, answers = run_session(args, project, rounds, binary, pace, rust_env)
+                    rec, answers = run_session(
+                        args, project, rounds, binary, pace, rust_env
+                    )
                     rec["compare"] = compare(rounds, go_answers, answers)
                     sess["rust"][label] = rec
                     evaluate(sess)

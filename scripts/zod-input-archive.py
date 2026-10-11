@@ -5,10 +5,10 @@ import hashlib
 import hmac
 import json
 import os
-from pathlib import Path
 import stat
 import sys
 import tarfile
+from pathlib import Path
 
 
 def require(condition, message):

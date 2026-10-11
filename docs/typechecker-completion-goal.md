@@ -20,26 +20,25 @@ parallel. Approximately 65-75% of the engineering is a post-contract
 parallelization target once work is divided by semantic leaf rather than by
 failing fixture. Before the member/instantiation, location-query, and source
 dispatch contracts land, current executable concurrency is closer to two
-semantic writer lanes plus measurement and review. The eventual remaining
-25-35% is deliberately serialized because it changes shared type identity,
-lazy cache publication, relation behavior, source dispatch, or compiler
-classification.
+semantic writer lanes plus measurement and review. The eventual remaining 25-35%
+is deliberately serialized because it changes shared type identity, lazy cache
+publication, relation behavior, source dispatch, or compiler classification.
 
 The default topology is therefore:
 
-- one integration owner for shared checker contracts, Cargo, corpus scoring,
-  and merge order;
-- multiple leaf owners working in isolated worktrees on non-overlapping
-  semantic modules;
+- one integration owner for shared checker contracts, Cargo, corpus scoring, and
+  merge order;
+- multiple leaf owners working in isolated worktrees on non-overlapping semantic
+  modules;
 - independent typescript-go and Rust-invariant reviewers; and
 - a fixer/oracle lane that turns review and corpus output into bounded queues.
 
 The current session supports more than four agents. Keep one integration owner
 and give each implementation agent exclusive ownership of specific files. Use
 additional agents for upstream audits, focused reviews, fixture analysis, and
-independent compiler subsystems. Serialize Cargo commands, commits, and edits
-to shared checker contracts. Increase the number of implementation lanes only
-when their ownership does not overlap.
+independent compiler subsystems. Serialize Cargo commands, commits, and edits to
+shared checker contracts. Increase the number of implementation lanes only when
+their ownership does not overlap.
 
 The implementation strategy is a faithful port of coherent typescript-go
 algorithms. Preserve recognizable upstream structure and behavior first;
@@ -97,9 +96,9 @@ provides the right operating model for a large AI-assisted port:
 This repository needs one adaptation. Bun could mechanically translate a broad
 file surface and repair it later. TypeScript's checker is a highly connected
 lazy graph, so independently translated files are not useful unless they share
-exact identity, publication, and recursion contracts. Our unit of parallelism
-is therefore an upstream semantic cluster behind an opaque Rust leaf API, not
-an arbitrary source file.
+exact identity, publication, and recursion contracts. Our unit of parallelism is
+therefore an upstream semantic cluster behind an opaque Rust leaf API, not an
+arbitrary source file.
 
 The tuple, indexed-access, and `typeof` flow work validated this model. Separate
 workers produced bounded leaves and reviews while root integrated shared
@@ -116,11 +115,11 @@ The hard substrate is present and useful:
 
 - program-branded node, file, flow, symbol, type, signature, mapper, and link
   identities;
-- canonical binder declaration graphs, name resolution, aliases, and a broad
-  CFG construction prefix;
+- canonical binder declaration graphs, name resolution, aliases, and a broad CFG
+  construction prefix;
 - the complete `TypeData` representation and all checker LinkStores;
-- intrinsic and global bootstrap, literal and union caches, and canonical
-  global Array/Object/Function identities;
+- intrinsic and global bootstrap, literal and union caches, and canonical global
+  Array/Object/Function identities;
 - declared type parameters, classes/interfaces as identities, aliases, direct
   generics, arrays, property objects, function types, unions, tuples, and a
   concrete indexed-access leaf;
@@ -129,34 +128,34 @@ The hard substrate is present and useful:
 - bounded instantiation, constraints, generic inference, contextual typing,
   calls, overload sets, source expressions, imports, and diagnostics;
 - transactional source checking for a useful but narrow set of variables,
-  functions, assignments, calls, properties, operators, enums, and ESM
-  imports; and
+  functions, assignments, calls, properties, operators, enums, and ESM imports;
+  and
 - invocation-local truthiness and strict `typeof` flow with two-arm joins.
 
-Recent integrated verticals include canonical tuple annotations, concrete
-inline indexed access, property objects in unions, all eight strict `typeof`
-tags, reversed comparisons, object/function classification, `void` projection,
-and base/local join identity restoration.
+Recent integrated verticals include canonical tuple annotations, concrete inline
+indexed access, property objects in unions, all eight strict `typeof` tags,
+reversed comparisons, object/function classification, `void` projection, and
+base/local join identity restoration.
 
 ### Execution checkpoint: 2026-08-27
 
-The current saved semantic smoke records clean Rust commit `8357dac3` and
-51 exact results in 95 executed variants. The remaining results are 43
-unsupported and one artifact mismatch, with no fatal invariants. See the
+The current saved semantic smoke records clean Rust commit `8357dac3` and 51
+exact results in 95 executed variants. The remaining results are 43 unsupported
+and one artifact mismatch, with no fatal invariants. See the
 [checkpoint table](#quantitative-posture) for artifact counts and evidence.
 
 The retained 397/511 milestone is diagnostic-only and records clean `74fd417a`,
 not `8357dac3`. Full verification of `8357dac3`, a semantic milestone at that
-commit, complete upstream corpus parity, and a modern-project parity ring
-remain unproved. The full port goal remains active.
+commit, complete upstream corpus parity, and a modern-project parity ring remain
+unproved. The full port goal remains active.
 
 ### Earlier wave 131 checkpoint: 2026-08-27
 
 Wave 131 passes all 6,239 workspace tests. Strict workspace Clippy passes after
 one test-only lint fix. The fixed semantic report has 48 exact results in 95
-executed variants, one more than wave 128. The diagnostic-only milestone
-retains all 397 exact results in 511 executed variants. Neither report lost an
-exact result or produced a fatal invariant.
+executed variants, one more than wave 128. The diagnostic-only milestone retains
+all 397 exact results in 511 executed variants. Neither report lost an exact
+result or produced a fatal invariant.
 
 JSDoc callback alias identity, mode-aware module targets, dependency-ordered
 source checking, retained config and resolver inputs, and exact project error
@@ -176,11 +175,11 @@ executed variants, seven more than wave 127. The diagnostic-only milestone
 retains all 397 exact results in 511 executed variants. Neither report lost an
 exact result or produced a fatal invariant.
 
-Canonical library ordering, lazy module values, enum declaration queries,
-owned project graph observations, and source replay are integrated. The
-remaining semantic outcomes are 46 unsupported variants and two artifact
-mismatches. Prepared project inputs and Go probes remain separate evidence,
-not a passing project ring.
+Canonical library ordering, lazy module values, enum declaration queries, owned
+project graph observations, and source replay are integrated. The remaining
+semantic outcomes are 46 unsupported variants and two artifact mismatches.
+Prepared project inputs and Go probes remain separate evidence, not a passing
+project ring.
 
 See [`typechecker-wave128-status.md`](typechecker-wave128-status.md) for runtime
 checkpoint `df2ba7bc`, lint follow-up `f07dc2f1`, and the verification details.
@@ -195,41 +194,41 @@ executed variants. Neither report lost an exact result or produced a fatal
 invariant. The remaining semantic outcomes are 50 unsupported variants and five
 artifact mismatches.
 
-The opt-in canonical project CLI and the reviewed modern-project input
-inventory are integrated. The inventory contains five core repositories with
-224,500 non-generated TypeScript code lines. Dependency graphs, exact Go
-artifacts, forced replay, and performance evidence remain incomplete.
+The opt-in canonical project CLI and the reviewed modern-project input inventory
+are integrated. The inventory contains five core repositories with 224,500
+non-generated TypeScript code lines. Dependency graphs, exact Go artifacts,
+forced replay, and performance evidence remain incomplete.
 
 See [`typechecker-wave127-status.md`](typechecker-wave127-status.md) for the
-runtime checkpoint `ed33229a`, lint-only follow-up `4a6f52fe`, evidence, and held
-iterator and project-runner work. The full port goal remains active.
+runtime checkpoint `ed33229a`, lint-only follow-up `4a6f52fe`, evidence, and
+held iterator and project-runner work. The full port goal remains active.
 
 ### Earlier wave 126 checkpoint: 2026-08-26
 
 Code checkpoint `c440602d` passes all 6,001 workspace tests and strict Clippy
 for all targets. The semantic smoke report has 37 exact results in 95 executed
-variants, five more than wave 125. The diagnostics-only milestone has 397
-exact results in 511 executed variants, two more than wave 125. Neither report
-lost an exact match or produced a fatal invariant.
+variants, five more than wave 125. The diagnostics-only milestone has 397 exact
+results in 511 executed variants, two more than wave 125. Neither report lost an
+exact match or produced a fatal invariant.
 
-Semantic smoke still has 50 unsupported variants and eight artifact
-mismatches. Two previously blocked queries now expose existing display gaps.
-Full upstream semantic parity and the modern-project rings remain incomplete.
+Semantic smoke still has 50 unsupported variants and eight artifact mismatches.
+Two previously blocked queries now expose existing display gaps. Full upstream
+semantic parity and the modern-project rings remain incomplete.
 
 See [`typechecker-wave126-status.md`](typechecker-wave126-status.md) for the
 verified code, evidence, separate branches, and build rules.
 
 ### Earlier wave 125 checkpoint: 2026-08-26
 
-Code checkpoint `5e2f9e37` passes the full repository verification script.
-The semantic smoke report has 32 exact results in 95 executed variants, eight
-more than the previous batch, with no exact losses or fatal invariants. The
+Code checkpoint `5e2f9e37` passes the full repository verification script. The
+semantic smoke report has 32 exact results in 95 executed variants, eight more
+than the previous batch, with no exact losses or fatal invariants. The
 diagnostics-only milestone retains 395 exact results in 511 executed variants.
 Neither result establishes complete upstream semantic parity.
 
 See [`typechecker-wave125-status.md`](typechecker-wave125-status.md) for the
-evidence, prepared branches, and required per-worktree build directories.
-The older figures below remain as execution history.
+evidence, prepared branches, and required per-worktree build directories. The
+older figures below remain as execution history.
 
 ### Earlier checkpoint: 2026-08-22
 
@@ -245,15 +244,14 @@ variants, 95 execute and one is skipped by upstream. The executed variants
 produce 14 exact matches, 81 typed unsupported outcomes, and no fatal
 invariants.
 
-Production location queries and fixture walkers generate `.types` and
-`.symbols` artifacts. Mapped, conditional, and template types, JSX, JavaScript,
-and JSDoc now have production checker implementations and focused tests.
-Complete support for those features remains in progress.
+Production location queries and fixture walkers generate `.types` and `.symbols`
+artifacts. Mapped, conditional, and template types, JSX, JavaScript, and JSDoc
+now have production checker implementations and focused tests. Complete support
+for those features remains in progress.
 
-That historical scorecard is
-`/tmp/ts-rust-type-node-zero-fatal-scorecard.json`. A completed run of the
-512-variant milestone, complete upstream corpus parity, and the final workspace
-verification were unverified at that checkpoint.
+That historical scorecard is `/tmp/ts-rust-type-node-zero-fatal-scorecard.json`.
+A completed run of the 512-variant milestone, complete upstream corpus parity,
+and the final workspace verification were unverified at that checkpoint.
 
 ### Earlier implementation checkpoints
 
@@ -288,61 +286,61 @@ nongeneric interfaces with exact `propertiesTypes` timing, eager `IndexType`
 origins, symbolic display, and fail-closed warm validation. Direct full-arity
 local generic class/interface references now reuse the target-owned
 instantiation cache without creating mappers or consuming instantiation
-sessions, with pinned TS2314/TS2315 recovery. The focused public targets and
-the adjacent indexed-access, index-signature, heritage, tuple, generic-call,
-import, and reexport targets pass. The fixed 96-variant shard remains four
-exact, 90 typed capability boundaries, two supported mismatches, and zero
-fatal invariants; its established provenance-normalized digest remains
+sessions, with pinned TS2314/TS2315 recovery. The focused public targets and the
+adjacent indexed-access, index-signature, heritage, tuple, generic-call, import,
+and reexport targets pass. The fixed 96-variant shard remains four exact, 90
+typed capability boundaries, two supported mismatches, and zero fatal
+invariants; its established provenance-normalized digest remains
 `353dddd39af6749db775683da54d7c9a`.
 
 The next Wave 1 cut is integrated through `d443d1b`. Exact two-way union
 property synthesis now has a declared type-literal production adapter with
-source declaration/owner provenance, partial-member caching, a freshly
-allocated `string | bigint` public gate, and allocation-free warm validation.
-Direct nongeneric interface references can now participate in canonical union
-type nodes, while the member leaf still rejects interfaces and mixed modes
-before writes. Direct scalar conditional initializers are whole-source
-preflighted and replay exactly, and the first nongeneric/no-heritage class
-instance/value shells are installed with canonical no-base state. Independent
-review found no P0/P1 issue in the union and conditional cuts. The frozen
-96-variant shard remains four exact, 90 typed capability boundaries, two
-supported mismatches, and zero fatal invariants; its provenance-normalized
-digest is still `353dddd39af6749db775683da54d7c9a`.
+source declaration/owner provenance, partial-member caching, a freshly allocated
+`string | bigint` public gate, and allocation-free warm validation. Direct
+nongeneric interface references can now participate in canonical union type
+nodes, while the member leaf still rejects interfaces and mixed modes before
+writes. Direct scalar conditional initializers are whole-source preflighted and
+replay exactly, and the first nongeneric/no-heritage class instance/value shells
+are installed with canonical no-base state. Independent review found no P0/P1
+issue in the union and conditional cuts. The frozen 96-variant shard remains
+four exact, 90 typed capability boundaries, two supported mismatches, and zero
+fatal invariants; its provenance-normalized digest is still
+`353dddd39af6749db775683da54d7c9a`.
 
-The following source-facing cut is integrated through `1ad5689`. Direct
-property reads over exact two-member declared type-literal unions now execute
-through the ordinary source dispatcher with pinned synthetic-member identity,
-TS2339/TS2551 diagnostics, first-missing constituent detail, spelling
-suggestions, warm replay, and fail-closed apparent-Object/comparator handling.
+The following source-facing cut is integrated through `1ad5689`. Direct property
+reads over exact two-member declared type-literal unions now execute through the
+ordinary source dispatcher with pinned synthetic-member identity, TS2339/TS2551
+diagnostics, first-missing constituent detail, spelling suggestions, warm
+replay, and fail-closed apparent-Object/comparator handling.
 Nongeneric/no-heritage classes with primitive annotated fields now execute at
-their lexical source positions, publish exact instance/static member graphs
-and the canonical default construct signature, and are admitted through the
-compiler adapter. Whole-file planning validates every later class before an
-earlier class can publish; exported, anonymous, unsafe-initialization, and
-unsupported member families remain typed capability boundaries. Independent
-review found no remaining P0/P1 issue. A fixed-shard run caught one anonymous
-class invariant classification after initial integration; `1ad5689` repairs it
-and the full rerun has four exact variants, 90 typed capability boundaries, two
-supported mismatches, and zero fatal invariants. The normalized digest changes
-to `c3dd4beaec5aae1377c60e50e7871d6f` solely because 15 frontier details move
+their lexical source positions, publish exact instance/static member graphs and
+the canonical default construct signature, and are admitted through the compiler
+adapter. Whole-file planning validates every later class before an earlier class
+can publish; exported, anonymous, unsafe-initialization, and unsupported member
+families remain typed capability boundaries. Independent review found no
+remaining P0/P1 issue. A fixed-shard run caught one anonymous class invariant
+classification after initial integration; `1ad5689` repairs it and the full
+rerun has four exact variants, 90 typed capability boundaries, two supported
+mismatches, and zero fatal invariants. The normalized digest changes to
+`c3dd4beaec5aae1377c60e50e7871d6f` solely because 15 frontier details move
 within the same capability/status classes; there are no exact losses.
 
-The next class composition cut is integrated through `67d072d`. One exact
-direct non-alias source-owned nongeneric base class now contributes pinned
-base instance/value identities, own-first inherited instance/static surfaces,
+The next class composition cut is integrated through `67d072d`. One exact direct
+non-alias source-owned nongeneric base class now contributes pinned base
+instance/value identities, own-first inherited instance/static surfaces,
 distinct resolved member tables, a derived-return default construct signature,
-and fail-closed class-only structural relations. Direct top-level
-`new Model()` for a preceding admitted no-base class now consumes that same
-canonical construct graph and publishes exact constructor symbol/static type,
-selected signature, result type, and variable/property identities through a
-whole-plan validate/reserve/ensure transaction. Arguments, type arguments,
-missing parentheses, aliases, forward classes, abstract or explicit
-constructors, heritage construction, optional chaining, and broader class
-families remain typed boundaries. Both leaves passed focused public gates,
-strict Clippy, and independent review with no remaining P0/P1 issue. The fixed
-96-variant shard is semantically byte-identical to `1ad5689` after provenance
-normalization: four exact, 90 typed capability boundaries, two supported
-mismatches, and zero fatal invariants.
+and fail-closed class-only structural relations. Direct top-level `new Model()`
+for a preceding admitted no-base class now consumes that same canonical
+construct graph and publishes exact constructor symbol/static type, selected
+signature, result type, and variable/property identities through a whole-plan
+validate/reserve/ensure transaction. Arguments, type arguments, missing
+parentheses, aliases, forward classes, abstract or explicit constructors,
+heritage construction, optional chaining, and broader class families remain
+typed boundaries. Both leaves passed focused public gates, strict Clippy, and
+independent review with no remaining P0/P1 issue. The fixed 96-variant shard is
+semantically byte-identical to `1ad5689` after provenance normalization: four
+exact, 90 typed capability boundaries, two supported mismatches, and zero fatal
+invariants.
 
 The next type-algebra/source-declaration cut is integrated through `74ea3ca`.
 Direct nongeneric intersections now preserve ordered raw identity, flatten and
@@ -372,15 +370,14 @@ TS2558/TS2344/TS2345 diagnostics. A strict top-level direct-identifier call
 statement leaf lets those declarations execute in the same source forms as the
 pinned fixtures while preserving whole-source preflight and warm replay. Both
 leaves passed independent P0/P1 review, 77 combined checker tests, eight
-compiler tests, library checking, and strict focused Clippy. The fixed shard
-has raw digest `16a26f90058c7b7090a3f0462f10daf6` and provenance-
-normalized digest `beab382c4f923f0d393b4abd0a61d4bb`. Its only status
-change advances `typeArgumentArityErrorSkipsTrivia.ts` to an exact match; only
-`moduleKeywordSkipLibCheck.ts` and
-`exactOptionalPropertyTypesArgumentError.ts` otherwise change, both from the
-old assignment-fallback spelling to the direct-call boundary. The result is
-five exact variants, 89 typed capability boundaries, two supported mismatches,
-and zero fatal invariants.
+compiler tests, library checking, and strict focused Clippy. The fixed shard has
+raw digest `16a26f90058c7b7090a3f0462f10daf6` and provenance- normalized digest
+`beab382c4f923f0d393b4abd0a61d4bb`. Its only status change advances
+`typeArgumentArityErrorSkipsTrivia.ts` to an exact match; only
+`moduleKeywordSkipLibCheck.ts` and `exactOptionalPropertyTypesArgumentError.ts`
+otherwise change, both from the old assignment-fallback spelling to the
+direct-call boundary. The result is five exact variants, 89 typed capability
+boundaries, two supported mismatches, and zero fatal invariants.
 
 The four-slot topology has rotated into local ambient overload families plus a
 direct class-heritage source adapter and a property-only generic-interface
@@ -391,10 +388,10 @@ because the pinned overload fixture encounters those boundaries in that order.
 The live commit/worktree ledger is
 [`typechecker-wave0-status.md`](typechecker-wave0-status.md).
 
-The ambient-overload cut is integrated through `290afc9`. Arbitrary-length
-local nongeneric `declare function` groups retain source order, one canonical
-callable object, exact owner/declaration/signature reverse maps, optional/minimum
-arity, literal-specialized candidate ordering, and the existing subtype-then-
+The ambient-overload cut is integrated through `290afc9`. Arbitrary-length local
+nongeneric `declare function` groups retain source order, one canonical callable
+object, exact owner/declaration/signature reverse maps, optional/minimum arity,
+literal-specialized candidate ordering, and the existing subtype-then-
 assignable resolver. Whole-source preflight now covers singleton functions,
 direct arrows, and contextual-arrow target closures before any overload group
 publishes. Two independent cache findings—callable-union dirtiness and retained
@@ -403,8 +400,8 @@ before integration. Six public checker tests, two compiler tests, the library
 check, strict focused Clippy, and independent P0/P1 review pass. The fixed shard
 has raw digest `9aaab16ed4d80a594c2686c2494d907b` and provenance-normalized
 digest `616f256f9ec771ae7eefa3324e52faa7`; its sole semantic delta is
-`ambiguousOverloadResolution.ts` advancing from the merged-function boundary
-to direct class heritage, with the headline unchanged at five exact, 89 typed
+`ambiguousOverloadResolution.ts` advancing from the merged-function boundary to
+direct class heritage, with the headline unchanged at five exact, 89 typed
 capability boundaries, two supported mismatches, and zero fatal invariants.
 
 ### Quantitative posture
@@ -413,25 +410,25 @@ The semantic smoke records clean Rust source
 `8357dac34c37b4a4f24b210a4ddafb76310bfaec` and clean upstream source
 `dc37b5249ab60e2bbce936f71b883e6c8136167e`.
 
-| Evidence | Recorded result | Scope |
-|---|---|---|
-| Smoke selection | 96 selected, 95 executed, one upstream skip | Fixed `checker-smoke-v1` selection |
-| Smoke outcomes | 51 exact, 43 unsupported, one artifact mismatch, zero fatal | Not full-corpus parity |
-| Unsupported outcomes | 28 checker capabilities, 15 harness/configuration errors | Neither category counts as success |
-| Smoke `.types` | 89 expected, 46 exact, one mismatch, 15 unsupported, 27 not reached | Production semantic artifact comparison |
-| Smoke `.symbols` | 89 expected, 54 exact, seven mismatches, one unsupported, 27 not reached | Secondary mismatches also remain failures |
-| Retained diagnostic-only milestone | 512 selected, 511 executed, one upstream skip, 397 exact, 114 unsupported, zero fatal | Clean `74fd417a`, not `8357dac3`. No type or symbol comparison |
-| Wave 137 check log | Dev check finished with 18 library warnings and one library-test warning | No source SHA in the log. Not full-test or strict-lint proof |
-| Full `8357dac3` verification | Unproved | Full tests, strict Clippy, rustdoc, and a semantic milestone need checkpoint-bound records |
-| Port-map clusters | 46 | Unchanged: 11 verified, 30 porting, and five blocked |
+| Evidence                           | Recorded result                                                                       | Scope                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Smoke selection                    | 96 selected, 95 executed, one upstream skip                                           | Fixed `checker-smoke-v1` selection                                                         |
+| Smoke outcomes                     | 51 exact, 43 unsupported, one artifact mismatch, zero fatal                           | Not full-corpus parity                                                                     |
+| Unsupported outcomes               | 28 checker capabilities, 15 harness/configuration errors                              | Neither category counts as success                                                         |
+| Smoke `.types`                     | 89 expected, 46 exact, one mismatch, 15 unsupported, 27 not reached                   | Production semantic artifact comparison                                                    |
+| Smoke `.symbols`                   | 89 expected, 54 exact, seven mismatches, one unsupported, 27 not reached              | Secondary mismatches also remain failures                                                  |
+| Retained diagnostic-only milestone | 512 selected, 511 executed, one upstream skip, 397 exact, 114 unsupported, zero fatal | Clean `74fd417a`, not `8357dac3`. No type or symbol comparison                             |
+| Wave 137 check log                 | Dev check finished with 18 library warnings and one library-test warning              | No source SHA in the log. Not full-test or strict-lint proof                               |
+| Full `8357dac3` verification       | Unproved                                                                              | Full tests, strict Clippy, rustdoc, and a semantic milestone need checkpoint-bound records |
+| Port-map clusters                  | 46                                                                                    | Unchanged: 11 verified, 30 porting, and five blocked                                       |
 
 Saved runtime evidence paths are relative to the main workspace:
 
-- Semantic smoke: `target/wave137-combined-semantic-smoke.json`.
-  SHA-256: `927cf97cb834c87da2fb2b3290f7438eea9de87da3a7e8f7b81e739782499d7a`.
+- Semantic smoke: `target/wave137-combined-semantic-smoke.json`. SHA-256:
+  `927cf97cb834c87da2fb2b3290f7438eea9de87da3a7e8f7b81e739782499d7a`.
 - Diagnostic-only milestone: `target/wave131-combined-milestone.json`, Rust SHA
-  `74fd417aab1365618db7d7d668e01a7d82294215`.
-  SHA-256: `dbe23396ff1571c9b00e02532da64e4e5b64fd6e59449fa69f43726372cb2054`.
+  `74fd417aab1365618db7d7d668e01a7d82294215`. SHA-256:
+  `dbe23396ff1571c9b00e02532da64e4e5b64fd6e59449fa69f43726372cb2054`.
 - Check log: `target/wave137-combined-check.log`.
 
 The implementation is no longer bottlenecked on basic representation. It is
@@ -444,32 +441,32 @@ Discovery does not prove execution of every option configuration. Only exact
 variants count as success. Advancing an unsupported variant to a later
 unsupported boundary is not an exact win.
 
-The retained milestone compares diagnostic artifacts only. Its invocation has
-no `--semantic-artifacts`, and `semanticArtifacts` is null. Its `full_artifact`
-label does not establish `.types` or `.symbols` parity. A semantic milestone
-at `8357dac3` and complete upstream corpus parity remain unverified.
-Historical first-50 and 500-case runs predate this checkpoint and are not its
-failure totals.
+The retained milestone compares diagnostic artifacts only. Its invocation has no
+`--semantic-artifacts`, and `semanticArtifacts` is null. Its `full_artifact`
+label does not establish `.types` or `.symbols` parity. A semantic milestone at
+`8357dac3` and complete upstream corpus parity remain unverified. Historical
+first-50 and 500-case runs predate this checkpoint and are not its failure
+totals.
 
 The historical first blockers were dominated by:
 
-| First blocker family | Variants in the old 500-case run |
-|---|---:|
-| JS/JSX/TSX/JSON source kind | 105 |
-| Class declarations | 79 |
-| Function declarations/bodies | 69 |
-| Variable inference and bindings | 55 |
-| Other source syntax | 46 |
-| Namespaces/modules | 32 |
-| Interfaces | 29 |
-| Import-equals | 28 |
-| Declaration-file admission | 24 |
-| Imports/exports | 19 |
-| Enums | 19 |
-| Module-mode facts | 19 |
+| First blocker family            | Variants in the old 500-case run |
+| ------------------------------- | -------------------------------: |
+| JS/JSX/TSX/JSON source kind     |                              105 |
+| Class declarations              |                               79 |
+| Function declarations/bodies    |                               69 |
+| Variable inference and bindings |                               55 |
+| Other source syntax             |                               46 |
+| Namespaces/modules              |                               32 |
+| Interfaces                      |                               29 |
+| Import-equals                   |                               28 |
+| Declaration-file admission      |                               24 |
+| Imports/exports                 |                               19 |
+| Enums                           |                               19 |
+| Module-mode facts               |                               19 |
 
-These counts understate relations, instantiation, inference, and advanced
-types because the runner exposes only the first boundary in each variant.
+These counts understate relations, instantiation, inference, and advanced types
+because the runner exposes only the first boundary in each variant.
 
 ### Largest semantic gaps
 
@@ -498,19 +495,19 @@ types because the runner exposes only the first boundary in each variant.
 
 These files and records are serialized within an integration wave:
 
-| Surface | Reason |
-|---|---|
-| `semantic/type_nodes.rs` | Type-family dispatch, whole-query planning, allocation budgets, and cache publication |
-| `semantic/source.rs` | Whole-source preflight, statement/expression dispatch, diagnostics, and atomic commit |
-| `semantic/relater.rs` | Relation recursion, cache keys, mode-specific behavior, and structured reduction |
-| `semantic/store.rs`, `links.rs`, `production.rs` | Program identity, lazy state, public query boundaries, and publication invariants |
-| `semantic/formatter.rs` | Exact display routing shared by diagnostics and artifacts |
-| `ts_compiler/src/lib.rs` | Capability-versus-invariant classification and program option/fact projection |
+| Surface                                          | Reason                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `semantic/type_nodes.rs`                         | Type-family dispatch, whole-query planning, allocation budgets, and cache publication |
+| `semantic/source.rs`                             | Whole-source preflight, statement/expression dispatch, diagnostics, and atomic commit |
+| `semantic/relater.rs`                            | Relation recursion, cache keys, mode-specific behavior, and structured reduction      |
+| `semantic/store.rs`, `links.rs`, `production.rs` | Program identity, lazy state, public query boundaries, and publication invariants     |
+| `semantic/formatter.rs`                          | Exact display routing shared by diagnostics and artifacts                             |
+| `ts_compiler/src/lib.rs`                         | Capability-versus-invariant classification and program option/fact projection         |
 
-Root owns each shared contract and integration commit. Root may grant one
-worker an explicit, single-wave lease for one hub such as `relater.rs`; while
-that lease is active, root and every other worker treat the file as read-only.
-The lease names the allowed functions and ends when the reviewed stack is
+Root owns each shared contract and integration commit. Root may grant one worker
+an explicit, single-wave lease for one hub such as `relater.rs`; while that
+lease is active, root and every other worker treat the file as read-only. The
+lease names the allowed functions and ends when the reviewed stack is
 integrated. A leaf worker that needs a new shared field or dispatch contract
 stops and proposes the narrow interface instead of independently widening the
 hub. Thus S2's relation work is a lease, not contradictory ownership of a
@@ -528,8 +525,8 @@ Every new type/source family should follow the established leaf pattern:
    the complete family atomically.
 4. `validate`: prove warm cache identity, graph closure, store ownership, and
    option compatibility.
-5. public production test: exercise the actual binder/context/program path,
-   not a parallel test-only constructor.
+5. public production test: exercise the actual binder/context/program path, not
+   a parallel test-only constructor.
 
 Leaf owners should prefer new modules such as `keyof_types.rs`,
 `reference_types.rs`, `conditional_types.rs`, or `classes.rs`. Root registers
@@ -558,8 +555,7 @@ reason to postpone the checker.
 Extend scorecard records with:
 
 - upstream SHA, Rust SHA, dirty state, manifest digest, and exact invocation;
-- a stable variant key from case path, canonical options, and expected
-  baseline;
+- a stable variant key from case path, canonical options, and expected baseline;
 - separate harness/config, checker-capability, supported mismatch, and fatal
   invariant outcomes;
 - a stable capability code linked to the port map, for example
@@ -572,35 +568,34 @@ nonzero. A fatal invariant is never reclassified as unsupported merely to make
 the run complete.
 
 Check in `docs/typechecker-capabilities.tsv` with `code`, `port_map_id`,
-`description`, `owner_slice`, `introduced_version`, `status`, and
-`replacement`. Every capability code maps to exactly one primary port-map row,
-has a stable description and outcome class, and is never silently renamed or
-reused. Retired codes remain with a replacement. Fatal invariants use a
-separate `INV.*` namespace and can never be reclassified as capabilities. CI
-validates uniqueness, registry completeness for typed unsupported results, and
-scorecard references. Registry/schema changes are reviewed like public API
-changes and recorded in scorecard provenance.
+`description`, `owner_slice`, `introduced_version`, `status`, and `replacement`.
+Every capability code maps to exactly one primary port-map row, has a stable
+description and outcome class, and is never silently renamed or reused. Retired
+codes remain with a replacement. Fatal invariants use a separate `INV.*`
+namespace and can never be reclassified as capabilities. CI validates
+uniqueness, registry completeness for typed unsupported results, and scorecard
+references. Registry/schema changes are reviewed like public API changes and
+recorded in scorecard provenance.
 
 ### M0.2: balanced fixed shards
 
 Keep the alphabetic first-50 for historical comparison, but replace it as the
-primary gate with checked-in manifests, never a sample chosen dynamically at
-run time:
+primary gate with checked-in manifests, never a sample chosen dynamically at run
+time:
 
 - `tools/ts_fixture/manifests/checker-smoke-v1.json`: 96 exact variant keys,
-  twelve from each of modules and
-  declarations, objects and relations, generics/calls/inference, flow/source
-  syntax, classes, advanced types, TSX, and JavaScript/JSDoc/modern options;
-- `tools/ts_fixture/manifests/checker-milestone-v1.json`: a 512-variant
-  balanced superset used at wave gates;
-  and
+  twelve from each of modules and declarations, objects and relations,
+  generics/calls/inference, flow/source syntax, classes, advanced types, TSX,
+  and JavaScript/JSDoc/modern options;
+- `tools/ts_fixture/manifests/checker-milestone-v1.json`: a 512-variant balanced
+  superset used at wave gates; and
 - the complete pinned manifest at frozen-epoch closure.
 
 Each family quota includes clean and error-producing programs, and the whole
 manifest includes single/multi-file, `.ts`/`.d.ts`, and relevant module-option
-variants. Each manifest stores canonical variant keys and a digest. Replacing
-a key requires an explicit reviewed manifest change; newly supported cases do
-not rotate out harder cases. The manifests cover:
+variants. Each manifest stores canonical variant keys and a digest. Replacing a
+key requires an explicit reviewed manifest change; newly supported cases do not
+rotate out harder cases. The manifests cover:
 
 - clean and error-producing programs;
 - single- and multi-file programs;
@@ -626,10 +621,10 @@ H02 is three deliverables, not a formatter-only task:
 3. Exact artifact closure grows with the supported semantic rows; no early H02
    scaffold is called complete merely because it can traverse a file.
 
-Diagnostic-clean programs can otherwise appear exact while inferring the
-wrong types or binding the wrong symbols. Artifact generation must use the
-production checker query surface and exact upstream ordering; it must not
-reconstruct semantic meaning from rendered diagnostics.
+Diagnostic-clean programs can otherwise appear exact while inferring the wrong
+types or binding the wrong symbols. Artifact generation must use the production
+checker query surface and exact upstream ordering; it must not reconstruct
+semantic meaning from rendered diagnostics.
 
 ### Per-merge attribution
 
@@ -681,12 +676,12 @@ modern syntax/options, complete corpus closure.
 
 S2 and S3 deliberately run concurrently behind a fixed interface: S3 creates
 lazy instantiated shells; S2 resolves their members. S7 and S8 may run
-concurrently only after they agree on a narrow inference request/result API.
-S9 and S10 can run concurrently after S8 because mapped construction does not
+concurrently only after they agree on a narrow inference request/result API. S9
+and S10 can run concurrently after S8 because mapped construction does not
 require conditional evaluation for its first complete core. S11a moves class
-admission ahead of advanced types. S12a covers intrinsic and function
-components without waiting for classes or conditional/mapped types; S12b adds
-their managed behavior later.
+admission ahead of advanced types. S12a covers intrinsic and function components
+without waiting for classes or conditional/mapped types; S12b adds their managed
+behavior later.
 
 A **leaf gate** uses only already integrated contracts and must pass before the
 leaf is merged. A **composition gate** is root-owned and runs after all named
@@ -704,8 +699,8 @@ targets before checker leaves can run.
 **S1a, root compiler prerequisite:** admit resolved `.d.ts` targets into the
 canonical program manifest with exact source kind, declaration status,
 resolution mode, and ownership. `skipLibCheck` suppresses declaration checking
-diagnostics; it does not skip binding or lazy semantic consumption. Leaf gate:
-a `.ts` importer and a bound `.d.ts` target share one canonical context without
+diagnostics; it does not skip binding or lazy semantic consumption. Leaf gate: a
+`.ts` importer and a bound `.d.ts` target share one canonical context without
 source-checking the declaration body.
 
 **S1b, ESM aliases/exports:** default and namespace imports, named/star
@@ -715,9 +710,9 @@ forced warm replay, and atomic failure. Its composition gate consumes imported
 values/types through S2/S6 without reconstructing identity.
 
 **S1c, bounded namespaces/merges:** internal and repeated namespaces,
-external-module namespace objects, qualified type/value lookup, and merging
-with aliases, interfaces, and ordinary values. Namespace+class/function
-merging waits for S11; general augmentation remains a module follow-on.
+external-module namespace objects, qualified type/value lookup, and merging with
+aliases, interfaces, and ordinary values. Namespace+class/function merging waits
+for S11; general augmentation remains a module follow-on.
 
 **N1, NodeNext fact lane:** after S1a, compiler-only workers can retain package
 boundaries, `.mts`/`.cts`/`.d.mts`/`.d.cts` modes, condition selection, and
@@ -725,20 +720,20 @@ resolution-mode provenance without waiting for advanced types. Checker
 consumption composes later through S1b. `import =`/`export =` is a separate
 CommonJS-mode sub-slice and is not smuggled through the plain-ESM gate.
 
-Upstream anchors: alias resolution and exports in `checker.go` and
-`exports.go`, plus program/module facts. Rust ownership:
-`module_resolution.rs`, `alias_provider.rs`, `source_imports.rs`, and a
-root-owned `ts_compiler` manifest/fact adapter; root owns `source.rs` dispatch.
+Upstream anchors: alias resolution and exports in `checker.go` and `exports.go`,
+plus program/module facts. Rust ownership: `module_resolution.rs`,
+`alias_provider.rs`, `source_imports.rs`, and a root-owned `ts_compiler`
+manifest/fact adapter; root owns `source.rs` dispatch.
 
 ### S2: structured members and relation completion
 
 **S2a, declared/reference member core:** one canonical structured result for
-properties, call/construct signatures, and index infos; type literals and
-direct interfaces; direct heritage; optional/readonly semantics; string/number
-index compatibility; fixed signatures; and the consumer side of an
-instantiated shell. Its leaf gate uses non-generic direct types and proves
-cold/warm publication, relation behavior, and malformed/foreign-cache
-rejection. S2a and S3 share a frozen request/result contract.
+properties, call/construct signatures, and index infos; type literals and direct
+interfaces; direct heritage; optional/readonly semantics; string/number index
+compatibility; fixed signatures; and the consumer side of an instantiated shell.
+Its leaf gate uses non-generic direct types and proves cold/warm publication,
+relation behavior, and malformed/foreign-cache rejection. S2a and S3 share a
+frozen request/result contract.
 
 **S2b, union/intersection/apparent member algebra:** reduction/apparent
 projection before lookup, union/intersection property synthesis, Object and
@@ -765,12 +760,12 @@ Scope:
 - identity-preserving no-op instantiation;
 - exact recursion depth and count budgets.
 
-Conditional, mapped, and inference-owned special cases remain typed handoffs
-to S9, S10, and S8.
+Conditional, mapped, and inference-owned special cases remain typed handoffs to
+S9, S10, and S8.
 
-Upstream anchors: `mapper.go`, `instantiateSignature`,
-`instantiateTypeWorker`, and `getObjectTypeInstantiation`. Rust ownership:
-`mapper.rs`, `instantiate.rs`, and `signatures.rs`; root owns shared store APIs.
+Upstream anchors: `mapper.go`, `instantiateSignature`, `instantiateTypeWorker`,
+and `getObjectTypeInstantiation`. Rust ownership: `mapper.rs`, `instantiate.rs`,
+and `signatures.rs`; root owns shared store APIs.
 
 Leaf gate: mapper composition, shell/cache/mapped-record identity,
 tuple/reference/signature/index-record substitution, exact budgets,
@@ -791,10 +786,9 @@ syntax and `??` typing; destructuring/binding patterns; object/array spread;
 function expressions and broader arrow bodies; general returns,
 throw/break/continue, `for..of`, ordinary `try`/`catch` and
 `useUnknownInCatchVariables`; `as const`, `satisfies`, and non-null assertions;
-broader variable inference; and assignment targets. Each family gets an
-isolated production vertical and a typed handoff when member/call/flow
-semantics are unavailable. S7 owns call/new/async-callable algorithms, not
-this dispatcher.
+broader variable inference; and assignment targets. Each family gets an isolated
+production vertical and a typed handoff when member/call/flow semantics are
+unavailable. S7 owns call/new/async-callable algorithms, not this dispatcher.
 
 **S4c, discriminant/nullish flow:** equality and property-discriminant
 narrowing, discriminant switches, `in`, optional-chain containment, nullish
@@ -821,8 +815,8 @@ Scope:
 - exact named/string/number precedence;
 - `noUncheckedIndexedAccess` option plumbing.
 
-Generic forms become executable after S6; they are not part of S5's
-independent leaf gate.
+Generic forms become executable after S6; they are not part of S5's independent
+leaf gate.
 
 Upstream anchors: `getTypeFromIntersectionTypeNode`, `getIntersectionType`,
 `getIndexType`, `getIndexedAccessTypeOrUndefined`, and
@@ -831,10 +825,9 @@ Upstream anchors: `getTypeFromIntersectionTypeNode`, `getIntersectionType`,
 formatter, option, and compiler adapters.
 
 Leaf gate: non-generic resolved-object `keyof`/index/intersection behavior,
-mixed properties/indexes, union indexing, the option matrix, cold/warm
-identity, and adversarial member-cache tests. Generic `T[K]`, imported
-recursive generics, and tuple indexing are a Wave 1 composition gate with
-S2/S3/S6/A10.
+mixed properties/indexes, union indexing, the option matrix, cold/warm identity,
+and adversarial member-cache tests. Generic `T[K]`, imported recursive generics,
+and tuple indexing are a Wave 1 composition gate with S2/S3/S6/A10.
 
 ### S6: general generic references, aliases, and `this`
 
@@ -856,9 +849,9 @@ ownership: preferably new `reference_types.rs`, `declared.rs`, and S3's
 instantiation API; root owns `type_nodes.rs` registration.
 
 Leaf gate: local declarations, alias bodies, defaults, constraints, recursion,
-outer parameters, `this` substitution, warm replay, and exact arity
-diagnostics. Imported/qualified targets compose with S1; instantiated members
-compose with S2/S3; generic `keyof`/`T[K]` composes with S5.
+outer parameters, `this` substitution, warm replay, and exact arity diagnostics.
+Imported/qualified targets compose with S1; instantiated members compose with
+S2/S3; generic `keyof`/`T[K]` composes with S5.
 
 ### S7: callable shapes, overloads, spreads, and construction
 
@@ -875,8 +868,8 @@ Scope:
 - `await`, Promise/thenable unwrapping, Promise-like diagnostics, and
   `for await` composition with S4b.
 
-S8 supplies the inference interface; S7 must remain independently testable
-with explicit or fixed type arguments.
+S8 supplies the inference interface; S7 must remain independently testable with
+explicit or fixed type arguments.
 
 Upstream anchors: `resolveCall`, `chooseOverload`, `hasCorrectArity`,
 `getSignatureApplicabilityError`, and signature instantiation. Rust ownership:
@@ -895,25 +888,23 @@ Scope:
 
 - canonical inference contexts, priorities, candidate collection, fixing, and
   deterministic ordering;
-- inference through arrays, tuples, object properties, parameters, and
-  returns;
+- inference through arrays, tuples, object properties, parameters, and returns;
 - contextual arrows/functions;
 - repeated covariant and contravariant candidates;
 - `const` type-parameter candidate preservation and tuple/object literal
   inference;
 - a narrow engine API consumed by S7.
 
-Defer conditional `infer` consumption to S9 and reverse-mapped inference to
-S10.
+Defer conditional `infer` consumption to S9 and reverse-mapped inference to S10.
 
 Upstream anchors: `inference.go` and `inferTypeArguments`. Rust ownership:
 `inference.rs`, `generic_calls.rs`, `contextual.rs`, and a dedicated
 `source_arrows.rs`; root owns the S7 bridge.
 
 Gate: structured identity, `map`-style callbacks, object/array candidates,
-defaults/constraints, contravariance, const-parameter literal preservation,
-and repeatable candidate order. A10's const-generic source-call closure is a
-Wave 2 composition gate with S7.
+defaults/constraints, contravariance, const-parameter literal preservation, and
+repeatable candidate order. A10's const-generic source-call closure is a Wave 2
+composition gate with S7.
 
 ### S9: conditional and `infer` types
 
@@ -926,9 +917,8 @@ Scope:
 - the exact tail-recursion limit of 1,000.
 
 Upstream anchors: `getTypeFromConditionalTypeNode`, `getConditionalType`, and
-`getConditionalTypeInstantiation`. Rust ownership: new
-`conditional_types.rs` with bounded S3/constraint APIs; root owns dispatch and
-formatter routing.
+`getConditionalTypeInstantiation`. Rust ownership: new `conditional_types.rs`
+with bounded S3/constraint APIs; root owns dispatch and formatter routing.
 
 Gate: `Exclude`, `Extract`, `ReturnType`, nested distribution, constrained
 inference, tail recursion, circular behavior, cold/warm identity, and poison
@@ -958,10 +948,10 @@ supported key remap, reverse-inference records, and stable lazy member caches.
 
 ### S11: classes in two project-facing stages
 
-**S11a, class shells/members:** start after S2a/S3/S6. Port declaration
-identity and value/instance split, static/instance annotated properties and
-method signatures, simple `extends`, generic base instantiation, and class
-expressions once S4b admits them. Leaf gate: exact member tables/base identities,
+**S11a, class shells/members:** start after S2a/S3/S6. Port declaration identity
+and value/instance split, static/instance annotated properties and method
+signatures, simple `extends`, generic base instantiation, and class expressions
+once S4b admits them. Leaf gate: exact member tables/base identities,
 static/instance separation, cold execution, and forced warm replay. Its
 composition gate lets class types participate in relations and module exports.
 
@@ -975,24 +965,24 @@ advanced initialization analysis to a follow-on.
 
 Upstream anchors: `checkClassLikeDeclaration`,
 `getDeclaredTypeOfClassOrInterface`, `resolveBaseTypesOfClass`, and member/
-constructor checkers. Rust ownership: new `classes.rs` consuming
-S2/S3/S4/S6/S7; root owns source and compiler dispatch.
+constructor checkers. Rust ownership: new `classes.rs` consuming S2/S3/S4/S6/S7;
+root owns source and compiler dispatch.
 
 ### S12: TSX in basic and managed stages
 
-**S12a, basic TSX/function components:** TSX program admission, intrinsic
-tags, fixed function components, attributes/children/basic spreads, JSX
-namespace lookup, and classic/automatic runtime resolution after S1b/S2a/S7.
-Generic function components compose after S8. This gate deliberately does not
-wait for classes, conditional types, or mapped types.
+**S12a, basic TSX/function components:** TSX program admission, intrinsic tags,
+fixed function components, attributes/children/basic spreads, JSX namespace
+lookup, and classic/automatic runtime resolution after S1b/S2a/S7. Generic
+function components compose after S8. This gate deliberately does not wait for
+classes, conditional types, or mapped types.
 
 **S12b, managed/class JSX:** after S9/S10/S11b, add class components,
 `LibraryManagedAttributes`, and conditional/mapped prop transformations.
 
 Upstream anchors: `jsx.go` call resolution, attribute construction, props
 extraction, and namespace lookup. Rust ownership: new `jsx.rs`; root owns TSX
-program admission. The S12a gate is a local React-like declaration fixture
-with intrinsic/fixed components and bad-prop diagnostics. Generic components,
+program admission. The S12a gate is a local React-like declaration fixture with
+intrinsic/fixed components and bad-prop diagnostics. Generic components,
 automatic runtime imports, managed attributes, and class components are named
 composition gates at their respective stages.
 
@@ -1019,8 +1009,8 @@ Exit gate:
 ### Wave 1: references, member algebra, and source breadth
 
 Run S1c and N1 fact infrastructure, S2b, S5's non-generic core, S6, S4b, and
-H02b as dependencies and slots allow. Start S11a once S2a/S3/S6 are green.
-With four slots this is four reviewed sub-waves—S5/S6, S2b/S4b, S1c/N1, then
+H02b as dependencies and slots allow. Start S11a once S2a/S3/S6 are green. With
+four slots this is four reviewed sub-waves—S5/S6, S2b/S4b, S1c/N1, then
 S11a/composition—not eight simultaneous writers.
 
 Composition gate: imported recursive generic objects expose instantiated
@@ -1036,19 +1026,18 @@ finish S11a and add S11b, stage S12a fixed components before its generic
 composition, connect NodeNext facts to the checker, and add H02c adapters for
 each integrated family.
 
-Composition gate: generic callbacks, overloads/rest/spread/`new`,
-const-generic calls, async functions/`await`/`for await`, discriminated unions
-and optional chains, predicate/assertion functions, `try`/`catch`,
-const/satisfies/non-null assertions, executable ordinary classes, basic
-function-component TSX, and bounded Bundler/NodeNext projects are exact in
-errors/types/symbols.
+Composition gate: generic callbacks, overloads/rest/spread/`new`, const-generic
+calls, async functions/`await`/`for await`, discriminated unions and optional
+chains, predicate/assertion functions, `try`/`catch`, const/satisfies/non-null
+assertions, executable ordinary classes, basic function-component TSX, and
+bounded Bundler/NodeNext projects are exact in errors/types/symbols.
 
 ### Wave 3: advanced type closure
 
-Run S9 conditional core, S10 mapped core, A14 template/string-mapping types,
-and the `NoInfer`/required-intrinsic subset of A15 as capacity permits. After
-the cores land, serialize conditional key-remap/`Omit`, reverse-mapped
-inference, standard utility-type integration, and S12b managed/class JSX.
+Run S9 conditional core, S10 mapped core, A14 template/string-mapping types, and
+the `NoInfer`/required-intrinsic subset of A15 as capacity permits. After the
+cores land, serialize conditional key-remap/`Omit`, reverse-mapped inference,
+standard utility-type integration, and S12b managed/class JSX.
 
 Exit gate: the pinned modern-project core ring passes, standard-library
 utilities, template keys, string mappings, `NoInfer`, and checker intrinsics
@@ -1073,75 +1062,75 @@ root algorithms in parallel, never fixture names. Close JavaScript/JSDoc,
 remaining syntax/options, diagnostic elaboration, and semantic display, then
 pass the complete ecosystem project ring.
 
-Exit gate: zero Rust-only unsupported variants, zero unapproved mismatches,
-zero fatal invariants, and exact complete artifacts for the frozen epoch.
+Exit gate: zero Rust-only unsupported variants, zero unapproved mismatches, zero
+fatal invariants, and exact complete artifacts for the frozen epoch.
 
 ## Staffing and scaling
 
-| Active slots | Recommended topology | Useful concurrency |
-|---:|---|---:|
-| 4 | root/integrator; two leaf implementers; one rotating reviewer/oracle/fixer | about 2.5-3 lanes |
-| 8 | root; four leaf implementers; Go reviewer; Rust-invariant reviewer; fixer/oracle | about 6-7 lanes |
-| 12 | root; seven leaf owners; two reviewers; one fixer; one oracle worker | about 9-10 lanes |
-| 16+ | keep roughly seven semantic writers; add corpus shards, fuzz/property testing, diagnostics, module/project gates, and more review | integration-limited |
+| Active slots | Recommended topology                                                                                                              |  Useful concurrency |
+| -----------: | --------------------------------------------------------------------------------------------------------------------------------- | ------------------: |
+|            4 | root/integrator; two leaf implementers; one rotating reviewer/oracle/fixer                                                        |   about 2.5-3 lanes |
+|            8 | root; four leaf implementers; Go reviewer; Rust-invariant reviewer; fixer/oracle                                                  |     about 6-7 lanes |
+|           12 | root; seven leaf owners; two reviewers; one fixer; one oracle worker                                                              |    about 9-10 lanes |
+|          16+ | keep roughly seven semantic writers; add corpus shards, fuzz/property testing, diagnostics, module/project gates, and more review | integration-limited |
 
 Before S2/S3/S6/S7/S8 contracts freeze, allow at most two simultaneous writers
 on shared type/signature/relation state. After they freeze, seven semantic leaf
-owners are plausible. Additional workers remain valuable for independent
-review and corpus attribution; converting every slot into a writer would lower
+owners are plausible. Additional workers remain valuable for independent review
+and corpus attribution; converting every slot into a writer would lower
 throughput by overloading integration.
 
 The executable four-slot schedule is:
 
-| Phase | Root | Worker A | Worker B | Worker C |
-|---|---|---|---|---|
-| W0.0 | Freeze S2/S3 and typed compiler/query envelopes | S2 inventory/API proof; review M0 | S3 inventory/API proof; review M0 | Implement fixed-manifest/retained-fatal harness |
-| W0.1 | Rust-review and serially integrate leaves | Implement S2a | Implement S3 | Go review/oracle |
-| W0.2 | Root-only S1a/query adapters and integration | Implement S1b | Implement first S4a vertical | H02a between Go reviews |
-| W1.0 | Review and serial integration | Implement dependency-independent S5 core | Implement S6 | Go review/oracle; advance H02b |
-| W1.1 | Root member/source adapters | Implement S2b | Implement S4b | Go review/oracle; advance H02b |
-| W1.2 | Root module/compiler adapters | Implement S1c | Implement N1 fact snapshots | Go review/oracle; advance H02b |
-| W1.3 | Composition adapters and scoring | Implement S11a | Own cross-slice composition tests/fixes | Go review/oracle; close H02b gate |
+| Phase | Root                                            | Worker A                                 | Worker B                                | Worker C                                        |
+| ----- | ----------------------------------------------- | ---------------------------------------- | --------------------------------------- | ----------------------------------------------- |
+| W0.0  | Freeze S2/S3 and typed compiler/query envelopes | S2 inventory/API proof; review M0        | S3 inventory/API proof; review M0       | Implement fixed-manifest/retained-fatal harness |
+| W0.1  | Rust-review and serially integrate leaves       | Implement S2a                            | Implement S3                            | Go review/oracle                                |
+| W0.2  | Root-only S1a/query adapters and integration    | Implement S1b                            | Implement first S4a vertical            | H02a between Go reviews                         |
+| W1.0  | Review and serial integration                   | Implement dependency-independent S5 core | Implement S6                            | Go review/oracle; advance H02b                  |
+| W1.1  | Root member/source adapters                     | Implement S2b                            | Implement S4b                           | Go review/oracle; advance H02b                  |
+| W1.2  | Root module/compiler adapters                   | Implement S1c                            | Implement N1 fact snapshots             | Go review/oracle; advance H02b                  |
+| W1.3  | Composition adapters and scoring                | Implement S11a                           | Own cross-slice composition tests/fixes | Go review/oracle; close H02b gate               |
 
 M0 lands before the first semantic stack is integrated, although S2/S3 may be
 implemented while it is being reviewed. Reviews may be sequential: every
 semantic stack receives a fresh Go-semantic review and a different
 Rust-invariant review. Root may supply the Rust review only when root authored
 none of that stack. A root-authored adapter is reviewed by Worker C and the
-non-owning semantic worker; joint root/Worker-C M0 work is reviewed by Workers
-A and B. There are never more than two unreviewed stacks.
+non-owning semantic worker; joint root/Worker-C M0 work is reviewed by Workers A
+and B. There are never more than two unreviewed stacks.
 
-A hub lease is recorded as `hub, wave, owner, base_sha, allowed_symbols,
-expiry_commit`. Only one lease exists per hub and a worker holds at most one.
-M0 consumes a root-provided typed capability envelope; H02 consumes a
-root-provided artifact-query interface. Neither lane edits compiler,
-production, or formatter internals independently.
+A hub lease is recorded as
+`hub, wave, owner, base_sha, allowed_symbols, expiry_commit`. Only one lease
+exists per hub and a worker holds at most one. M0 consumes a root-provided typed
+capability envelope; H02 consumes a root-provided artifact-query interface.
+Neither lane edits compiler, production, or formatter internals independently.
 
 ### Complete port-map assignment
 
 Every port-map row has one primary lane below. Other slices may consume it but
 do not become co-owners.
 
-| Primary rows | Wave/lane | Owner | Shared lease/adapter | Completion gate |
-|---|---|---|---|---|
-| H00 H01 A00 A01 B00 B01 B02 B03 T00 T01 T02 | verified foundation | root regression | none | all later gates retain foundation invariants |
-| H02 T07 C00 C01 | M0/continuous | oracle + root query | root compiler/production/formatter adapters | retained scorecards and per-wave exact artifacts |
-| B04 T04 M00 | S1, W0-W4 | module owner | root compiler/source adapter | declaration ESM, namespaces, then package/CommonJS closure |
-| R00 R01 R02 | S2, W0-W1 | member/relation owner | exclusive `relater.rs` lease | declared then synthetic/apparent members exact |
-| T03 R03 | S3, W0 | instantiation owner | root store API | shells, mappers, and composite instantiation exact |
-| B05 E00 E01 F00 | S4, W0-W4 | source/flow owner | root `source.rs` adapter | general statement/expression routing and narrowing exact; S7 supplies call/new algorithms |
-| A11 A16 | S5, W1 | property-algebra owner | root type-node/formatter adapters | intersections, `keyof`, indexed access, option matrix exact |
-| T05 T06 R04 | S6, W1 | reference owner | root type-node adapter | local/imported recursive references, aliases, constraints exact |
-| R06 A10 | S7, W2 | call owner | root source/type adapters | overload/rest/spread/construct, tuple-call, and S8-composed const-generic behavior exact |
-| R05 | S8, W2 | inference owner | frozen S7/S8 interface | structured/contextual inference exact |
-| A13 | S9, W3 | conditional owner | root type-node/formatter adapters | conditional/infer core and utility composition exact |
-| A12 | S10, W3 | mapped owner | root type-node/formatter adapters | mapped/reverse-mapped core and utility composition exact |
-| E02 | S11, W1-W4 | class owner | root source/compiler adapter | shells, executable classes, then advanced class closure |
-| M01 M04 | S12, W2-W3 | JSX owner | root TSX admission adapter | basic function JSX, then managed/class JSX exact |
-| A14 A15 | W3-W4 advanced core/follow-on | advanced-type owners | root type/formatter adapters | template/string/NoInfer/intrinsic core, then variance closure exact |
-| M03 | W4 follow-on | modern-syntax owner | root source/compiler adapters | modern option/syntax shards exact |
-| G00 M02 | W5 closure | diagnostics + JS owners | root source/formatter adapters | exact diagnostics and JS/JSDoc project ring |
-| C02 | post-parity | root | production cutover | controlled roll-forward retains frozen parity |
+| Primary rows                                | Wave/lane                     | Owner                   | Shared lease/adapter                        | Completion gate                                                                           |
+| ------------------------------------------- | ----------------------------- | ----------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| H00 H01 A00 A01 B00 B01 B02 B03 T00 T01 T02 | verified foundation           | root regression         | none                                        | all later gates retain foundation invariants                                              |
+| H02 T07 C00 C01                             | M0/continuous                 | oracle + root query     | root compiler/production/formatter adapters | retained scorecards and per-wave exact artifacts                                          |
+| B04 T04 M00                                 | S1, W0-W4                     | module owner            | root compiler/source adapter                | declaration ESM, namespaces, then package/CommonJS closure                                |
+| R00 R01 R02                                 | S2, W0-W1                     | member/relation owner   | exclusive `relater.rs` lease                | declared then synthetic/apparent members exact                                            |
+| T03 R03                                     | S3, W0                        | instantiation owner     | root store API                              | shells, mappers, and composite instantiation exact                                        |
+| B05 E00 E01 F00                             | S4, W0-W4                     | source/flow owner       | root `source.rs` adapter                    | general statement/expression routing and narrowing exact; S7 supplies call/new algorithms |
+| A11 A16                                     | S5, W1                        | property-algebra owner  | root type-node/formatter adapters           | intersections, `keyof`, indexed access, option matrix exact                               |
+| T05 T06 R04                                 | S6, W1                        | reference owner         | root type-node adapter                      | local/imported recursive references, aliases, constraints exact                           |
+| R06 A10                                     | S7, W2                        | call owner              | root source/type adapters                   | overload/rest/spread/construct, tuple-call, and S8-composed const-generic behavior exact  |
+| R05                                         | S8, W2                        | inference owner         | frozen S7/S8 interface                      | structured/contextual inference exact                                                     |
+| A13                                         | S9, W3                        | conditional owner       | root type-node/formatter adapters           | conditional/infer core and utility composition exact                                      |
+| A12                                         | S10, W3                       | mapped owner            | root type-node/formatter adapters           | mapped/reverse-mapped core and utility composition exact                                  |
+| E02                                         | S11, W1-W4                    | class owner             | root source/compiler adapter                | shells, executable classes, then advanced class closure                                   |
+| M01 M04                                     | S12, W2-W3                    | JSX owner               | root TSX admission adapter                  | basic function JSX, then managed/class JSX exact                                          |
+| A14 A15                                     | W3-W4 advanced core/follow-on | advanced-type owners    | root type/formatter adapters                | template/string/NoInfer/intrinsic core, then variance closure exact                       |
+| M03                                         | W4 follow-on                  | modern-syntax owner     | root source/compiler adapters               | modern option/syntax shards exact                                                         |
+| G00 M02                                     | W5 closure                    | diagnostics + JS owners | root source/formatter adapters              | exact diagnostics and JS/JSDoc project ring                                               |
+| C02                                         | post-parity                   | root                    | production cutover                          | controlled roll-forward retains frozen parity                                             |
 
 ## Implement-review-fix loop
 
@@ -1225,29 +1214,29 @@ RUSTDOCFLAGS='-D warnings' \
   scripts/run-cargo-capped.sh doc -p ts_checker --no-deps
 ```
 
-The capped runner defaults to an aggregate memory limit of up to 8 GiB when
-the host has enough available memory. Set `TS_CARGO_MEMORY_LIMIT_KIB` to adjust
-the limit. The complete checker unit-test binary now runs within the updated
-memory envelope. Keep Cargo commands serialized across agent worktrees, and
-run focused public integration tests for each changed behavior.
+The capped runner defaults to an aggregate memory limit of up to 8 GiB when the
+host has enough available memory. Set `TS_CARGO_MEMORY_LIMIT_KIB` to adjust the
+limit. The complete checker unit-test binary now runs within the updated memory
+envelope. Keep Cargo commands serialized across agent worktrees, and run focused
+public integration tests for each changed behavior.
 
 ### Objective modern-project manifest
 
 Before Wave 1 closes, check in
 `tools/ts_fixture/manifests/modern-projects-v1.tsv`. Each row pins repository
 URL and commit, license, lockfile digest, package manager, exact tsconfig paths,
-project ring, non-generated TypeScript line count, and the pinned
-typescript-go artifact digests. Selection happens once under review, not at
-claim time. The initial candidate pool should include a type-heavy library
-such as Zod or ts-pattern, a callback/inference-heavy library such as TanStack
-Query, a multi-package Bundler/ESM library such as Hono, and a React/TSX project
-such as React Hook Form; final entries and revisions are fixed by the manifest.
+project ring, non-generated TypeScript line count, and the pinned typescript-go
+artifact digests. Selection happens once under review, not at claim time. The
+initial candidate pool should include a type-heavy library such as Zod or
+ts-pattern, a callback/inference-heavy library such as TanStack Query, a
+multi-package Bundler/ESM library such as Hono, and a React/TSX project such as
+React Hook Form; final entries and revisions are fixed by the manifest.
 
-The **core ring** contains at least four strict `.ts` projects totaling at
-least 100,000 non-generated lines and covers utility-heavy generics, classes,
-callback inference, and a multi-package Bundler/ESM graph consuming `.d.ts`.
-The **ecosystem ring** adds at least one NodeNext project, one TSX project, and
-one mixed JavaScript/JSDoc project.
+The **core ring** contains at least four strict `.ts` projects totaling at least
+100,000 non-generated lines and covers utility-heavy generics, classes, callback
+inference, and a multi-package Bundler/ESM graph consuming `.d.ts`. The
+**ecosystem ring** adds at least one NodeNext project, one TSX project, and one
+mixed JavaScript/JSDoc project.
 
 A ring passes only from clean pinned checkouts with:
 
@@ -1255,15 +1244,14 @@ A ring passes only from clean pinned checkouts with:
 - identical files, libraries, options, and module graphs in Rust and the pinned
   Go oracle;
 - exact diagnostics, `.types`, and `.symbols`;
-- identical cold execution and forced warm replay across two deterministic
-  runs;
+- identical cold execution and forced warm replay across two deterministic runs;
 - zero unsupported, mismatch, or fatal results; and
 - release-mode wall time no worse than 10x typescript-go and peak RSS no worse
   than `max(2x typescript-go, 4 GiB)` on the recorded machine profile.
 
 Wave 3 may claim the core ring, Wave 4 adds the NodeNext and TSX entries, and
-Wave 5 claims the complete ecosystem ring. These are ceilings for viability,
-not a claim that performance optimization is finished.
+Wave 5 claims the complete ecosystem ring. These are ceilings for viability, not
+a claim that performance optimization is finished.
 
 ## Milestone claims
 
@@ -1272,8 +1260,8 @@ not a claim that performance optimization is finished.
 Claim this only when the pinned modern-project core ring proves:
 
 - `.ts` and consumed `.d.ts` across multi-file Bundler/ESM graphs;
-- ordinary interfaces, generic objects/functions, utility types, arrays,
-  tuples, intersections, indexed access, conditionals, and mapped types;
+- ordinary interfaces, generic objects/functions, utility types, arrays, tuples,
+  intersections, indexed access, conditionals, and mapped types;
 - overloads, callbacks, rest/spread, constructors, and classes;
 - ordinary assignments, branches, loops, switches, and narrowing;
 - strict options needed by the suite; and
@@ -1295,23 +1283,23 @@ semantic dependency closure.
 ### Maintainability
 
 Port one later upstream semantic batch using the retained function/module map,
-then prove both the new epoch and all frozen-epoch regression artifacts. This
-is required evidence that the Rust architecture remains recognizable and
+then prove both the new epoch and all frozen-epoch regression artifacts. This is
+required evidence that the Rust architecture remains recognizable and
 maintainable.
 
 ## Risks and controls
 
-| Risk | Control |
-|---|---|
-| Parallel workers race on shared state | Exclusive module/record ownership; root-only hub adapters; isolated worktrees |
-| Compilation is mistaken for correctness | Two independent adversarial reviews and production-path artifacts |
-| Corpus count rewards front-door admissions | Stable frontier codes plus exact errors/types/symbols and balanced shards |
-| New capabilities poison warm caches | Mandatory forced replay, poison, foreign-ID, and atomic-retry tests |
-| Calls/inference/relations diverge into incompatible mini-engines | Freeze narrow shared APIs and one relation owner per wave |
-| Classes or TSX begin before prerequisites | Enforce the DAG and allow syntax planning only behind fixed semantic plans |
-| Standard library remains special-cased | Make library declarations consumers of S1/S2/S3/S6/S9/S10 |
-| Too many workers overload integration | Cap semantic writers around seven; put excess capacity into review, oracle, and fuzzing |
-| Upstream drift causes endless churn | Frozen epoch, drift ledger, one required roll-forward after parity |
+| Risk                                                             | Control                                                                                 |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Parallel workers race on shared state                            | Exclusive module/record ownership; root-only hub adapters; isolated worktrees           |
+| Compilation is mistaken for correctness                          | Two independent adversarial reviews and production-path artifacts                       |
+| Corpus count rewards front-door admissions                       | Stable frontier codes plus exact errors/types/symbols and balanced shards               |
+| New capabilities poison warm caches                              | Mandatory forced replay, poison, foreign-ID, and atomic-retry tests                     |
+| Calls/inference/relations diverge into incompatible mini-engines | Freeze narrow shared APIs and one relation owner per wave                               |
+| Classes or TSX begin before prerequisites                        | Enforce the DAG and allow syntax planning only behind fixed semantic plans              |
+| Standard library remains special-cased                           | Make library declarations consumers of S1/S2/S3/S6/S9/S10                               |
+| Too many workers overload integration                            | Cap semantic writers around seven; put excess capacity into review, oracle, and fuzzing |
+| Upstream drift causes endless churn                              | Frozen epoch, drift ledger, one required roll-forward after parity                      |
 
 ## Immediate execution queue
 

@@ -24,7 +24,11 @@ R=$ROOT/target/continuation-r97-goport
 SELF=$(realpath "${BASH_SOURCE[0]}")
 G=$(dirname "$SELF")
 RS=$ROOT/scripts/goport/remote.sh
-die() { echo "oracle-rebase.sh: $*" >&2; echo "FAIL rc=2"; exit 2; }
+die() {
+  echo "oracle-rebase.sh: $*" >&2
+  echo "FAIL rc=2"
+  exit 2
+}
 
 (($# >= 4)) || die "usage: oracle-rebase.sh <pin> <name> <bins dir> <out dir> [--no-wire] [--known-diffs TSV]"
 PIN=$1 NAME=$2 BINS=$(realpath -m "$3") OUT=$(realpath -m "$4")
@@ -80,7 +84,11 @@ echo "$(date -u +%FT%TZ) host $H pin $PIN oracle ${OSHA:0:12} bins $(cut -c1-9 "
     "$(realpath "$NTRACES")" "$APIROOT" &&
   "$RS" sync-bins "$H" "$BINS" &&
   "$RS" run "$H" "cd $BINS && sha256sum -c --quiet bins.sha256 && mkdir -p $R/tests2/api/results && echo bins ok"; } \
-  >> "$OUT/logs/sync-$H.log" 2>&1 || { echo "sync to $H failed (log $OUT/logs/sync-$H.log)"; echo "FAIL rc=3"; exit 3; }
+  >>"$OUT/logs/sync-$H.log" 2>&1 || {
+  echo "sync to $H failed (log $OUT/logs/sync-$H.log)"
+  echo "FAIL rc=3"
+  exit 3
+}
 rc=0
 for label in "${LABELS[@]}"; do
   log=$OUT/logs/$label.log
@@ -93,19 +101,28 @@ for label in "${LABELS[@]}"; do
     l+=" --battery \$b --goport $BINS/tsgo --oracle $ORACLE --label $label --jobs 12 ${WIRE:+--wire $WIRE}; done"
   fi
   r=0
-  "$RS" run "$H" "$l" < /dev/null >> "$log" 2>&1 || r=$?
-  "$RS" fetch "$H" "$(dir_of "$label")" >> "$log" 2>&1 || r=$((r ? r : 4))
+  "$RS" run "$H" "$l" </dev/null >>"$log" 2>&1 || r=$?
+  "$RS" fetch "$H" "$(dir_of "$label")" >>"$log" 2>&1 || r=$((r ? r : 4))
   echo "$(date -u +%FT%TZ) end $label rc $r"
   ((r == 0)) || rc=$r
 done
-((rc == 0)) || { echo "FAIL rc=$rc"; exit "$rc"; }
+((rc == 0)) || {
+  echo "FAIL rc=$rc"
+  exit "$rc"
+}
 python3 "$G/oracle-rebase.py" fragment --pin "$PIN" --bins "$BINS" --lsp-tool "$G/lsp_oracle.py" --api-tool "$G/api_oracle.py" \
   ${WIRE:+--wire "$WIRE"} --host "$H" --lsp "$(dir_of "${LABELS[0]}")" "$(dir_of "${LABELS[2]}")" \
   --api "$(dir_of "${LABELS[1]}")" "$(dir_of "${LABELS[3]}")" ${KNOWN:+--known-diffs "$KNOWN"} --out "$OUT/oracle-rebase.json" \
-  > /dev/null || { echo "FAIL rc=5"; exit 5; }
+  >/dev/null || {
+  echo "FAIL rc=5"
+  exit 5
+}
 for k in lsp api; do
-  python3 "$G/oracle-rebase.py" classes "$(dir_of "$k-$NAME-1")" "$(dir_of "$k-$NAME-2")" --out "$OUT/classes-$k.md" > /dev/null ||
-    { echo "FAIL rc=6"; exit 6; }
+  python3 "$G/oracle-rebase.py" classes "$(dir_of "$k-$NAME-1")" "$(dir_of "$k-$NAME-2")" --out "$OUT/classes-$k.md" >/dev/null ||
+    {
+      echo "FAIL rc=6"
+      exit 6
+    }
 done
 echo "$(date -u +%FT%TZ) fragment $OUT/oracle-rebase.json sha256 $(sha256sum "$OUT/oracle-rebase.json" | cut -c1-12)"
 echo DONE

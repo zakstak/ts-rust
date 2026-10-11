@@ -132,7 +132,12 @@ NULL_ANSWER_METHODS = (
     "client/unregisterCapability",
     "window/workDoneProgress/create",
 )
-FORBIDDEN_ANCESTOR_ENTRIES = ("tsconfig.json", "jsconfig.json", "package.json", "node_modules")
+FORBIDDEN_ANCESTOR_ENTRIES = (
+    "tsconfig.json",
+    "jsconfig.json",
+    "package.json",
+    "node_modules",
+)
 EVENT_KINDS = ("request", "notification", "fs", "reply", "expect")
 CLASSES = (
     "same",
@@ -217,7 +222,9 @@ class Reader:
                     )
                 content_length = int(text)
                 if content_length < 0:
-                    raise JsonRpcError(f"{ERR_INVALID_CONTENT_LENGTH}: negative value {content_length}")
+                    raise JsonRpcError(
+                        f"{ERR_INVALID_CONTENT_LENGTH}: negative value {content_length}"
+                    )
 
         if content_length <= 0:
             raise JsonRpcError(ERR_NO_CONTENT_LENGTH)
@@ -293,25 +300,44 @@ IDENTITY = Replacer()
 
 # Go: ls/lsconv/converters.go:86 extraEscapeReplacer
 EXTRA_ESCAPE_REPLACER = Replacer(
-    ":", "%3A",
-    "/", "%2F",
-    "?", "%3F",
-    "#", "%23",
-    "[", "%5B",
-    "]", "%5D",
-    "@", "%40",
-    "!", "%21",
-    "$", "%24",
-    "&", "%26",
-    "'", "%27",
-    "(", "%28",
-    ")", "%29",
-    "*", "%2A",
-    "+", "%2B",
-    ",", "%2C",
-    ";", "%3B",
-    "=", "%3D",
-    " ", "%20",
+    ":",
+    "%3A",
+    "/",
+    "%2F",
+    "?",
+    "%3F",
+    "#",
+    "%23",
+    "[",
+    "%5B",
+    "]",
+    "%5D",
+    "@",
+    "%40",
+    "!",
+    "%21",
+    "$",
+    "%24",
+    "&",
+    "%26",
+    "'",
+    "%27",
+    "(",
+    "%28",
+    ")",
+    "%29",
+    "*",
+    "%2A",
+    "+",
+    "%2B",
+    ",",
+    "%2C",
+    ";",
+    "%3B",
+    "=",
+    "%3D",
+    " ",
+    "%20",
 )
 
 
@@ -324,7 +350,7 @@ def url_path_escape(s: str) -> str:
         if b < 0x80 and (c.isalnum() or c in "-_.~$&+:=@"):
             out.append(c)
         else:
-            out.append("%%%02X" % b)
+            out.append(f"%{b:02X}")
     return "".join(out)
 
 
@@ -356,8 +382,7 @@ def file_name_to_document_uri(file_name: str) -> str:
     if volume != "":
         volume = "/" + EXTRA_ESCAPE_REPLACER.replace(volume)
 
-    if file_name.startswith("//"):
-        file_name = file_name[2:]
+    file_name = file_name.removeprefix("//")
 
     parts = file_name.split("/")
     parts = [EXTRA_ESCAPE_REPLACER.replace(url_path_escape(part)) for part in parts]
@@ -500,7 +525,10 @@ def generalize(path):
 
 
 def pattern_string(pattern) -> str:
-    return "".join("/" + ("*" if t == "*" else str(t).replace("~", "~0").replace("/", "~1")) for t in pattern)
+    return "".join(
+        "/" + ("*" if t == "*" else str(t).replace("~", "~0").replace("/", "~1"))
+        for t in pattern
+    )
 
 
 def apply_multisets(v, patterns):
@@ -536,7 +564,9 @@ def find_unstable(a0, b0, max_rounds=64):
         for k in range(len(d), -1, -1):
             p = d[:k]
             va, vb = pointer_get(a, p), pointer_get(b, p)
-            if not (isinstance(va, list) and isinstance(vb, list)) or len(va) != len(vb):
+            if not (isinstance(va, list) and isinstance(vb, list)) or len(va) != len(
+                vb
+            ):
                 continue
             pat = pattern_string(generalize(p))
             if pat in patterns:
@@ -556,14 +586,43 @@ def find_unstable(a0, b0, max_rounds=64):
 
 # Go: fourslash/fourslash.go:344 defaultSemanticTokenTypes
 DEFAULT_SEMANTIC_TOKEN_TYPES = [
-    "namespace", "class", "enum", "interface", "struct", "typeParameter", "type", "parameter",
-    "variable", "property", "enumMember", "decorator", "event", "function", "method", "macro",
-    "label", "comment", "string", "keyword", "number", "regexp", "operator",
+    "namespace",
+    "class",
+    "enum",
+    "interface",
+    "struct",
+    "typeParameter",
+    "type",
+    "parameter",
+    "variable",
+    "property",
+    "enumMember",
+    "decorator",
+    "event",
+    "function",
+    "method",
+    "macro",
+    "label",
+    "comment",
+    "string",
+    "keyword",
+    "number",
+    "regexp",
+    "operator",
 ]
 # Go: fourslash/fourslash.go:372 defaultSemanticTokenModifiers
 DEFAULT_SEMANTIC_TOKEN_MODIFIERS = [
-    "declaration", "definition", "readonly", "static", "deprecated", "abstract", "async",
-    "modification", "documentation", "defaultLibrary", "local",
+    "declaration",
+    "definition",
+    "readonly",
+    "static",
+    "deprecated",
+    "abstract",
+    "async",
+    "modification",
+    "documentation",
+    "defaultLibrary",
+    "local",
 ]
 
 
@@ -571,7 +630,9 @@ DEFAULT_SEMANTIC_TOKEN_MODIFIERS = [
 def get_capabilities_with_defaults(position_encoding: str):
     # PORT: Go always uses utf-8; sweeps pass utf-16 (map-oracle.md 3.3).
     markdown_plain = ["markdown", "plaintext"]
-    diagnostic_tags = {"valueSet": [1, 2]}  # DiagnosticTagUnnecessary, DiagnosticTagDeprecated
+    diagnostic_tags = {
+        "valueSet": [1, 2]
+    }  # DiagnosticTagUnnecessary, DiagnosticTagDeprecated
     return {
         "general": {"positionEncodings": [position_encoding]},
         "experimental": {"hoverVerbosityLevel": True},
@@ -588,7 +649,10 @@ def get_capabilities_with_defaults(position_encoding: str):
                 "completionList": {"itemDefaults": ["commitCharacters", "editRange"]},
             },
             "diagnostic": {"relatedInformation": True, "tagSupport": diagnostic_tags},
-            "publishDiagnostics": {"relatedInformation": True, "tagSupport": diagnostic_tags},
+            "publishDiagnostics": {
+                "relatedInformation": True,
+                "tagSupport": diagnostic_tags,
+            },
             "semanticTokens": {
                 "requests": {"full": True},
                 "tokenTypes": DEFAULT_SEMANTIC_TOKEN_TYPES,
@@ -616,7 +680,10 @@ def get_capabilities_with_defaults(position_encoding: str):
         },
         "workspace": {
             "fileOperations": {"willRename": True},
-            "workspaceEdit": {"documentChanges": True, "resourceOperations": ["rename"]},
+            "workspaceEdit": {
+                "documentChanges": True,
+                "resourceOperations": ["rename"],
+            },
             "configuration": True,
         },
     }
@@ -627,7 +694,9 @@ def default_initialize_params(header):
         "processId": None,
         "rootUri": ROOT_DIR_URI_PLACEHOLDER,
         "locale": "en-US",
-        "capabilities": get_capabilities_with_defaults(header.get("positionEncoding") or "utf-16"),
+        "capabilities": get_capabilities_with_defaults(
+            header.get("positionEncoding") or "utf-16"
+        ),
         "initializationOptions": {"disablePushDiagnostics": True, "logVerbosity": 0},
     }
 
@@ -650,18 +719,28 @@ def with_ata_off(section):
 
 def initialize_params(ev, header):
     """Params of the initialize event, with the harness settings forced (placeholder form)."""
-    params = copy.deepcopy(ev["params"]) if isinstance(ev.get("params"), dict) else default_initialize_params(header)
+    params = (
+        copy.deepcopy(ev["params"])
+        if isinstance(ev.get("params"), dict)
+        else default_initialize_params(header)
+    )
     # A real process id makes the server watch that process; never send one.
     params["processId"] = None
     opts = params.get("initializationOptions")
     opts = copy.deepcopy(opts) if isinstance(opts, dict) else {}
     opts.setdefault("disablePushDiagnostics", True)
     opts.setdefault("logVerbosity", 0)
-    caps = params.get("capabilities") if isinstance(params.get("capabilities"), dict) else {}
+    caps = (
+        params.get("capabilities")
+        if isinstance(params.get("capabilities"), dict)
+        else {}
+    )
     workspace = caps.get("workspace") if isinstance(caps.get("workspace"), dict) else {}
     # Go: lsp/server.go RequestConfiguration reads initializationOptions.userPreferences
     # as the js/ts section when the client has no workspace.configuration.
-    if workspace.get("configuration") is not True or isinstance(opts.get("userPreferences"), dict):
+    if workspace.get("configuration") is not True or isinstance(
+        opts.get("userPreferences"), dict
+    ):
         opts["userPreferences"] = with_ata_off(opts.get("userPreferences"))
     params["initializationOptions"] = opts
     return params
@@ -672,7 +751,9 @@ def notification_params(ev):
     if "params" not in ev:
         return MISSING
     params = copy.deepcopy(ev["params"])
-    if ev.get("method") == "workspace/didChangeConfiguration" and isinstance(params, dict):
+    if ev.get("method") == "workspace/didChangeConfiguration" and isinstance(
+        params, dict
+    ):
         settings = params.get("settings")
         # Go: lsp/server.go handleDidChangeWorkspaceConfiguration ignores nil and non-object settings.
         if isinstance(settings, dict):
@@ -688,10 +769,19 @@ def configuration_result(req_params, config, reply_result=MISSING):
         result = copy.deepcopy(reply_result)
     else:
         config = config if isinstance(config, dict) else {}
-        result = [copy.deepcopy(config.get(it.get("section"))) if isinstance(it, dict) else None for it in items]
+        result = [
+            copy.deepcopy(config.get(it.get("section")))
+            if isinstance(it, dict)
+            else None
+            for it in items
+        ]
     if isinstance(result, list):
         for j, it in enumerate(items):
-            if j < len(result) and isinstance(it, dict) and it.get("section") == "js/ts":
+            if (
+                j < len(result)
+                and isinstance(it, dict)
+                and it.get("section") == "js/ts"
+            ):
                 result[j] = with_ata_off(result[j])
     return result
 
@@ -707,11 +797,17 @@ def normalize_response(method, msg, norm: Replacer):
     if err is not None:
         err = err if isinstance(err, dict) else {"message": str(err)}
         message = str(err.get("message", "")).split("\n", 1)[0]
-        return "error", {"error": {"code": err.get("code"), "message": norm.replace(message)}}
+        return "error", {
+            "error": {"code": err.get("code"), "message": norm.replace(message)}
+        }
     if "result" not in msg:
         return "ok", {"missingResult": True}
     result = norm.value(msg["result"])
-    if method == "initialize" and isinstance(result, dict) and isinstance(result.get("serverInfo"), dict):
+    if (
+        method == "initialize"
+        and isinstance(result, dict)
+        and isinstance(result.get("serverInfo"), dict)
+    ):
         result["serverInfo"].pop("version", None)
     if method == "textDocument/completion":
         # Go map order makes the item order random (map-oracle.md 2).
@@ -801,7 +897,9 @@ def check_materialized_root(root: str):
     while True:
         for name in FORBIDDEN_ANCESTOR_ENTRIES:
             if os.path.lexists(os.path.join(p, name)):
-                raise UsageError(f"refusing materialized root {root}: {os.path.join(p, name)} exists (tsgo walks up)")
+                raise UsageError(
+                    f"refusing materialized root {root}: {os.path.join(p, name)} exists (tsgo walks up)"
+                )
         if p == "/":
             break
         p = os.path.dirname(p)
@@ -813,6 +911,7 @@ def check_input_unchanged(guard: str, marker: str):
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         text=True,
+        check=False,
     )
     return out.stdout.strip() or None
 
@@ -837,12 +936,18 @@ def write_root_file(root: str, rel: str, content, expand: Replacer):
             f.write(expand.replace(content))
     elif isinstance(content, dict) and isinstance(content.get("symlink"), str):
         target = expand.replace(content["symlink"])
-        resolved = target if os.path.isabs(target) else os.path.join(os.path.dirname(path), target)
+        resolved = (
+            target
+            if os.path.isabs(target)
+            else os.path.join(os.path.dirname(path), target)
+        )
         if not is_within(resolved, root):
             raise TraceError(f"symlink {rel!r} -> {target!r} leaves the root")
         os.symlink(target, path)
     else:
-        raise TraceError(f"file {rel!r}: content must be a string or {{\"symlink\": target}}")
+        raise TraceError(
+            f'file {rel!r}: content must be a string or {{"symlink": target}}'
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -854,7 +959,11 @@ def load_trace(path):
     """Returns (header, events, sha256 of the file)."""
     with open(path, "rb") as f:
         raw = f.read()
-    text = gzip.decompress(raw).decode("utf-8") if path.endswith(".gz") else raw.decode("utf-8")
+    text = (
+        gzip.decompress(raw).decode("utf-8")
+        if path.endswith(".gz")
+        else raw.decode("utf-8")
+    )
     lines = [line for line in text.split("\n") if line.strip()]
     if not lines:
         raise TraceError("empty trace")
@@ -873,31 +982,47 @@ def validate_trace(header, events):
     root = header.get("root")
     if not isinstance(root, dict) or root.get("kind") not in ("materialize", "project"):
         raise TraceError("header root.kind must be materialize or project")
-    if not events or events[0].get("kind") != "request" or events[0].get("method") != "initialize":
+    if (
+        not events
+        or events[0].get("kind") != "request"
+        or events[0].get("method") != "initialize"
+    ):
         raise TraceError("event 0 must be the initialize request")
     for i, ev in enumerate(events):
         if not isinstance(ev, dict) or ev.get("kind") not in EVENT_KINDS:
             raise TraceError(f"event {i}: unknown kind")
-        if ev["kind"] in ("request", "notification", "reply") and not isinstance(ev.get("method"), str):
+        if ev["kind"] in ("request", "notification", "reply") and not isinstance(
+            ev.get("method"), str
+        ):
             raise TraceError(f"event {i}: missing method")
         pf = ev.get("paramsFrom")
         if pf is not None:
-            if ev["kind"] != "request" or not isinstance(pf, dict) or not isinstance(pf.get("event"), int):
+            if (
+                ev["kind"] != "request"
+                or not isinstance(pf, dict)
+                or not isinstance(pf.get("event"), int)
+            ):
                 raise TraceError(f"event {i}: bad paramsFrom")
             if not 0 <= pf["event"] < i:
                 raise TraceError(f"event {i}: paramsFrom must name an earlier event")
         if ev["kind"] == "fs":
-            if ev.get("op") not in ("write", "append", "remove") or not isinstance(ev.get("path"), str):
+            if ev.get("op") not in ("write", "append", "remove") or not isinstance(
+                ev.get("path"), str
+            ):
                 raise TraceError(f"event {i}: bad fs event")
             if root.get("kind") == "project":
-                raise TraceError(f"event {i}: fs events are refused on read-only project roots")
+                raise TraceError(
+                    f"event {i}: fs events are refused on read-only project roots"
+                )
 
 
 def write_golden(path, header_line, records):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp"
     with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=6) as f:
-        f.write(json.dumps(header_line, ensure_ascii=False, separators=(",", ":")) + "\n")
+        f.write(
+            json.dumps(header_line, ensure_ascii=False, separators=(",", ":")) + "\n"
+        )
         for rec in records:
             f.write(json.dumps(rec, ensure_ascii=False, separators=(",", ":")) + "\n")
     os.replace(tmp, path)
@@ -939,7 +1064,15 @@ def expand_batteries(base: str, battery: str):
         if os.path.isdir(d):
             out.append((name, d))
             continue
-        subs = sorted(x for x in os.listdir(base) if x.startswith(name + "-") and os.path.isdir(os.path.join(base, x))) if os.path.isdir(base) else []
+        subs = (
+            sorted(
+                x
+                for x in os.listdir(base)
+                if x.startswith(name + "-") and os.path.isdir(os.path.join(base, x))
+            )
+            if os.path.isdir(base)
+            else []
+        )
         if not subs:
             raise UsageError(f"no battery {name!r} under {base}")
         out.extend((s, os.path.join(base, s)) for s in subs)
@@ -992,7 +1125,12 @@ class LspClient:
     def __init__(self, argv, cwd, env, on_server_request, on_message=None):
         try:
             self.proc = subprocess.Popen(
-                argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                argv,
+                cwd=cwd,
+                env=env,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
         except OSError as e:
             raise UsageError(f"cannot start {argv[0]}: {e}") from None
@@ -1041,7 +1179,9 @@ class LspClient:
 
     def _read_stderr(self):
         for line in self.proc.stderr:
-            self.stderr_tail.append(line.decode("utf-8", errors="replace").rstrip()[:300])
+            self.stderr_tail.append(
+                line.decode("utf-8", errors="replace").rstrip()[:300]
+            )
         self.stderr_done.set()
 
     # Go: lspclient.go:196 handleServerRequest
@@ -1165,10 +1305,14 @@ class Root:
         run_uri = file_name_to_document_uri(trace_dir)
         # Go: lsp/replay_test.go:100 rootDirReplacer
         self.expand = Replacer(
-            ROOT_DIR_PLACEHOLDER, path,
-            ROOT_DIR_URI_PLACEHOLDER, self.uri,
-            RUN_DIR_PLACEHOLDER, trace_dir,
-            RUN_DIR_URI_PLACEHOLDER, run_uri,
+            ROOT_DIR_PLACEHOLDER,
+            path,
+            ROOT_DIR_URI_PLACEHOLDER,
+            self.uri,
+            RUN_DIR_PLACEHOLDER,
+            trace_dir,
+            RUN_DIR_URI_PLACEHOLDER,
+            run_uri,
         )
         # Normalization rule 1: the longest actual string first.
         pairs = [
@@ -1183,7 +1327,9 @@ class Root:
 
 def prepare_root(header, run_dir, key):
     for salt in itertools.count():
-        trace_dir = os.path.join(run_dir, hashlib.sha256(f"{key}#{salt}".encode()).hexdigest()[:8])
+        trace_dir = os.path.join(
+            run_dir, hashlib.sha256(f"{key}#{salt}".encode()).hexdigest()[:8]
+        )
         try:
             os.makedirs(trace_dir)
             break
@@ -1212,7 +1358,9 @@ def _prepare_root(header, run_dir, trace_dir):
         path = os.path.realpath(d)
         guard = guard_dir_for(path)
         if is_within(run_dir, guard):
-            raise UsageError(f"run directory {run_dir} is inside the project input {guard}")
+            raise UsageError(
+                f"run directory {run_dir} is inside the project input {guard}"
+            )
     cwd_rel = header.get("cwd") or ""
     cwd = path if cwd_rel in ("", ".") else safe_join(path, cwd_rel)
     root = Root(path, cwd, trace_dir, home, guard)
@@ -1248,7 +1396,12 @@ def resolve_params_from(pf, ev, results):
             return MISSING, "pick on a non-array value"
         if "match" in pick:
             want = pick["match"]
-            hits = [e for e in value if isinstance(e, dict) and all(canon(e.get(k)) == canon(v) for k, v in want.items())]
+            hits = [
+                e
+                for e in value
+                if isinstance(e, dict)
+                and all(canon(e.get(k)) == canon(v) for k, v in want.items())
+            ]
             if not hits:
                 return MISSING, "no element matches"
             value = hits[0]
@@ -1290,8 +1443,22 @@ class SessionRun:
     sends exactly the params stored in the golden and skips requests the oracle
     did not answer."""
 
-    def __init__(self, *, header, events, frozen, argv, role, run_dir, key, marker,
-                 request_timeout=None, methods=None, printer=None, keep=False):
+    def __init__(
+        self,
+        *,
+        header,
+        events,
+        frozen,
+        argv,
+        role,
+        run_dir,
+        key,
+        marker,
+        request_timeout=None,
+        methods=None,
+        printer=None,
+        keep=False,
+    ):
         self.header = header
         self.events = events  # [(index, event)]
         self.frozen = frozen
@@ -1321,7 +1488,11 @@ class SessionRun:
             result = None
         else:
             return None
-        return {"jsonrpc": req.get("jsonrpc", "2.0"), "id": req.get("id"), "result": result}
+        return {
+            "jsonrpc": req.get("jsonrpc", "2.0"),
+            "id": req.get("id"),
+            "result": result,
+        }
 
     def run(self):
         start = time.monotonic()
@@ -1343,7 +1514,9 @@ class SessionRun:
         dead = None
         last_send = None
         max_gap = 0.0
-        client = LspClient(self.argv, root.cwd, session_env(root), self.on_server_request, self.printer)
+        client = LspClient(
+            self.argv, root.cwd, session_env(root), self.on_server_request, self.printer
+        )
         shutdown = {}
         code = None
         try:
@@ -1355,9 +1528,14 @@ class SessionRun:
                     method = ev["method"]
                     rec = {"i": i, "kind": "request", "method": method, "id": next_id}
                     if self.frozen:
-                        params = copy.deepcopy(ev["params"]) if "params" in ev else MISSING
+                        params = (
+                            copy.deepcopy(ev["params"]) if "params" in ev else MISSING
+                        )
                         if ev.get("status") not in ("ok", "error"):
-                            rec.update(status="not_run", reason="oracle:" + str(ev.get("status")))
+                            rec.update(
+                                status="not_run",
+                                reason="oracle:" + str(ev.get("status")),
+                            )
                     elif i == 0:
                         params = initialize_params(ev, self.header)
                     elif "paramsFrom" in ev:
@@ -1366,12 +1544,21 @@ class SessionRun:
                         if params is MISSING:
                             rec.update(status="not_run", reason="paramsFrom: " + why)
                     else:
-                        params = copy.deepcopy(ev["params"]) if "params" in ev else MISSING
+                        params = (
+                            copy.deepcopy(ev["params"]) if "params" in ev else MISSING
+                        )
                     if params is not MISSING:
                         rec["params"] = params
                     if "status" not in rec and dead is not None:
-                        rec.update(status="crash" if dead == "crash" else "not_run", reason="after " + dead)
-                    if "status" not in rec and i != 0 and not method_selected(method, self.methods):
+                        rec.update(
+                            status="crash" if dead == "crash" else "not_run",
+                            reason="after " + dead,
+                        )
+                    if (
+                        "status" not in rec
+                        and i != 0
+                        and not method_selected(method, self.methods)
+                    ):
                         rec["status"] = "skipped_method"
                     if "status" in rec:
                         records.append(rec)
@@ -1387,7 +1574,11 @@ class SessionRun:
                         if "params" in msg:
                             entry["params"] = root.normalize.value(msg["params"])
                         if entry["dir"] == "response":
-                            entry.update(root.normalize.value({k: v for k, v in msg.items() if k != "jsonrpc"}))
+                            entry.update(
+                                root.normalize.value(
+                                    {k: v for k, v in msg.items() if k != "jsonrpc"}
+                                )
+                            )
                         traffic.append(entry)
 
                     now = time.monotonic()
@@ -1395,7 +1586,9 @@ class SessionRun:
                         max_gap = max(max_gap, now - last_send)
                     last_send = now
                     timeout = INITIALIZE_TIMEOUT if i == 0 else self.request_timeout
-                    st, msg = client.send_request_worker(method, root.expand.value(params), next_id, timeout, sink)
+                    st, msg = client.send_request_worker(
+                        method, root.expand.value(params), next_id, timeout, sink
+                    )
                     rec["ms"] = round((time.monotonic() - now) * 1000, 2)
                     if st == "ok":
                         status, resp = normalize_response(method, msg, root.normalize)
@@ -1423,7 +1616,9 @@ class SessionRun:
                             dead = "crash"
                 elif kind == "notification":
                     if self.frozen:
-                        params = copy.deepcopy(ev["params"]) if "params" in ev else MISSING
+                        params = (
+                            copy.deepcopy(ev["params"]) if "params" in ev else MISSING
+                        )
                     else:
                         params = notification_params(ev)
                     rec = {"i": i, "kind": "notification", "method": ev["method"]}
@@ -1432,7 +1627,9 @@ class SessionRun:
                     records.append(rec)
                     if dead is None:
                         try:
-                            client.send_notification(ev["method"], root.expand.value(params))
+                            client.send_notification(
+                                ev["method"], root.expand.value(params)
+                            )
                         except OSError:
                             dead = "crash"
                 elif kind == "fs":
@@ -1443,17 +1640,33 @@ class SessionRun:
                         self.apply_fs(ev)
                 elif kind == "reply":
                     self.replies[ev["method"]].append(ev)
-                    records.append({"i": i, "kind": "reply", "method": ev["method"], "result": ev.get("result")})
+                    records.append(
+                        {
+                            "i": i,
+                            "kind": "reply",
+                            "method": ev["method"],
+                            "result": ev.get("result"),
+                        }
+                    )
                 elif kind == "expect":
-                    rec = {"i": i, "kind": "expect", "event": ev.get("event"), "response": ev.get("response")}
+                    rec = {
+                        "i": i,
+                        "kind": "expect",
+                        "event": ev.get("event"),
+                        "response": ev.get("response"),
+                    }
                     expects.append(rec)
                     records.append(rec)
             if dead is None:
                 sd = []
-                st, msg = client.send_request_worker("shutdown", MISSING, next_id + 1, SHUTDOWN_TIMEOUT, sd.append)
+                st, msg = client.send_request_worker(
+                    "shutdown", MISSING, next_id + 1, SHUTDOWN_TIMEOUT, sd.append
+                )
                 shutdown = {"id": next_id + 1, "status": st}
                 if st == "ok":
-                    shutdown["status"], shutdown["response"] = normalize_response("shutdown", msg, root.normalize)
+                    shutdown["status"], shutdown["response"] = normalize_response(
+                        "shutdown", msg, root.normalize
+                    )
                 if st != "crash":
                     try:
                         client.send_notification("exit")
@@ -1478,17 +1691,25 @@ class SessionRun:
                 rec["fidelity"] = "not_run"
             else:
                 exp = rec.get("response")
-                if isinstance(exp, dict) and ("result" in exp or "error" in exp) and set(exp) <= {"jsonrpc", "id", "result", "error"}:
+                if (
+                    isinstance(exp, dict)
+                    and ("result" in exp or "error" in exp)
+                    and set(exp) <= {"jsonrpc", "id", "result", "error"}
+                ):
                     msg = exp
                 else:
                     msg = {"result": exp}
                 _, norm = normalize_response(target["method"], msg, IDENTITY)
-                rec["fidelity"] = "same" if canon(norm) == canon(target["response"]) else "diff"
+                rec["fidelity"] = (
+                    "same" if canon(norm) == canon(target["response"]) else "diff"
+                )
             fidelity[rec["fidelity"]] += 1
         # A kill by the harness (after a timeout, or no exit after `exit`) is not a crash of the server.
         killed_by_harness = dead == "timeout" or code == "killed"
-        exit_crash = not killed_by_harness and isinstance(code, int) and (
-            code < 0 or (self.role == "goport" and code == EXIT_UNPORTED)
+        exit_crash = (
+            not killed_by_harness
+            and isinstance(code, int)
+            and (code < 0 or (self.role == "goport" and code == EXIT_UNPORTED))
         )
         return {
             "records": records,
@@ -1513,13 +1734,19 @@ class SessionRun:
         if op in ("write", "append"):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             if os.path.lexists(path) and not is_within(path, root):
-                raise TraceError(f"fs {op} {ev['path']!r} leaves the root through a symlink")
-            with open(path, "w" if op == "write" else "a", encoding="utf-8", newline="") as f:
+                raise TraceError(
+                    f"fs {op} {ev['path']!r} leaves the root through a symlink"
+                )
+            with open(
+                path, "w" if op == "write" else "a", encoding="utf-8", newline=""
+            ) as f:
                 f.write(self.root.expand.replace(ev.get("content") or ""))
         elif os.path.islink(path) or os.path.isfile(path):
             os.remove(path)
         elif os.path.isdir(path):
-            if not is_within(path, root) or os.path.realpath(path) == os.path.realpath(root):
+            if not is_within(path, root) or os.path.realpath(path) == os.path.realpath(
+                root
+            ):
                 raise TraceError(f"fs remove {ev['path']!r} leaves the root")
             shutil.rmtree(path)
 
@@ -1563,11 +1790,15 @@ class Context:
         self.out_root = os.path.realpath(args.out_root)
         if is_within(self.out_root, PROJECT_INPUTS):
             raise UsageError(f"--out-root {self.out_root} is inside the project inputs")
-        self.traces_dir = os.path.realpath(getattr(args, "traces_dir", None) or os.path.join(self.out_root, "traces"))
+        self.traces_dir = os.path.realpath(
+            getattr(args, "traces_dir", None) or os.path.join(self.out_root, "traces")
+        )
         base = os.path.join(os.path.realpath(tempfile.gettempdir()), "goport-lsp")
         self.run_dir = os.path.join(base, f"{command}-{os.getpid()}-{int(time.time())}")
         if is_within(self.run_dir, PROJECT_INPUTS):
-            raise UsageError(f"run directory {self.run_dir} is inside the project inputs")
+            raise UsageError(
+                f"run directory {self.run_dir} is inside the project inputs"
+            )
         os.makedirs(self.run_dir)
         self.marker = os.path.join(self.run_dir, ".start")
         with open(self.marker, "w"):
@@ -1626,7 +1857,11 @@ def cmd_record(args):
         groot = golden_root_for(ctx.out_root, sha)
         batteries = expand_batteries(ctx.traces_dir, args.battery)
         for battery, bdir in batteries:
-            traces = [(n, p) for n, p in list_files(bdir, (".jsonl.gz", ".jsonl")) if not args.only or args.only in n]
+            traces = [
+                (n, p)
+                for n, p in list_files(bdir, (".jsonl.gz", ".jsonl"))
+                if not args.only or args.only in n
+            ]
             outcome = collections.Counter()
 
             def one(item, battery=battery):
@@ -1647,10 +1882,16 @@ def cmd_record(args):
                         pass
                 try:
                     result = SessionRun(
-                        header=header, events=list(enumerate(events)), frozen=False,
-                        argv=[oracle, "--lsp", "--stdio"], role="oracle", run_dir=ctx.run_dir,
-                        key=ctx.key(battery, name, "record"), marker=ctx.marker,
-                        request_timeout=args.request_timeout, keep=ctx.keep,
+                        header=header,
+                        events=list(enumerate(events)),
+                        frozen=False,
+                        argv=[oracle, "--lsp", "--stdio"],
+                        role="oracle",
+                        run_dir=ctx.run_dir,
+                        key=ctx.key(battery, name, "record"),
+                        marker=ctx.marker,
+                        request_timeout=args.request_timeout,
+                        keep=ctx.keep,
                     ).run()
                 except TraceError as e:
                     log(f"trace {battery}/{name} failed: {e}")
@@ -1677,8 +1918,11 @@ def cmd_record(args):
                 write_golden(gpath, header_line, result["records"])
                 cleanup_trace_dir(result, ctx.keep)
                 st = counts["status"]
-                log(f"record {battery}/{name}: {sum(st.values())} requests "
-                    + " ".join(f"{k} {v}" for k, v in sorted(st.items())) + f" ({result['wallMs'] / 1000:.1f}s)")
+                log(
+                    f"record {battery}/{name}: {sum(st.values())} requests "
+                    + " ".join(f"{k} {v}" for k, v in sorted(st.items()))
+                    + f" ({result['wallMs'] / 1000:.1f}s)"
+                )
                 return "recorded"
 
             for r in run_jobs(args.jobs, traces, one):
@@ -1731,15 +1975,28 @@ def record_summary(groot, battery, oracle, sha, outcome):
 
 
 def format_record_summary(s):
-    lines = [f"record {s['battery']}: oracle {s['oracle']['sha256'][:12]}, {s['goldens']} goldens; this run "
-             + ", ".join(f"{k} {v}" for k, v in sorted(s["thisRun"].items()))]
-    lines.append("  requests: " + ", ".join(f"{k} {v}" for k, v in sorted(s["requests"].items())))
+    lines = [
+        f"record {s['battery']}: oracle {s['oracle']['sha256'][:12]}, {s['goldens']} goldens; this run "
+        + ", ".join(f"{k} {v}" for k, v in sorted(s["thisRun"].items()))
+    ]
+    lines.append(
+        "  requests: " + ", ".join(f"{k} {v}" for k, v in sorted(s["requests"].items()))
+    )
     if s["errors"]:
-        lines.append("  oracle errors: " + ", ".join(f"{k} {v}" for k, v in sorted(s["errors"].items())))
+        lines.append(
+            "  oracle errors: "
+            + ", ".join(f"{k} {v}" for k, v in sorted(s["errors"].items()))
+        )
     if s["fidelity"]:
-        lines.append("  fidelity: " + ", ".join(f"{k} {v}" for k, v in sorted(s["fidelity"].items())))
-    lines.append("  exit codes: " + ", ".join(f"{k} {v}" for k, v in sorted(s["exitCodes"].items()))
-                 + f"; timing-risk {s['timingRisk']}")
+        lines.append(
+            "  fidelity: "
+            + ", ".join(f"{k} {v}" for k, v in sorted(s["fidelity"].items()))
+        )
+    lines.append(
+        "  exit codes: "
+        + ", ".join(f"{k} {v}" for k, v in sorted(s["exitCodes"].items()))
+        + f"; timing-risk {s['timingRisk']}"
+    )
     return "\n".join(lines)
 
 
@@ -1755,7 +2012,11 @@ def cmd_selfcheck(args):
         groot = golden_root_for(ctx.out_root, sha)
         batteries = expand_batteries(groot, args.battery)
         for battery, bdir in batteries:
-            goldens = [(n, p) for n, p in list_files(bdir, (".golden.jsonl.gz",)) if not args.only or args.only in n]
+            goldens = [
+                (n, p)
+                for n, p in list_files(bdir, (".golden.jsonl.gz",))
+                if not args.only or args.only in n
+            ]
             totals = collections.Counter()
 
             def one(item, battery=battery):
@@ -1764,7 +2025,9 @@ def cmd_selfcheck(args):
                     return None
                 header, records = read_golden(gpath)
                 if header.get("oracle", {}).get("sha256") != sha:
-                    log(f"golden {battery}/{name} was recorded by another oracle; skipped")
+                    log(
+                        f"golden {battery}/{name} was recorded by another oracle; skipped"
+                    )
                     return None
                 gsha = sha256_file(gpath)
                 fpath = flaky_path(groot, battery, name)
@@ -1780,10 +2043,16 @@ def cmd_selfcheck(args):
                 for _ in range(args.runs):
                     try:
                         result = SessionRun(
-                            header=header["header"], events=golden_events(records), frozen=True,
-                            argv=[oracle, "--lsp", "--stdio"], role="oracle", run_dir=ctx.run_dir,
-                            key=ctx.key(battery, name, "selfcheck"), marker=ctx.marker,
-                            request_timeout=args.request_timeout, keep=ctx.keep,
+                            header=header["header"],
+                            events=golden_events(records),
+                            frozen=True,
+                            argv=[oracle, "--lsp", "--stdio"],
+                            role="oracle",
+                            run_dir=ctx.run_dir,
+                            key=ctx.key(battery, name, "selfcheck"),
+                            marker=ctx.marker,
+                            request_timeout=args.request_timeout,
+                            keep=ctx.keep,
                         ).run()
                     except TraceError as e:
                         log(f"selfcheck {battery}/{name} failed: {e}")
@@ -1801,9 +2070,19 @@ def cmd_selfcheck(args):
                             continue
                         if canon(g.get("response")) == canon(rec.get("response")):
                             continue
-                        entry = events.get(key) or {"method": rec["method"], "multiset": []}
-                        if g["status"] == "ok" and rec["status"] == "ok" and "result" in g["response"] and "result" in rec["response"]:
-                            pats, bad = find_unstable(g["response"]["result"], rec["response"]["result"])
+                        entry = events.get(key) or {
+                            "method": rec["method"],
+                            "multiset": [],
+                        }
+                        if (
+                            g["status"] == "ok"
+                            and rec["status"] == "ok"
+                            and "result" in g["response"]
+                            and "result" in rec["response"]
+                        ):
+                            pats, bad = find_unstable(
+                                g["response"]["result"], rec["response"]["result"]
+                            )
                         else:
                             pats, bad = [], "(status or error differs)"
                         entry["multiset"] = sorted(set(entry["multiset"]) | set(pats))
@@ -1812,20 +2091,36 @@ def cmd_selfcheck(args):
                             entry.setdefault("pointer", bad)
                         events[key] = entry
                     cleanup_trace_dir(result, ctx.keep)
-                write_json(fpath, {
-                    "format": FLAKY_FORMAT,
-                    "golden": gpath,
-                    "goldenSha256": gsha,
-                    "oracleSha256": sha,
-                    "runs": runs,
-                    "checked": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                    "events": dict(sorted(events.items(), key=lambda kv: int(kv[0]))),
-                    "rerunProblems": problems,
-                })
+                write_json(
+                    fpath,
+                    {
+                        "format": FLAKY_FORMAT,
+                        "golden": gpath,
+                        "goldenSha256": gsha,
+                        "oracleSha256": sha,
+                        "runs": runs,
+                        "checked": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                        "events": dict(
+                            sorted(events.items(), key=lambda kv: int(kv[0]))
+                        ),
+                        "rerunProblems": problems,
+                    },
+                )
                 n_unstable = sum(1 for e in events.values() if e.get("unstable"))
-                n_multi = sum(1 for e in events.values() if e.get("multiset") and not e.get("unstable"))
-                log(f"selfcheck {battery}/{name}: {len(by_i)} requests, multiset {n_multi}, unstable {n_unstable}, rerun problems {len(problems)}")
-                return {"requests": len(by_i), "multiset": n_multi, "unstable": n_unstable, "problems": len(problems)}
+                n_multi = sum(
+                    1
+                    for e in events.values()
+                    if e.get("multiset") and not e.get("unstable")
+                )
+                log(
+                    f"selfcheck {battery}/{name}: {len(by_i)} requests, multiset {n_multi}, unstable {n_unstable}, rerun problems {len(problems)}"
+                )
+                return {
+                    "requests": len(by_i),
+                    "multiset": n_multi,
+                    "unstable": n_unstable,
+                    "problems": len(problems),
+                }
 
             for r in run_jobs(args.jobs, goldens, one):
                 if r == "failed":
@@ -1834,10 +2129,18 @@ def cmd_selfcheck(args):
                 elif isinstance(r, dict):
                     totals["traces"] += 1
                     totals.update(r)
-            summary = {"format": "goport-lsp-selfcheck-summary/1", "battery": battery, "oracleSha256": sha,
-                       "generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"), **dict(totals)}
+            summary = {
+                "format": "goport-lsp-selfcheck-summary/1",
+                "battery": battery,
+                "oracleSha256": sha,
+                "generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                **dict(totals),
+            }
             write_json(os.path.join(groot, battery, "selfcheck-summary.json"), summary)
-            print(f"selfcheck {battery}: " + ", ".join(f"{k} {v}" for k, v in sorted(totals.items())))
+            print(
+                f"selfcheck {battery}: "
+                + ", ".join(f"{k} {v}" for k, v in sorted(totals.items()))
+            )
     finally:
         ctx.close()
     return status
@@ -1854,13 +2157,19 @@ def cmd_check(args):
             raise UsageError(f"--goport {goport} is not an executable file")
         goport_sha = sha256_file(goport)
         label_dir = os.path.join(ctx.out_root, "results", args.label)
-        methods = set(m for m in (args.methods or "").split(",") if m) or None
+        methods = {m for m in (args.methods or "").split(",") if m} or None
         batteries = expand_batteries(groot, args.battery)
         for battery, _ in batteries:
             if os.path.exists(os.path.join(label_dir, "traces", battery)):
-                raise UsageError(f"results for {args.label}/{battery} exist; use a new label (results are never replaced)")
+                raise UsageError(
+                    f"results for {args.label}/{battery} exist; use a new label (results are never replaced)"
+                )
         for battery, bdir in batteries:
-            goldens = [(n, p) for n, p in list_files(bdir, (".golden.jsonl.gz",)) if not args.only or args.only in n]
+            goldens = [
+                (n, p)
+                for n, p in list_files(bdir, (".golden.jsonl.gz",))
+                if not args.only or args.only in n
+            ]
 
             def one(item, battery=battery):
                 name, gpath = item
@@ -1875,16 +2184,25 @@ def cmd_check(args):
                     if f.get("goldenSha256") == gsha:
                         flaky = f.get("events", {})
                     else:
-                        log(f"{battery}/{name}: flaky file is for another golden; ignored")
+                        log(
+                            f"{battery}/{name}: flaky file is for another golden; ignored"
+                        )
                         fpath = None
                 else:
                     fpath = None
                 try:
                     result = SessionRun(
-                        header=header["header"], events=golden_events(records), frozen=True,
-                        argv=[goport, "--lsp", "--stdio"], role="goport", run_dir=ctx.run_dir,
-                        key=ctx.key(battery, name, "check"), marker=ctx.marker,
-                        request_timeout=args.request_timeout, methods=methods, keep=ctx.keep,
+                        header=header["header"],
+                        events=golden_events(records),
+                        frozen=True,
+                        argv=[goport, "--lsp", "--stdio"],
+                        role="goport",
+                        run_dir=ctx.run_dir,
+                        key=ctx.key(battery, name, "check"),
+                        marker=ctx.marker,
+                        request_timeout=args.request_timeout,
+                        methods=methods,
+                        keep=ctx.keep,
                     ).run()
                 except TraceError as e:
                     log(f"check {battery}/{name} failed: {e}")
@@ -1910,8 +2228,13 @@ def cmd_check(args):
                         ev["ms"] = rec["ms"]
                     if "ms" in g:
                         ev["oracleMs"] = g["ms"]
-                    if rec.get("status") in ("ok", "error") and g.get("status") in ("ok", "error"):
-                        same_traffic = canon(g.get("traffic", [])) == canon(rec.get("traffic", []))
+                    if rec.get("status") in ("ok", "error") and g.get("status") in (
+                        "ok",
+                        "error",
+                    ):
+                        same_traffic = canon(g.get("traffic", [])) == canon(
+                            rec.get("traffic", [])
+                        )
                         ev["traffic"] = "same" if same_traffic else "diff"
                         traffic_diff += not same_traffic
                     events.append(ev)
@@ -1919,13 +2242,35 @@ def cmd_check(args):
                     if cls == "goport_error":
                         subs[sub] += 1
                     if first is None and cls in DIVERGENT_CLASSES:
-                        first = {k: ev[k] for k in ("i", "method", "class", "sub", "pointer") if k in ev}
-                    responses.append({k: rec[k] for k in ("i", "method", "status", "response", "traffic", "reason") if k in rec})
-                rpath = os.path.join(label_dir, "responses", battery, name + ".jsonl.gz")
+                        first = {
+                            k: ev[k]
+                            for k in ("i", "method", "class", "sub", "pointer")
+                            if k in ev
+                        }
+                    responses.append(
+                        {
+                            k: rec[k]
+                            for k in (
+                                "i",
+                                "method",
+                                "status",
+                                "response",
+                                "traffic",
+                                "reason",
+                            )
+                            if k in rec
+                        }
+                    )
+                rpath = os.path.join(
+                    label_dir, "responses", battery, name + ".jsonl.gz"
+                )
                 os.makedirs(os.path.dirname(rpath), exist_ok=True)
                 with gzip.open(rpath, "wt", encoding="utf-8") as f:
                     for r in responses:
-                        f.write(json.dumps(r, ensure_ascii=False, separators=(",", ":")) + "\n")
+                        f.write(
+                            json.dumps(r, ensure_ascii=False, separators=(",", ":"))
+                            + "\n"
+                        )
                 trace_result = {
                     "format": RESULT_FORMAT,
                     "label": args.label,
@@ -1950,10 +2295,16 @@ def cmd_check(args):
                     "wallMs": result["wallMs"],
                     "events": events,
                 }
-                write_json(os.path.join(label_dir, "traces", battery, name + ".json"), trace_result)
+                write_json(
+                    os.path.join(label_dir, "traces", battery, name + ".json"),
+                    trace_result,
+                )
                 cleanup_trace_dir(result, ctx.keep)
-                log(f"check {battery}/{name}: " + " ".join(f"{k} {v}" for k, v in sorted(counts.items()))
-                    + f"; exit {result['exit']['code']} ({result['wallMs'] / 1000:.1f}s)")
+                log(
+                    f"check {battery}/{name}: "
+                    + " ".join(f"{k} {v}" for k, v in sorted(counts.items()))
+                    + f"; exit {result['exit']['code']} ({result['wallMs'] / 1000:.1f}s)"
+                )
                 return "checked"
 
             for r in run_jobs(args.jobs, goldens, one):
@@ -1982,10 +2333,19 @@ def build_summary(out_root, label, baseline):
     oracle_shas, goports, golden_lines = set(), set(), []
     filters = set()
     for t in traces:
-        b = batteries.setdefault(t["battery"], {
-            "traces": 0, "requests": 0, "classes": collections.Counter(), "goportErrors": collections.Counter(),
-            "exitCodes": collections.Counter(), "crashExits": 0, "timingRisk": 0, "trafficDiff": 0,
-        })
+        b = batteries.setdefault(
+            t["battery"],
+            {
+                "traces": 0,
+                "requests": 0,
+                "classes": collections.Counter(),
+                "goportErrors": collections.Counter(),
+                "exitCodes": collections.Counter(),
+                "crashExits": 0,
+                "timingRisk": 0,
+                "trafficDiff": 0,
+            },
+        )
         b["traces"] += 1
         b["requests"] += len(t["events"])
         b["classes"].update(t["counts"])
@@ -1997,9 +2357,11 @@ def build_summary(out_root, label, baseline):
         for ev in t["events"]:
             methods[ev["method"]][ev["class"]] += 1
             if ev.get("sub", "").startswith("unported:"):
-                unported[ev["sub"][len("unported:"):]] += 1
+                unported[ev["sub"][len("unported:") :]] += 1
         if t.get("firstDivergence"):
-            firsts.append({"battery": t["battery"], "trace": t["trace"], **t["firstDivergence"]})
+            firsts.append(
+                {"battery": t["battery"], "trace": t["trace"], **t["firstDivergence"]}
+            )
         oracle_shas.add(t.get("oracleSha256"))
         goports.add((t["goport"]["path"], t["goport"]["sha256"]))
         golden_lines.append(f"{t['battery']}/{t['trace']} {t['goldenSha256']}")
@@ -2013,9 +2375,14 @@ def build_summary(out_root, label, baseline):
         "traceSetSha256": sha256_bytes("\n".join(sorted(golden_lines)).encode()),
         "methodsFilter": sorted(filters),
         "batteries": {
-            name: {**{k: v for k, v in b.items() if not isinstance(v, collections.Counter)},
-                   "classes": dict(b["classes"]), "goportErrors": dict(b["goportErrors"]),
-                   "exitCodes": dict(b["exitCodes"])}
+            name: {
+                **{
+                    k: v for k, v in b.items() if not isinstance(v, collections.Counter)
+                },
+                "classes": dict(b["classes"]),
+                "goportErrors": dict(b["goportErrors"]),
+                "exitCodes": dict(b["exitCodes"]),
+            }
             for name, b in sorted(batteries.items())
         },
         "methods": {m: dict(c) for m, c in sorted(methods.items())},
@@ -2054,36 +2421,63 @@ def compare_labels(out_root, baseline, traces):
             counts["unrun"] += 1
         else:
             counts["lost"] += 1
-            lost.append({"battery": key[0], "trace": key[1], "event": key[2], "method": now[key][1], "class": now[key][0]})
+            lost.append(
+                {
+                    "battery": key[0],
+                    "trace": key[1],
+                    "event": key[2],
+                    "method": now[key][1],
+                    "class": now[key][0],
+                }
+            )
     for key, (cls, _) in now.items():
         if cls == "same" and before.get(key) != "same":
             counts["new"] += 1
-    return {"label": baseline, **{k: counts[k] for k in ("retained", "new", "lost", "unrun", "absent")}, "lostFirst": lost[:50]}
+    return {
+        "label": baseline,
+        **{k: counts[k] for k in ("retained", "new", "lost", "unrun", "absent")},
+        "lostFirst": lost[:50],
+    }
 
 
 def summary_markdown(s):
     out = [f"# LSP oracle check: {s['label']}", ""]
-    out.append(f"- oracle sha256: {', '.join(x[:12] for x in s['oracleSha256']) or '?'}")
-    out.append("- goport: " + ", ".join(f"{g['path']} ({g['sha256'][:12]})" for g in s["goport"]))
+    out.append(
+        f"- oracle sha256: {', '.join(x[:12] for x in s['oracleSha256']) or '?'}"
+    )
+    out.append(
+        "- goport: "
+        + ", ".join(f"{g['path']} ({g['sha256'][:12]})" for g in s["goport"])
+    )
     out.append(f"- trace set sha256: {s['traceSetSha256'][:12]}")
     out.append(f"- methods filter: {', '.join(f or 'all' for f in s['methodsFilter'])}")
     out.append("")
     cols = list(CLASSES)
     out.append("## Batteries")
     out.append("")
-    out.append("| battery | traces | requests | " + " | ".join(cols) + " | exit crash | timing-risk | traffic diff |")
+    out.append(
+        "| battery | traces | requests | "
+        + " | ".join(cols)
+        + " | exit crash | timing-risk | traffic diff |"
+    )
     out.append("|---|" + "---:|" * (len(cols) + 5))
     for name, b in s["batteries"].items():
-        out.append(f"| {name} | {b['traces']} | {b['requests']} | "
-                   + " | ".join(str(b["classes"].get(c, 0)) for c in cols)
-                   + f" | {b['crashExits']} | {b['timingRisk']} | {b['trafficDiff']} |")
+        out.append(
+            f"| {name} | {b['traces']} | {b['requests']} | "
+            + " | ".join(str(b["classes"].get(c, 0)) for c in cols)
+            + f" | {b['crashExits']} | {b['timingRisk']} | {b['trafficDiff']} |"
+        )
     out.append("")
     out.append("## Methods")
     out.append("")
     out.append("| method | total | " + " | ".join(cols) + " |")
     out.append("|---|" + "---:|" * (len(cols) + 1))
     for m, c in s["methods"].items():
-        out.append(f"| {m} | {sum(c.values())} | " + " | ".join(str(c.get(x, 0)) for x in cols) + " |")
+        out.append(
+            f"| {m} | {sum(c.values())} | "
+            + " | ".join(str(c.get(x, 0)) for x in cols)
+            + " |"
+        )
     errs = collections.Counter()
     for b in s["batteries"].values():
         errs.update(b["goportErrors"])
@@ -2105,13 +2499,17 @@ def summary_markdown(s):
             out.append(f"| {k} | {v} |")
     if s["firstDivergences"]:
         out.append("")
-        out.append(f"## First divergences ({len(s['firstDivergences'])} of {s['firstDivergenceCount']})")
+        out.append(
+            f"## First divergences ({len(s['firstDivergences'])} of {s['firstDivergenceCount']})"
+        )
         out.append("")
         out.append("| battery | trace | event | method | class | detail |")
         out.append("|---|---|---:|---|---|---|")
         for d in s["firstDivergences"]:
             detail = d.get("sub") or (f"at `{d['pointer']}`" if "pointer" in d else "")
-            out.append(f"| {d['battery']} | {d['trace']} | {d['i']} | {d['method']} | {d['class']} | {detail} |")
+            out.append(
+                f"| {d['battery']} | {d['trace']} | {d['i']} | {d['method']} | {d['class']} | {detail} |"
+            )
     if s.get("baseline"):
         bl = s["baseline"]
         out.append("")
@@ -2119,13 +2517,17 @@ def summary_markdown(s):
         out.append("")
         out.append("| retained | new | lost | unrun | absent |")
         out.append("|---:|---:|---:|---:|---:|")
-        out.append(f"| {bl['retained']} | {bl['new']} | {bl['lost']} | {bl['unrun']} | {bl['absent']} |")
+        out.append(
+            f"| {bl['retained']} | {bl['new']} | {bl['lost']} | {bl['unrun']} | {bl['absent']} |"
+        )
         if bl["lostFirst"]:
             out.append("")
             out.append("| lost: battery | trace | event | method | class now |")
             out.append("|---|---|---:|---|---|")
             for d in bl["lostFirst"]:
-                out.append(f"| {d['battery']} | {d['trace']} | {d['event']} | {d['method']} | {d['class']} |")
+                out.append(
+                    f"| {d['battery']} | {d['trace']} | {d['event']} | {d['method']} | {d['class']} |"
+                )
     return "\n".join(out) + "\n"
 
 
@@ -2138,10 +2540,16 @@ def cmd_summary(args):
 def cmd_show(args):
     out_root = os.path.realpath(args.out_root)
     traces = load_label(out_root, args.label)
-    hits = [t for t in traces if (t["trace"] == args.trace or f"{t['battery']}/{t['trace']}" == args.trace)
-            and (not args.battery or t["battery"] == args.battery)]
+    hits = [
+        t
+        for t in traces
+        if (t["trace"] == args.trace or f"{t['battery']}/{t['trace']}" == args.trace)
+        and (not args.battery or t["battery"] == args.battery)
+    ]
     if len(hits) != 1:
-        raise UsageError(f"{len(hits)} traces match {args.trace!r} in {args.label}; give --battery or battery/name")
+        raise UsageError(
+            f"{len(hits)} traces match {args.trace!r} in {args.label}; give --battery or battery/name"
+        )
     t = hits[0]
     _, records = read_golden(t["golden"])
     g = next((r for r in records if r["i"] == args.event), None)
@@ -2161,8 +2569,11 @@ def cmd_show(args):
     flaky = {}
     if t.get("flaky") and os.path.exists(t["flaky"]):
         flaky = read_json(t["flaky"]).get("events", {}).get(str(args.event), {})
-    print(f"{t['battery']}/{t['trace']} event {args.event} {g['method']}: {ev.get('class')}"
-          + (f" {ev['sub']}" if ev.get("sub") else "") + (f" at {ev['pointer']}" if "pointer" in ev else ""))
+    print(
+        f"{t['battery']}/{t['trace']} event {args.event} {g['method']}: {ev.get('class')}"
+        + (f" {ev['sub']}" if ev.get("sub") else "")
+        + (f" at {ev['pointer']}" if "pointer" in ev else "")
+    )
     if flaky:
         print(f"flaky: {json.dumps(flaky)}")
     patterns = flaky.get("multiset") or []
@@ -2173,7 +2584,11 @@ def cmd_show(args):
         resp = rec.get("response")
         if isinstance(resp, dict) and "result" in resp:
             resp = {"result": apply_multisets(resp["result"], patterns)}
-        return {"status": rec.get("status"), "response": resp, "reason": rec.get("reason")}
+        return {
+            "status": rec.get("status"),
+            "response": resp,
+            "reason": rec.get("reason"),
+        }
 
     a = json.dumps(side(g), indent=1, sort_keys=True, ensure_ascii=False).splitlines()
     b = json.dumps(side(run), indent=1, sort_keys=True, ensure_ascii=False).splitlines()
@@ -2206,7 +2621,11 @@ def filter_messages(messages, simple, super_simple):
             j -= 1
         for k in range(i, j + 1):
             msg = messages[k]
-            if msg["method"] in ("textDocument/didOpen", "textDocument/didChange", "textDocument/didClose"):
+            if msg["method"] in (
+                "textDocument/didOpen",
+                "textDocument/didChange",
+                "textDocument/didClose",
+            ):
                 new_messages.append(msg)
         for k in range(max(i, j), len(messages)):
             new_messages.append(messages[k])
@@ -2241,10 +2660,17 @@ def filtered_events(events, simple, super_simple):
         return list(enumerate(events))
     # PORT: the harness sends initialized, shutdown and exit itself; they take part in the filter as in Go.
     messages = [{"method": "initialize", "i": 0}, {"method": "initialized", "i": None}]
-    messages += [{"method": ev["method"], "i": i} for i, ev in enumerate(events)
-                 if i > 0 and ev["kind"] in ("request", "notification")]
+    messages += [
+        {"method": ev["method"], "i": i}
+        for i, ev in enumerate(events)
+        if i > 0 and ev["kind"] in ("request", "notification")
+    ]
     messages += [{"method": "shutdown", "i": None}, {"method": "exit", "i": None}]
-    kept = collections.Counter(m["i"] for m in filter_messages(messages, simple, super_simple) if m["i"] is not None)
+    kept = collections.Counter(
+        m["i"]
+        for m in filter_messages(messages, simple, super_simple)
+        if m["i"] is not None
+    )
     out = []
     for i, ev in enumerate(events):
         if ev["kind"] in ("request", "notification"):
@@ -2262,7 +2688,7 @@ class Printer:
     def __call__(self, direction, msg):
         k = message_kind(msg)
         ms = (time.monotonic() - self.start) * 1000
-        head = f"{ms:9.1f}ms {direction} {k:12s} id={str(msg.get('id')):6s} {msg.get('method', '')}"
+        head = f"{ms:9.1f}ms {direction} {k:12s} id={msg.get('id')!s:6s} {msg.get('method', '')}"
         if self.verbose or k == "response":
             payload = msg.get("params", msg.get("result", msg.get("error")))
             text = json.dumps(payload, ensure_ascii=False)
@@ -2279,19 +2705,37 @@ def cmd_replay(args):
     try:
         printer = Printer(args.verbose)
         run = SessionRun(
-            header=header, events=filtered_events(events, args.simple, args.super_simple), frozen=False,
-            argv=shlex.split(args.server), role="server", run_dir=ctx.run_dir,
-            key=ctx.key("replay", args.trace), marker=ctx.marker,
-            request_timeout=args.request_timeout, printer=printer, keep=ctx.keep,
+            header=header,
+            events=filtered_events(events, args.simple, args.super_simple),
+            frozen=False,
+            argv=shlex.split(args.server),
+            role="server",
+            run_dir=ctx.run_dir,
+            key=ctx.key("replay", args.trace),
+            marker=ctx.marker,
+            request_timeout=args.request_timeout,
+            printer=printer,
+            keep=ctx.keep,
         )
-        print(f"# server: {args.server}\n# trace: {args.trace} ({header.get('name')})", flush=True)
+        print(
+            f"# server: {args.server}\n# trace: {args.trace} ({header.get('name')})",
+            flush=True,
+        )
         result = run.run()
         print(f"# root: {result['root'].path}")
         for r in result["records"]:
             if r["kind"] == "request":
-                extra = r.get("reason") or (error_class(r["response"]["error"]) if r["status"] == "error" else "")
-                print(f"# event {r['i']:4d} id {r['id']:4d} {r['method']:40s} {r['status']:14s} {r.get('ms', '')} {extra}")
-        print(f"# shutdown: {result['shutdown'].get('status')}; exit code {result['exit']['code']}")
+                extra = r.get("reason") or (
+                    error_class(r["response"]["error"])
+                    if r["status"] == "error"
+                    else ""
+                )
+                print(
+                    f"# event {r['i']:4d} id {r['id']:4d} {r['method']:40s} {r['status']:14s} {r.get('ms', '')} {extra}"
+                )
+        print(
+            f"# shutdown: {result['shutdown'].get('status')}; exit code {result['exit']['code']}"
+        )
         if result["exit"]["stderrTail"]:
             print("# stderr (last lines):")
             for line in result["exit"]["stderrTail"]:
@@ -2314,7 +2758,12 @@ def cmd_to_go_replay(args):
         out.write(json.dumps(obj, ensure_ascii=False, separators=(",", ":")) + "\n")
 
     # Go: lsp/replay_test.go:29 initialArguments
-    emit({"rootDirUriPlaceholder": ROOT_DIR_URI_PLACEHOLDER, "rootDirPlaceholder": ROOT_DIR_PLACEHOLDER})
+    emit(
+        {
+            "rootDirUriPlaceholder": ROOT_DIR_URI_PLACEHOLDER,
+            "rootDirPlaceholder": ROOT_DIR_PLACEHOLDER,
+        }
+    )
     skipped = 0
     for i, ev in enumerate(events):
         kind = ev["kind"]
@@ -2345,7 +2794,9 @@ def cmd_to_go_replay(args):
     emit({"kind": "request", "method": "shutdown"})
     emit({"kind": "notification", "method": "exit"})
     if skipped:
-        log(f"to-go-replay: {skipped} requests skipped (paramsFrom without --golden, or not answered by the oracle)")
+        log(
+            f"to-go-replay: {skipped} requests skipped (paramsFrom without --golden, or not answered by the oracle)"
+        )
     return EXIT_OK
 
 
@@ -2356,9 +2807,13 @@ def main(argv=None):
     def common(p, runs=True):
         p.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
         if runs:
-            p.add_argument("--traces-dir", help="trace root (default <out-root>/traces)")
+            p.add_argument(
+                "--traces-dir", help="trace root (default <out-root>/traces)"
+            )
             p.add_argument("--oracle", default=DEFAULT_ORACLE)
-            p.add_argument("--oracle-sha", help="golden set sha256 (default: hash of --oracle)")
+            p.add_argument(
+                "--oracle-sha", help="golden set sha256 (default: hash of --oracle)"
+            )
             p.add_argument("--jobs", type=int, default=1)
             p.add_argument("--only", help="only traces whose name contains this text")
             p.add_argument("--request-timeout", type=float)
@@ -2367,24 +2822,37 @@ def main(argv=None):
     p = sub.add_parser("record", help="run tsgo once per trace and write goldens")
     common(p)
     p.add_argument("--battery", required=True)
-    p.add_argument("--force", action="store_true", help="re-record goldens that match the trace")
+    p.add_argument(
+        "--force", action="store_true", help="re-record goldens that match the trace"
+    )
 
-    p = sub.add_parser("selfcheck", help="run tsgo again on the goldens and write .flaky.json")
+    p = sub.add_parser(
+        "selfcheck", help="run tsgo again on the goldens and write .flaky.json"
+    )
     common(p)
     p.add_argument("--battery", required=True)
     p.add_argument("--runs", type=int, default=1)
 
-    p = sub.add_parser("check", help="run goport on the goldens and classify each request")
+    p = sub.add_parser(
+        "check", help="run goport on the goldens and classify each request"
+    )
     common(p)
     p.add_argument("--battery", required=True)
     p.add_argument("--goport", required=True)
     p.add_argument("--label", required=True)
-    p.add_argument("--methods", help="comma list of methods to send (full or last segment)")
+    p.add_argument(
+        "--methods", help="comma list of methods to send (full or last segment)"
+    )
 
-    p = sub.add_parser("summary", help="rebuild summary.json and summary.md for a label")
+    p = sub.add_parser(
+        "summary", help="rebuild summary.json and summary.md for a label"
+    )
     common(p, runs=False)
     p.add_argument("--label", required=True)
-    p.add_argument("--baseline", help="earlier label: retained, new, lost, unrun and absent same counts")
+    p.add_argument(
+        "--baseline",
+        help="earlier label: retained, new, lost, unrun and absent same counts",
+    )
 
     p = sub.add_parser("show", help="print one request's diff")
     common(p, runs=False)
@@ -2393,7 +2861,9 @@ def main(argv=None):
     p.add_argument("--event", type=int, required=True)
     p.add_argument("--battery")
 
-    p = sub.add_parser("replay", help="run one trace against any server and print the message flow")
+    p = sub.add_parser(
+        "replay", help="run one trace against any server and print the message flow"
+    )
     p.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
     p.add_argument("--trace", required=True)
     p.add_argument("--server", required=True)
@@ -2406,7 +2876,9 @@ def main(argv=None):
 
     p = sub.add_parser("to-go-replay", help="write the Go TestReplay format to stdout")
     p.add_argument("--trace", required=True)
-    p.add_argument("--golden", help="take frozen params (resolved paramsFrom) from this golden")
+    p.add_argument(
+        "--golden", help="take frozen params (resolved paramsFrom) from this golden"
+    )
 
     args = ap.parse_args(argv)
     if getattr(args, "jobs", 1) < 1:

@@ -18,22 +18,22 @@ evidence that every existing line was produced by that model name.
 
 The implementation logs show three distinct Codex goal runs:
 
-| Goal run | Outcome | Goal-accounted tokens |
-| --- | --- | ---: |
-| Full Rust port, June 22–26 | Produced the broad prototype. A later audit found 70 failing tests and measured the broad compiler 2.6–3.4x slower than Go for equivalent work. Paused. | 207,170,354 |
-| `minimal-working-v0`, June 26 | Narrowed the claim to the explicit five-file no-check contract and built its oracle, runtime, and benchmark gates. Completed. | 1,439,471 |
-| Type-checking parity, June 27–July 8 | Added substantial checker work, but never demonstrated full `tsgo` parity. Paused. | 7,438,681 |
-| **Total** |  | **216,048,506 (~216 million)** |
+| Goal run                             | Outcome                                                                                                                                                 |          Goal-accounted tokens |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------: |
+| Full Rust port, June 22–26           | Produced the broad prototype. A later audit found 70 failing tests and measured the broad compiler 2.6–3.4x slower than Go for equivalent work. Paused. |                    207,170,354 |
+| `minimal-working-v0`, June 26        | Narrowed the claim to the explicit five-file no-check contract and built its oracle, runtime, and benchmark gates. Completed.                           |                      1,439,471 |
+| Type-checking parity, June 27–July 8 | Added substantial checker work, but never demonstrated full `tsgo` parity. Paused.                                                                      |                      7,438,681 |
+| **Total**                            |                                                                                                                                                         | **216,048,506 (~216 million)** |
 
 The estimate uses Codex's goal-level `tokensUsed` counters for the three runs
 that were explicitly tied to this repository. Those counters equal uncached
 input plus output tokens. The raw session log records about 8.34 billion
 input-plus-output tokens, but about 8.12 billion of those are cached context
-replay, so that larger number is not a useful estimate of new inference spent
-on the project. Work between goals and this README update are not included.
+replay, so that larger number is not a useful estimate of new inference spent on
+the project. Work between goals and this README update are not included.
 
 The history also explains why breadth is not the same as completion here. The
-first goal landed hundreds of commits across many compiler subsystems before
-the parity harness was authoritative. A recovery audit then reduced the scope
-to one measurable path. The later checker goal expanded the scope again and
-was suspended before cleanup and full verification were complete.
+first goal landed hundreds of commits across many compiler subsystems before the
+parity harness was authoritative. A recovery audit then reduced the scope to one
+measurable path. The later checker goal expanded the scope again and was
+suspended before cleanup and full verification were complete.

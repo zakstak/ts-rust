@@ -1,58 +1,288 @@
 # goport work queue
 
-Root keeps this queue. In goal mode, when a workflow ends, root starts the top item that is ready in the same turn, so at least 3 workflows run at all times. Remove an item when its workflow starts. Add new items at the place that fits their priority.
+Root keeps this queue. In goal mode, when a workflow ends, root starts the top
+item that is ready in the same turn, so at least 3 workflows run at all times.
+Remove an item when its workflow starts. Add new items at the place that fits
+their priority.
 
-Each item: one line of goal, the files or worktree it owns, and what it waits for.
+Each item: one line of goal, the files or worktree it owns, and what it waits
+for.
 
 ## Ready
 
-- **T3 Code drop-in (Theo, 2026-10-09: "asap"; t3code PR #16704). Running: workflow t3dropin1.** t3sat1: the `satisfies` TS2322 (diagnose against Go N, fix if a port bug, list other T3 Code gaps). plat2: darwin-x64 and win32-arm64 release binaries (PR stacked on win1). Then a release; Theo runs `npm/trust-setup.sh` for the new packages first. Later items from the T3 report: Effect editor features in `--lsp` (quick fixes, refactors), and T3 Code launcher passthrough of `-w` and `-b`.
+- **T3 Code drop-in (Theo, 2026-10-09: "asap"; t3code PR #16704). Running:
+  workflow t3dropin1.** t3sat1: the `satisfies` TS2322 (diagnose against Go N,
+  fix if a port bug, list other T3 Code gaps). plat2: darwin-x64 and win32-arm64
+  release binaries (PR stacked on win1). Then a release; Theo runs
+  `npm/trust-setup.sh` for the new packages first. Later items from the T3
+  report: Effect editor features in `--lsp` (quick fixes, refactors), and T3
+  Code launcher passthrough of `-w` and `-b`.
 
-- **tsc -b scheduling as Go (k2sched): parked after design round 2 (note k2sched-r2-2026-10-10; design k2sched/design-a.md; round 3 items in the note).** Load each started task's program and run its affected-file walk on the task's own thread, as Go's goroutines do, and write each early-emit output when its file's emit ends (not at task end). Fixes the node-redis and k2redis1 repro shapes (an extra TS2322 where Go reads new d.ts) and speeds up `tsc -b`. Design note first (Rounds rule; k2gaps1 rounds 1 to 3 broke shapes where Go and the port agreed). Owns execute/build/*, execute/incremental/emit_files.rs; after int58 and bwsig2 land.
-- **Fast plan (Theo, 2026-10-09; `target/continuation-r97-goport/fastplan/plan.md`, notes fastplan-decisions-2026-10-09 and fast0-result-2026-10-09).** fast0 re-rank (measure0 section 9): 1 shrink types, symbols, AST nodes plus parser cold paths and the huge-page A/B (first step: kind census on T3 server, VS Code, Excalidraw, T3 web); 2 inference memo (T3-class code; one lane with the flow memo only if purity tracking makes it cheap); 3 the rest of the small exact batch (no union front cache); opt-in: `--checkers 8` fast mode (equals Go at 8; docs first), lazy members (lazymem1 done; int60). excalsym1 done (Go N map order; fixed upstream by #64521; bump D item).  House bar: 1% single-thread instructions, 2% default wall or 5% peak memory.
-- **Windows support (Theo, 2026-10-09: "asap for next release"). Running: workflow win1.** One PR: a Windows CI job, win32-x64 tsc.exe (PGO) in the release and npm (@tsc-rs/win32-x64), dev docs, Go comparison and timing on Windows. Root merges when CI, Release and the skeptic pass. Theo runs `npm/trust-setup.sh` for @tsc-rs/win32-x64 (and linux-arm64) before the tag. Follow-ups: win32-arm64, fswatch walkdir_windows, the Windows allocator.
+- **tsc -b scheduling as Go (k2sched): parked after design round 2 (note
+  k2sched-r2-2026-10-10; design k2sched/design-a.md; round 3 items in the
+  note).** Load each started task's program and run its affected-file walk on
+  the task's own thread, as Go's goroutines do, and write each early-emit output
+  when its file's emit ends (not at task end). Fixes the node-redis and k2redis1
+  repro shapes (an extra TS2322 where Go reads new d.ts) and speeds up `tsc -b`.
+  Design note first (Rounds rule; k2gaps1 rounds 1 to 3 broke shapes where Go
+  and the port agreed). Owns execute/build/*, execute/incremental/emit_files.rs;
+  after int58 and bwsig2 land.
+- **Fast plan (Theo, 2026-10-09;
+  `target/continuation-r97-goport/fastplan/plan.md`, notes
+  fastplan-decisions-2026-10-09 and fast0-result-2026-10-09).** fast0 re-rank
+  (measure0 section 9): 1 shrink types, symbols, AST nodes plus parser cold
+  paths and the huge-page A/B (first step: kind census on T3 server, VS Code,
+  Excalidraw, T3 web); 2 inference memo (T3-class code; one lane with the flow
+  memo only if purity tracking makes it cheap); 3 the rest of the small exact
+  batch (no union front cache); opt-in: `--checkers 8` fast mode (equals Go at
+  8; docs first), lazy members (lazymem1 done; int60). excalsym1 done (Go N map
+  order; fixed upstream by #64521; bump D item). House bar: 1% single-thread
+  instructions, 2% default wall or 5% peak memory.
+- **Windows support (Theo, 2026-10-09: "asap for next release"). Running:
+  workflow win1.** One PR: a Windows CI job, win32-x64 tsc.exe (PGO) in the
+  release and npm (@tsc-rs/win32-x64), dev docs, Go comparison and timing on
+  Windows. Root merges when CI, Release and the skeptic pass. Theo runs
+  `npm/trust-setup.sh` for @tsc-rs/win32-x64 (and linux-arm64) before the tag.
+  Follow-ups: win32-arm64, fswatch walkdir_windows, the Windows allocator.
 
-- **Public issues first (Theo, 2026-10-07).** Check `scripts/goport/gh-inbox.py list` every 2 hours. A real incompatibility that a user reports goes before perf work. Upstream issues get the `upstream issue` label and wait for a pin bump.
-- **rr.py side order.** Interleave or shuffle the sides: on cup2 sys time grows with the run position after Go (int52 skeptic problem 2). The int53 prompt asks for interleaved sides; copy the fixed rr.py into `scripts/goport/` after int53.
-- **nevfast1 done (int60); mapmem0 parked (note lanes3-result-2026-10-10: mapfree -5 percent T3 server peak for +0.7 to +0.9 percent instructions).** Was: (decision B: count-free gains behind a flag) #64521 Go order made the mongodb check 5.8x slower (1.6 to 9.0 s, 424 MiB to 1.8 GiB; Go N' 18.8 s). Put the old fast order (non-methods first, stop at the first never) behind a flag, off by default, with output equal except counts. Also study typeorm +2 Symbols against Go (also at pin N; root src/cli-ts-node-commonjs.ts).
-- **infmemo2: parked after step 0 (note infmemo2-s0-2026-10-10): T3 server ceiling about 6 percent of check, always-on hooks cost 0.5 to 3.3 percent elsewhere. targs1 087cb1156 (skeptic PASS) goes into the first integration after bump D.** Design infmemo2/design.md and its check design-check.md (note stud2-result-2026-10-10): design round 2 first (apply the check's section 7 changes, close X1 to X3, add a cost off-switch); then the lane on bump D (targs1, barrier1 with the memo off, infmemo2). Expected T3 server -5 to -8 percent wall.
-- **emitretry1 (compat, old): running (workflow emitretry1, on the bump D int4 head).** After a failed write, the port's build emit writes its outputs again and reports 2 write errors where Go reports 1 and writes once (apisig4 probes K14, K17; R188 has it too). Find the retry in the emit path and follow Go's emitter.
-- **N1: n1free 84578cb27 skeptic PASS (Excalidraw peak -54 percent at 4 checkers; note n1free-result-2026-10-10): into int60 after bump D, PGO timing decides the zod +1 percent.** T3 server Types gap: found (t3types1), fix in int4. P0 and the N1 note are done: Excalidraw frees 864 MB at 4 checkers (54 percent of peak); prototype n1note/patch/n1proto.patch, design checked (n1note/go-model-check.md section 7 changes). Add a PORT note for N prime's 7 ReleaseArenas calls. Running now: mem1 (lspage1 sparse link store pages, effcache1 Effect plugin caches). Later: mapper and inference arenas (T3 server 15 percent), symbol tables. P0: a counters-only memory owner probe (who holds the other 51 to 69 percent of peak). N1: free the node builder's synthetic nodes after each type-to-string as Go does (nodebuilder.go:288 releases the factory arenas; the port keeps them, nodebuilder.rs:573): Excalidraw peak -29 to -38 percent (discarded relation error reports print 42,720 types). Go note first. Then A1, S1 + S2, T1 (after bump D lands); A3 needs Theo's approval.
-- **apisig4 0b680bc17: done (skeptic PASS; note apisig4-finish-2026-10-10): into int60 with 2 root corrections (a D3-shape test; the PORTING window bullet widened).** Redo `--api --async` signal handling as Go (conn_async.go Run and Call): Go note and a read-only check first (Rounds rule), start from the apisig3 skeptic's variant mz (no close_pending_calls at the ctx check in call), tests over every callback kind (readFile, writeFile, removeFile, directoryExists, nested and pipelined requests, EOF), the full signal table against Go N and R186. Files: ipc/conn_async.rs, tests/tsgo_stdio_end.rs, PORTING.md.
-- **specroot1: dropped (note specroot1-dropped-2026-10-10; Go N panics too; bump D int3 has the N prime fix).**
-- **int60 (after bump D is accepted; at N prime).** n1free 84578cb27, targs1 087cb1156, nevfast1 ac288e284 (root correction: comments checker_p24.rs :18 and :1000 and the README line say the switch can move TS2589 near the 5M limit), followups41 8c0f09e69, effcache1 920c94dd5 (T3 wall -6 to -9 percent), lspage1 6522e5d5a (VS Code RSS -7 percent; merge fixes: PORTING.md:179-184, debug_assert in SparseLinkPage::insert_record), apisig4 0b680bc17, lazymem1 d14f1b154 (round 2 skeptic PASS; +0.1 percent instructions, wall within noise) (all skeptic PASS; notes mem1-result-2026-10-10, apisig4-finish-2026-10-10). (lazymem1 3ec63faed moved into int59b.) (skeptic PASS; switch GOPORT_LAZY_MEMBERS, off by default; root fix: the summary claim about the remote Symbols check, tools/gate-on-job.sh quoting). Docs: README names `--checkers 8` as the opt-in fast mode (equals Go at 8; chk8) and GOPORT_LAZY_MEMBERS (memory).
-- **bump D wave 3 (note bumpD-int3-result-2026-10-10).** int3 b78f6653b PASS (0 failed names at N'). w3fix f32c68856 PASS (note bumpD-w3fix-result-2026-10-10; root correction in int4: stale notes checker_p01.rs:791-793, emit_resolver_p1.rs:154-156). int4 10b1145db PASS (note bumpD-int4-result-2026-10-10). After R189 is accepted: freeze (no other revision until bump D is accepted), merge main again into int4; then the pin-bump batch at N' (ruling request upstream/bumpD/w0fix2/ruling-request.md, protected tool paths, re-record the 2 strictly protected API N-set keys at N', N' API goldens on dbook-lan).
-- **npm trust for linux-arm64 (Theo, before the next release tag).** Run `npm/trust-setup.sh` to create `@tsc-rs/linux-arm64` and its trust; without it the publish stops after `@tsc-rs/linux-x64`. A rerun skips what is published.
-- **int59 round 4: running (workflow int59d): followups40 6ffbe6d76 (jemalloc layout order and cap) reverted for the multi-threaded page cost; side and timing on 3 hosts; then R189 (note int59c-result-2026-10-10).** Was: Lanes with a passed skeptic: followups40 d062c663a (R186 reviewer items; skeptic PASS round 2; root wording fixes at merge: PORTING.md:907-909 use "the class, or the symbol of the type that the site looks in", and the checker_p13.rs:591-598 doc comment), bwsig2 31d135ce7 (skeptic PASS; before merge add the skeptic's end-to-end coarse2 test in tests/build_watch_parses.rs (problem 1, mutant A has no test), the PORTING.md:531 line and the "11 of 11" comment (16 of 16)), thpguard2 52d2e83cb (docs, refactor, 2 tests).
-- **effect051 (issue #28): running (workflow int60e) as the next revision after R189, before the bump D freeze.** Theo approved the Effect gate rule (note theo-effect051-approval-2026-10-10). Reply on #28 when it lands.
-- **jemlayout1 (study, from thpguard2).** On THP `always` hosts (cup2, alvin, zbook) the THP watcher thread's first allocations (argument list, 32 KiB buffer, the thread) give jemalloc a layout with 5 to 25% fewer page faults and about 3% less wall on cup2. The LSP, API, watch mode and `GOPORT_THP_GUARD=0` start no watcher and get the worse layout. Find the mechanism and make the good layout on purpose on every path. Also: hand off the exit unmap with `clone(CLONE_VM)` when the real RSS is known (bin/tsgo.rs). `thpguard2/summary.md`, follow-ups 1 and 2.
-- **thpguard2 (goport-thpguard2 52d2e83cb, skeptic PASS):** docs, refactor and 2 tests only; behavior equal to R181. Take it in a later integration.
+- **Public issues first (Theo, 2026-10-07).** Check
+  `scripts/goport/gh-inbox.py list` every 2 hours. A real incompatibility that a
+  user reports goes before perf work. Upstream issues get the `upstream issue`
+  label and wait for a pin bump.
+- **rr.py side order.** Interleave or shuffle the sides: on cup2 sys time grows
+  with the run position after Go (int52 skeptic problem 2). The int53 prompt
+  asks for interleaved sides; copy the fixed rr.py into `scripts/goport/` after
+  int53.
+- **nevfast1 done (int60); mapmem0 parked (note lanes3-result-2026-10-10:
+  mapfree -5 percent T3 server peak for +0.7 to +0.9 percent instructions).**
+  Was: (decision B: count-free gains behind a flag) #64521 Go order made the
+  mongodb check 5.8x slower (1.6 to 9.0 s, 424 MiB to 1.8 GiB; Go N' 18.8 s).
+  Put the old fast order (non-methods first, stop at the first never) behind a
+  flag, off by default, with output equal except counts. Also study typeorm +2
+  Symbols against Go (also at pin N; root src/cli-ts-node-commonjs.ts).
+- **infmemo2: parked after step 0 (note infmemo2-s0-2026-10-10): T3 server
+  ceiling about 6 percent of check, always-on hooks cost 0.5 to 3.3 percent
+  elsewhere. targs1 087cb1156 (skeptic PASS) goes into the first integration
+  after bump D.** Design infmemo2/design.md and its check design-check.md (note
+  stud2-result-2026-10-10): design round 2 first (apply the check's section 7
+  changes, close X1 to X3, add a cost off-switch); then the lane on bump D
+  (targs1, barrier1 with the memo off, infmemo2). Expected T3 server -5 to -8
+  percent wall.
+- **emitretry1 (compat, old): running (workflow emitretry1, on the bump D int4
+  head).** After a failed write, the port's build emit writes its outputs again
+  and reports 2 write errors where Go reports 1 and writes once (apisig4 probes
+  K14, K17; R188 has it too). Find the retry in the emit path and follow Go's
+  emitter.
+- **N1: n1free 84578cb27 skeptic PASS (Excalidraw peak -54 percent at 4
+  checkers; note n1free-result-2026-10-10): into int60 after bump D, PGO timing
+  decides the zod +1 percent.** T3 server Types gap: found (t3types1), fix in
+  int4. P0 and the N1 note are done: Excalidraw frees 864 MB at 4 checkers (54
+  percent of peak); prototype n1note/patch/n1proto.patch, design checked
+  (n1note/go-model-check.md section 7 changes). Add a PORT note for N prime's 7
+  ReleaseArenas calls. Running now: mem1 (lspage1 sparse link store pages,
+  effcache1 Effect plugin caches). Later: mapper and inference arenas (T3 server
+  15 percent), symbol tables. P0: a counters-only memory owner probe (who holds
+  the other 51 to 69 percent of peak). N1: free the node builder's synthetic
+  nodes after each type-to-string as Go does (nodebuilder.go:288 releases the
+  factory arenas; the port keeps them, nodebuilder.rs:573): Excalidraw peak -29
+  to -38 percent (discarded relation error reports print 42,720 types). Go note
+  first. Then A1, S1 + S2, T1 (after bump D lands); A3 needs Theo's approval.
+- **apisig4 0b680bc17: done (skeptic PASS; note apisig4-finish-2026-10-10): into
+  int60 with 2 root corrections (a D3-shape test; the PORTING window bullet
+  widened).** Redo `--api --async` signal handling as Go (conn_async.go Run and
+  Call): Go note and a read-only check first (Rounds rule), start from the
+  apisig3 skeptic's variant mz (no close_pending_calls at the ctx check in
+  call), tests over every callback kind (readFile, writeFile, removeFile,
+  directoryExists, nested and pipelined requests, EOF), the full signal table
+  against Go N and R186. Files: ipc/conn_async.rs, tests/tsgo_stdio_end.rs,
+  PORTING.md.
+- **specroot1: dropped (note specroot1-dropped-2026-10-10; Go N panics too; bump
+  D int3 has the N prime fix).**
+- **int60 (after bump D is accepted; at N prime).** n1free 84578cb27, targs1
+  087cb1156, nevfast1 ac288e284 (root correction: comments checker_p24.rs :18
+  and :1000 and the README line say the switch can move TS2589 near the 5M
+  limit), followups41 8c0f09e69, effcache1 920c94dd5 (T3 wall -6 to -9 percent),
+  lspage1 6522e5d5a (VS Code RSS -7 percent; merge fixes: PORTING.md:179-184,
+  debug_assert in SparseLinkPage::insert_record), apisig4 0b680bc17, lazymem1
+  d14f1b154 (round 2 skeptic PASS; +0.1 percent instructions, wall within noise)
+  (all skeptic PASS; notes mem1-result-2026-10-10, apisig4-finish-2026-10-10).
+  (lazymem1 3ec63faed moved into int59b.) (skeptic PASS; switch
+  GOPORT_LAZY_MEMBERS, off by default; root fix: the summary claim about the
+  remote Symbols check, tools/gate-on-job.sh quoting). Docs: README names
+  `--checkers 8` as the opt-in fast mode (equals Go at 8; chk8) and
+  GOPORT_LAZY_MEMBERS (memory).
+- **bump D wave 3 (note bumpD-int3-result-2026-10-10).** int3 b78f6653b PASS (0
+  failed names at N'). w3fix f32c68856 PASS (note bumpD-w3fix-result-2026-10-10;
+  root correction in int4: stale notes checker_p01.rs:791-793,
+  emit_resolver_p1.rs:154-156). int4 10b1145db PASS (note
+  bumpD-int4-result-2026-10-10). After R189 is accepted: freeze (no other
+  revision until bump D is accepted), merge main again into int4; then the
+  pin-bump batch at N' (ruling request upstream/bumpD/w0fix2/ruling-request.md,
+  protected tool paths, re-record the 2 strictly protected API N-set keys at N',
+  N' API goldens on dbook-lan).
+- **npm trust for linux-arm64 (Theo, before the next release tag).** Run
+  `npm/trust-setup.sh` to create `@tsc-rs/linux-arm64` and its trust; without it
+  the publish stops after `@tsc-rs/linux-x64`. A rerun skips what is published.
+- **int59 round 4: running (workflow int59d): followups40 6ffbe6d76 (jemalloc
+  layout order and cap) reverted for the multi-threaded page cost; side and
+  timing on 3 hosts; then R189 (note int59c-result-2026-10-10).** Was: Lanes
+  with a passed skeptic: followups40 d062c663a (R186 reviewer items; skeptic
+  PASS round 2; root wording fixes at merge: PORTING.md:907-909 use "the class,
+  or the symbol of the type that the site looks in", and the
+  checker_p13.rs:591-598 doc comment), bwsig2 31d135ce7 (skeptic PASS; before
+  merge add the skeptic's end-to-end coarse2 test in tests/build_watch_parses.rs
+  (problem 1, mutant A has no test), the PORTING.md:531 line and the "11 of 11"
+  comment (16 of 16)), thpguard2 52d2e83cb (docs, refactor, 2 tests).
+- **effect051 (issue #28): running (workflow int60e) as the next revision after
+  R189, before the bump D freeze.** Theo approved the Effect gate rule (note
+  theo-effect051-approval-2026-10-10). Reply on #28 when it lands.
+- **jemlayout1 (study, from thpguard2).** On THP `always` hosts (cup2, alvin,
+  zbook) the THP watcher thread's first allocations (argument list, 32 KiB
+  buffer, the thread) give jemalloc a layout with 5 to 25% fewer page faults and
+  about 3% less wall on cup2. The LSP, API, watch mode and `GOPORT_THP_GUARD=0`
+  start no watcher and get the worse layout. Find the mechanism and make the
+  good layout on purpose on every path. Also: hand off the exit unmap with
+  `clone(CLONE_VM)` when the real RSS is known (bin/tsgo.rs).
+  `thpguard2/summary.md`, follow-ups 1 and 2.
+- **thpguard2 (goport-thpguard2 52d2e83cb, skeptic PASS):** docs, refactor and 2
+  tests only; behavior equal to R181. Take it in a later integration.
 - **parsefast1 with the AST memory work (memast).** Waits for a design note.
 - **lschk1 redesign.** Parked.
 
-- **Default pin switch.** UPSTREAM.json current, ~/.local/bin/tsgo-oracle and the default Go checkout still point at dc37b5249; main is at 52168999f3dc and bump B moves it to 16c25522e123. Switch once, straight to the bump B pin, after bump B is accepted, in a quiet window, on zbook and every host (move the old default caches under pins/dc37b5249ab6 first). Owns: UPSTREAM.json, scripts/upstream/pin.py.
+- **Default pin switch.** UPSTREAM.json current, ~/.local/bin/tsgo-oracle and
+  the default Go checkout still point at dc37b5249; main is at 52168999f3dc and
+  bump B moves it to 16c25522e123. Switch once, straight to the bump B pin,
+  after bump B is accepted, in a quiet window, on zbook and every host (move the
+  old default caches under pins/dc37b5249ab6 first). Owns: UPSTREAM.json,
+  scripts/upstream/pin.py.
 
-- **Split the `ts_goport` crate: step 1 done (R131, accepted 2026-09-28).** Test runners now run 7 test binaries: ts_goport lib, goport_util lib, goport_lsproto lib, go_baselines, multi_program, emit_pool, early_emit (`test --release --no-run -p ts_goport --lib --test go_baselines --test multi_program --test emit_pool --test early_emit` and `test --release --no-run -p goport_util -p goport_lsproto --lib`). Goport-only revisions now carry the roster from R131 (roster fingerprint 0fd7856f). Steps 2 to 4 (`buildspeed/split-plan-r129.md`) wait for bump B wave 3 and lsshells M2/M3, and may change after the legacy removal plan (workflow legacy-removal-audit).
+- **Split the `ts_goport` crate: step 1 done (R131, accepted 2026-09-28).** Test
+  runners now run 7 test binaries: ts_goport lib, goport_util lib,
+  goport_lsproto lib, go_baselines, multi_program, emit_pool, early_emit
+  (`test --release --no-run -p ts_goport --lib --test go_baselines --test multi_program --test emit_pool --test early_emit`
+  and `test --release --no-run -p goport_util -p goport_lsproto --lib`).
+  Goport-only revisions now carry the roster from R131 (roster fingerprint
+  0fd7856f). Steps 2 to 4 (`buildspeed/split-plan-r129.md`) wait for bump B wave
+  3 and lsshells M2/M3, and may change after the legacy removal plan (workflow
+  legacy-removal-audit).
 
 ## Waiting
 
-- **Own symbol ids in the checker arena (idcost1 follow-up, low value).** idcost1 (dropped 2026-10-09, skeptic PASS on the stop) found no change in its files that cuts 0.3% on zod; trunc1 costs +0.36 to +0.8% instructions (PGO). A `Vec<Cell<u32>>` in `SymbolIds` (core.rs) would cut about 0.27 to 0.32% on zod st and 0.07% on effect, but touches the arena clone, shadows, the wasm IdState swap and `SymbolArena` Sync. `idcost1/summary.md`, "What would cut it".
+- **Own symbol ids in the checker arena (idcost1 follow-up, low value).**
+  idcost1 (dropped 2026-10-09, skeptic PASS on the stop) found no change in its
+  files that cuts 0.3% on zod; trunc1 costs +0.36 to +0.8% instructions (PGO). A
+  `Vec<Cell<u32>>` in `SymbolIds` (core.rs) would cut about 0.27 to 0.32% on zod
+  st and 0.07% on effect, but touches the arena clone, shadows, the wasm IdState
+  swap and `SymbolArena` Sync. `idcost1/summary.md`, "What would cut it".
 
-- **AST node records (design study `ast-design/study.md`, 2026-09-29).** One 32-byte atomic `NodeRecord` plus 16-byte `NodeKids` per node in per-file blocks reached through a static `FILE_BLOCKS` table: 2 dependent loads per hot read for static and freeable files, no `unsafe`, freed versions reuse pooled blocks after a quarantine. 7 steps, one revision each: 1 records replace headers, kinds, names, children; 2 binder fields into records; 3 FILE_BLOCKS replaces frozen_of and the tiers; 4 freeable blocks from the pool, delete the owned-node slow paths; 5 owned default; 6 flow records; 7 LinkStore page pointers. Estimate: checker CPU -5 to -10%, effect check 16 PGO 1.9x to 2.0x, owned edit cost to 0.3 ms or less, effect long 0.1 to 0.2 MiB/edit. Waits for: M3g (it owns ast/store.rs and node.rs); S2 lands before step 1 or after step 3.
-- **Drop-in wave 1 results (`dropin1/summary.md`, 2026-09-29).** Candidates after R139, in this order: npm1 tooling merge, perfB1 (effect check about 2%), tscb1 (tsbuildinfo prefetch, after 3 skeptic fixes), platforms2 (kqueue, Windows watcher and paths, cross builds; the batch lists 17 paths). Wave 2 (dropin-wave2) takes the fixes, emit overlap in `tsc -b` (wide cold is 0.68x against Go), the TS5033 text, the Windows build and the watch fixes W1 to W3. Theo decides: npm package names (`typescript` belongs to Microsoft), and the Windows watcher (notify crate now, or a 1:1 port with about 150 lines of unsafe Win32 and a D-W1 change).
-- **Tool issues from drop-in wave 1.** `bin-identity.sh` on zod emit runs without `--rootDir` (only the read-only lock stops a write into the project input). Go-B effect emit is not deterministic (4 outputs in 4 runs), so timing13b EQUAL can mean equal to one Go run, and its `equal_rust` field compares against a side named `goB`. `goport_typesyms` on zod with R139 bins uses more than 24 GB.
-- **Watch rebuild and --singleThreaded fixes (diagnosis `dropin1/diag/report.md`, 2026-09-29).** Rebuild time is almost all work in new checkers, and the plain port runs at Go's speed per thread there. W1: free the old program in the background at `execute/watcher.rs:909`, about 3 ms on hono. W2: Fx hashers in `execute/incremental/*`, 1 to 2 ms. W3: no thp-guard polling in watch or LSP mode (CPU only). S2: keep subtree facts and decorators in the node store slot, not in thread-local maps (`ast/node.rs:1949`, `:2217`), because hono JS emit is slower than Go (plain 73 against 51 ms). W4 is checker speed per thread (the perf lane). Waits for: dropin-wave1 (tscb1 owns execute/incremental) and M3 (synthetic.rs).
-- **Bump B (pin 16c25522e123): accepted as R139 (2026-09-29), in main 4c270a7f0.** R140 (int14 + M3g) is open. Port done (waves 1 to 4); gate tools merged (a52dc0c6c, both verdicts after an auditor STOP on id-only allow entries); the branch merges R138 and gets a check round now (upstream/bumpB/open/). Legacy stage 4 (one lib dir, one catalog at B) is ready on goport-legacy4 and opens right after bump B.
-- **Bump C accepted as R146 (2026-09-30).** main is at microsoft/TypeScript 673a5f17d713. Open: the default pin switch (UPSTREAM.json current, protected), and the port debt below.
-- **int20 (next revision, at pin N).** Lanes built at pin B that wait for a merge onto main at N: rss2 32a15f7ab (peak RSS), gopanic3 3abbfcdc3 (includes gopanic2; LSP panics, []*T lists, Go error texts), textleak1 6f2b0c1f8 (includes astrec4 step 4b c0067a411; per-edit text, alias slots, paths order), typesize1 687b00c73 (Type 128 bytes), symread1 c35df0153 (symbol reads), static1 9bc5e9d1e (build-release.sh options, default unchanged), plus the showConfig plugins fix (ts#64397, show_config.rs, reviewer R146 item 2).
-- **Port debt from bump C (reviewer R146).** 184 Go tests new at N with no Rust port: internal/api/requestfilesystem 122, internal/api session and server 51, ipc 7, contentmapper_test.go:94 and :153 2, refcountcache 1, encoder TestDecodeSourceFile_Metadata 1; and 8 tsc tests missing since B. The code is ported and np-suite covers it.
-- **Theo decisions held.** Linux release linking (static glibc with LGPL duties, musl static at +0.5 to 1.9% time, or non-PIE without binary ASLR; note static1-decision-held-2026-09-30), npm package names, the Windows watcher, THP=always.
-- **Coverage branch goport-coverage1** (29 Go unit tests ported, b5 code action battery, full corpus at the pin clean): a candidate revision after bump B; then add the b5 battery to candidate.sh (protected, review).
-- **Legacy removal: done** (R133 and R134, 2026-09-29; state note legacy-removal-done-2026-09-29). Stage 4 (one lib dir, one diagnostics catalog at one pin) waits for bump B. Docs text in protected paths still names removed crates (accountability.md:47, goport-protected/README.md:48-53): fix in the next reviewed docs change.
-- **Editor long growth: M2a, M2b, then M3 D3. Running now (Theo, 2026-09-28: "fix please"; state note editor-memory-now-2026-09-28).** Workflow lsshells-m2 on branch goport-lsshells from main (pin 52168999f3dc): M2a, M2b, heap profiles before and after, editor sessions on query-core, hono and effect, answers, tests, speed; M3a starts in parallel on goport-lsshells-m3. Then M3b to M3d (`lsshells/m3-plan.md`), one writer, each a measured revision. Design: `target/continuation-r97-goport/lsshells/design.md`. Bump B merges main again after each accepted memory revision.
-- **tsc -b: load the later programs of a build in parallel.** perf11 profile (`perf11/decisions.md` tscb-1 to tscb-12): Go also builds the query chain one project at a time, so M8 to M11 gives about 0 ms there; what closes the query chain cell (1.77x) is loading the later programs in parallel (frontend/compiler) plus the shared cached file system part of M10. Owns: frontend/compiler/*, execute/build/host.rs. Waits for: bump B wave 2c (config lane owns frontend/compiler).
-- **Effect speed toward 2x.** perf14 accepted as R135. perf15 plan (`perf15/plan.md`): S0 synthetic `kind()` fast path (running on goport-perf15-d0, about 5 to 8 ms); S1 twin print threads for d.ts (750 to 1,050 lines, about 34 to 41 ms; waits for bump B wave 4 in main, runs before M3c in synthetic.rs); S2 only if S1's export is slow; S3 parsed `kind()` reads after M3b. perf16 (running): the fragmented-memory gap (effect emit 1.78x to 1.83x; huge pages and allocator).
-- **S6-003 watcher ids** (Go timing dependent) and **workspace/symbol first call** (language server). Waits for: bump B server lane.
-- **Free dispatch-thread synthetic nodes in idle time.** lsmem3 (b1489a5a6) frees them during the next edit: +3.6 to +4.3 ms per edit in the Hono new-expression state (lsmem3/verify.md). Drop them after the answers, in idle work. Owns: ast/synthetic.rs, the owner scope in lsp/server.rs. Waits for: int12 part 2.
-- **Gate editor stage: known FAILs end with lsmem2 and lsmem3 in main.** Until int12 (with goport-lsmem2 and goport-lsmem3) is accepted, an editor FAIL counts as known only if the same session fails on the R125 bins and is not worse. A new failing session, or a known one that got worse, is a regression. After int12 is in main, every editor FAIL is a regression, except `long` growth, which waits for the language server program-shell item above; when that lands, `long` is a regression too.
-- **Re-audit, 2026-09-30: done.** Findings and fixes are in `recommendations.md`, "Re-audit, 2026-09-30": dbook kept for revision evidence, `wfstatus --save` and `stale`, `help` on the tools, `scripts/goport/lib-blobs.sh`, a new auditor and reviewer for each batch, lanes under 500k context.
+- **AST node records (design study `ast-design/study.md`, 2026-09-29).** One
+  32-byte atomic `NodeRecord` plus 16-byte `NodeKids` per node in per-file
+  blocks reached through a static `FILE_BLOCKS` table: 2 dependent loads per hot
+  read for static and freeable files, no `unsafe`, freed versions reuse pooled
+  blocks after a quarantine. 7 steps, one revision each: 1 records replace
+  headers, kinds, names, children; 2 binder fields into records; 3 FILE_BLOCKS
+  replaces frozen_of and the tiers; 4 freeable blocks from the pool, delete the
+  owned-node slow paths; 5 owned default; 6 flow records; 7 LinkStore page
+  pointers. Estimate: checker CPU -5 to -10%, effect check 16 PGO 1.9x to 2.0x,
+  owned edit cost to 0.3 ms or less, effect long 0.1 to 0.2 MiB/edit. Waits for:
+  M3g (it owns ast/store.rs and node.rs); S2 lands before step 1 or after
+  step 3.
+- **Drop-in wave 1 results (`dropin1/summary.md`, 2026-09-29).** Candidates
+  after R139, in this order: npm1 tooling merge, perfB1 (effect check about 2%),
+  tscb1 (tsbuildinfo prefetch, after 3 skeptic fixes), platforms2 (kqueue,
+  Windows watcher and paths, cross builds; the batch lists 17 paths). Wave 2
+  (dropin-wave2) takes the fixes, emit overlap in `tsc -b` (wide cold is 0.68x
+  against Go), the TS5033 text, the Windows build and the watch fixes W1 to W3.
+  Theo decides: npm package names (`typescript` belongs to Microsoft), and the
+  Windows watcher (notify crate now, or a 1:1 port with about 150 lines of
+  unsafe Win32 and a D-W1 change).
+- **Tool issues from drop-in wave 1.** `bin-identity.sh` on zod emit runs
+  without `--rootDir` (only the read-only lock stops a write into the project
+  input). Go-B effect emit is not deterministic (4 outputs in 4 runs), so
+  timing13b EQUAL can mean equal to one Go run, and its `equal_rust` field
+  compares against a side named `goB`. `goport_typesyms` on zod with R139 bins
+  uses more than 24 GB.
+- **Watch rebuild and --singleThreaded fixes (diagnosis
+  `dropin1/diag/report.md`, 2026-09-29).** Rebuild time is almost all work in
+  new checkers, and the plain port runs at Go's speed per thread there. W1: free
+  the old program in the background at `execute/watcher.rs:909`, about 3 ms on
+  hono. W2: Fx hashers in `execute/incremental/*`, 1 to 2 ms. W3: no thp-guard
+  polling in watch or LSP mode (CPU only). S2: keep subtree facts and decorators
+  in the node store slot, not in thread-local maps (`ast/node.rs:1949`,
+  `:2217`), because hono JS emit is slower than Go (plain 73 against 51 ms). W4
+  is checker speed per thread (the perf lane). Waits for: dropin-wave1 (tscb1
+  owns execute/incremental) and M3 (synthetic.rs).
+- **Bump B (pin 16c25522e123): accepted as R139 (2026-09-29), in main
+  4c270a7f0.** R140 (int14 + M3g) is open. Port done (waves 1 to 4); gate tools
+  merged (a52dc0c6c, both verdicts after an auditor STOP on id-only allow
+  entries); the branch merges R138 and gets a check round now
+  (upstream/bumpB/open/). Legacy stage 4 (one lib dir, one catalog at B) is
+  ready on goport-legacy4 and opens right after bump B.
+- **Bump C accepted as R146 (2026-09-30).** main is at microsoft/TypeScript
+  673a5f17d713. Open: the default pin switch (UPSTREAM.json current, protected),
+  and the port debt below.
+- **int20 (next revision, at pin N).** Lanes built at pin B that wait for a
+  merge onto main at N: rss2 32a15f7ab (peak RSS), gopanic3 3abbfcdc3 (includes
+  gopanic2; LSP panics, []*T lists, Go error texts), textleak1 6f2b0c1f8
+  (includes astrec4 step 4b c0067a411; per-edit text, alias slots, paths order),
+  typesize1 687b00c73 (Type 128 bytes), symread1 c35df0153 (symbol reads),
+  static1 9bc5e9d1e (build-release.sh options, default unchanged), plus the
+  showConfig plugins fix (ts#64397, show_config.rs, reviewer R146 item 2).
+- **Port debt from bump C (reviewer R146).** 184 Go tests new at N with no Rust
+  port: internal/api/requestfilesystem 122, internal/api session and server 51,
+  ipc 7, contentmapper_test.go:94 and :153 2, refcountcache 1, encoder
+  TestDecodeSourceFile_Metadata 1; and 8 tsc tests missing since B. The code is
+  ported and np-suite covers it.
+- **Theo decisions held.** Linux release linking (static glibc with LGPL duties,
+  musl static at +0.5 to 1.9% time, or non-PIE without binary ASLR; note
+  static1-decision-held-2026-09-30), npm package names, the Windows watcher,
+  THP=always.
+- **Coverage branch goport-coverage1** (29 Go unit tests ported, b5 code action
+  battery, full corpus at the pin clean): a candidate revision after bump B;
+  then add the b5 battery to candidate.sh (protected, review).
+- **Legacy removal: done** (R133 and R134, 2026-09-29; state note
+  legacy-removal-done-2026-09-29). Stage 4 (one lib dir, one diagnostics catalog
+  at one pin) waits for bump B. Docs text in protected paths still names removed
+  crates (accountability.md:47, goport-protected/README.md:48-53): fix in the
+  next reviewed docs change.
+- **Editor long growth: M2a, M2b, then M3 D3. Running now (Theo, 2026-09-28:
+  "fix please"; state note editor-memory-now-2026-09-28).** Workflow lsshells-m2
+  on branch goport-lsshells from main (pin 52168999f3dc): M2a, M2b, heap
+  profiles before and after, editor sessions on query-core, hono and effect,
+  answers, tests, speed; M3a starts in parallel on goport-lsshells-m3. Then M3b
+  to M3d (`lsshells/m3-plan.md`), one writer, each a measured revision. Design:
+  `target/continuation-r97-goport/lsshells/design.md`. Bump B merges main again
+  after each accepted memory revision.
+- **tsc -b: load the later programs of a build in parallel.** perf11 profile
+  (`perf11/decisions.md` tscb-1 to tscb-12): Go also builds the query chain one
+  project at a time, so M8 to M11 gives about 0 ms there; what closes the query
+  chain cell (1.77x) is loading the later programs in parallel
+  (frontend/compiler) plus the shared cached file system part of M10. Owns:
+  frontend/compiler/*, execute/build/host.rs. Waits for: bump B wave 2c (config
+  lane owns frontend/compiler).
+- **Effect speed toward 2x.** perf14 accepted as R135. perf15 plan
+  (`perf15/plan.md`): S0 synthetic `kind()` fast path (running on
+  goport-perf15-d0, about 5 to 8 ms); S1 twin print threads for d.ts (750 to
+  1,050 lines, about 34 to 41 ms; waits for bump B wave 4 in main, runs before
+  M3c in synthetic.rs); S2 only if S1's export is slow; S3 parsed `kind()` reads
+  after M3b. perf16 (running): the fragmented-memory gap (effect emit 1.78x to
+  1.83x; huge pages and allocator).
+- **S6-003 watcher ids** (Go timing dependent) and **workspace/symbol first
+  call** (language server). Waits for: bump B server lane.
+- **Free dispatch-thread synthetic nodes in idle time.** lsmem3 (b1489a5a6)
+  frees them during the next edit: +3.6 to +4.3 ms per edit in the Hono
+  new-expression state (lsmem3/verify.md). Drop them after the answers, in idle
+  work. Owns: ast/synthetic.rs, the owner scope in lsp/server.rs. Waits for:
+  int12 part 2.
+- **Gate editor stage: known FAILs end with lsmem2 and lsmem3 in main.** Until
+  int12 (with goport-lsmem2 and goport-lsmem3) is accepted, an editor FAIL
+  counts as known only if the same session fails on the R125 bins and is not
+  worse. A new failing session, or a known one that got worse, is a regression.
+  After int12 is in main, every editor FAIL is a regression, except `long`
+  growth, which waits for the language server program-shell item above; when
+  that lands, `long` is a regression too.
+- **Re-audit, 2026-09-30: done.** Findings and fixes are in
+  `recommendations.md`, "Re-audit, 2026-09-30": dbook kept for revision
+  evidence, `wfstatus --save` and `stale`, `help` on the tools,
+  `scripts/goport/lib-blobs.sh`, a new auditor and reviewer for each batch,
+  lanes under 500k context.

@@ -9,7 +9,9 @@ The source contains a function merged with a runtime namespace:
 
 ```ts
 declare function callable(): void;
-declare namespace callable { export const value: string; }
+declare namespace callable {
+  export const value: string;
+}
 ```
 
 The probe changes the cached owner flags to `FUNCTION | NAMESPACE_MODULE` and
@@ -22,8 +24,8 @@ The formatter now checks the retained binder record before using callable
 display. It requires complete declaration binding, the original function owner,
 and matching binder ownership for every cached declaration.
 
-The binder records instantiated namespaces in `not_const_enum_only_modules`.
-A const-enum namespace merged with a function also sets this marker. Semantic
+The binder records instantiated namespaces in `not_const_enum_only_modules`. A
+const-enum namespace merged with a function also sets this marker. Semantic
 symbol setters cannot erase the retained record, so changing flags, deleting
 exports, or pruning cached declarations cannot hide the namespace value meaning.
 
@@ -46,10 +48,10 @@ and `RUST_MIN_STACK=16777216`.
 Logs in the writer worktree:
 
 - `target/namespace-owner-repair-red.log`: confirmed original failure.
-- `target/namespace-owner-repair-green.log`: eight checks passed, one extra
-  test stopped in an existing unsupported source-checking path.
-- `target/namespace-owner-repair-green-2.log`: eight checks passed, the alternate
-  setup stopped at an existing missing-type query boundary.
+- `target/namespace-owner-repair-green.log`: eight checks passed, one extra test
+  stopped in an existing unsupported source-checking path.
+- `target/namespace-owner-repair-green-2.log`: eight checks passed, the
+  alternate setup stopped at an existing missing-type query boundary.
 - `target/namespace-owner-repair-green-3.log`: final run using supported source
   declarations for the pruned-declaration probe. All nine checks passed.
 

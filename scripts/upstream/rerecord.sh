@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329 # Step callbacks are invoked by the phase dispatcher by name.
 # Re-records the Go-side evidence for an upstream pin into its pin-keyed dirs (drift.md section 7
 # step 3). Old evidence is never replaced: every recorder skips an output that exists.
 #
@@ -27,7 +28,10 @@ set -uo pipefail
 REPO=/home/theo/Code/sandbox/ts-rust
 R=$REPO/target/continuation-r97-goport
 PIN=$REPO/scripts/upstream/pin.py
-[[ $# -ge 1 && $1 != -* ]] || { sed -n '2,27p' "$0"; exit 2; }
+[[ $# -ge 1 && $1 != -* ]] || {
+  sed -n '2,27p' "$0"
+  exit 2
+}
 KEY=$(GOPORT_PIN=$1 python3 "$PIN" show | python3 -c 'import json,sys; print(json.load(sys.stdin)["key"])') || exit 2
 HOST=${2:-alvin}
 STEPS=${3:-prep,sync,projects,f1,sweep,emit,ls,api,fetch}
@@ -46,7 +50,8 @@ mkdir -p "$LOG"
 
 # Batteries with a selfchecked golden set for the current pin oracle (b3-effect was never finished).
 batteries() {
-  local d; for d in "$R/$1/golden/$(osha "$CURRENT")"/*/; do
+  local d
+  for d in "$R/$1/golden/$(osha "$CURRENT")"/*/; do
     [[ -f $d/selfcheck-summary.json ]] && basename "$d"
   done
 }
@@ -56,7 +61,8 @@ step_prep() {
 }
 step_sync() {
   bash scripts/goport/remote.sh sync-pin "$HOST" "$KEY" && bash scripts/goport/remote.sh sync-scripts "$HOST" || return
-  local d; for d in "${TRACES[@]}"; do
+  local d
+  for d in "${TRACES[@]}"; do
     rsync -a --mkpath --ignore-existing "$R/$d/" "$HOST:$R/$d/" || return
   done
 }
@@ -67,15 +73,21 @@ step_sweep() {
   GOPORT_BIN=/usr/bin/true bash "$R/tools-port/sweep.sh" "../pins/$KEY/rerecord/sweep-runs" &&
     GOPORT_BIN=/usr/bin/true bash "$R/tools-port/sweep-hono-runtime.sh" "../pins/$KEY/rerecord/hono-rt-runs"
 }
-step_emit() { JOBS=4 bash "$R/emit/compare-emit.sh" /usr/bin/true "rerecord-$KEY"; true; }
+step_emit() {
+  JOBS=4 bash "$R/emit/compare-emit.sh" /usr/bin/true "rerecord-$KEY"
+  true
+}
 step_ls() {
   local py=(python3 "$REPO/target/worktrees/goport-ls/scripts/goport/lsp_oracle.py") root b list extra
   for root in "${LS_ROOTS[@]}"; do
-    list=$(batteries "$root" | paste -sd,); [[ -n $list ]] || continue
-    extra=(); [[ $root == ls-oracle/battery ]] && extra=(--traces-dir "$R/ls-oracle")
+    list=$(batteries "$root" | paste -sd,)
+    [[ -n $list ]] || continue
+    extra=()
+    [[ $root == ls-oracle/battery ]] && extra=(--traces-dir "$R/ls-oracle")
     for b in ${list//,/ }; do
       # fourslash traces live in ls-oracle/fourslash; the other ls-oracle parts in ls-oracle/battery/traces.
-      local tr=(); [[ $b == fourslash ]] && tr=("${extra[@]}")
+      local tr=()
+      [[ $b == fourslash ]] && tr=("${extra[@]}")
       "${py[@]}" record --out-root "$R/$root" --battery "$b" --jobs "$JOBS" --oracle "$ORACLE" --request-timeout 300 "${tr[@]}" || echo "record $root $b exit $?"
       for run in 1 2; do
         "${py[@]}" selfcheck --out-root "$R/$root" --battery "$b" --jobs "$JOBS" --runs 2 --oracle "$ORACLE" "${tr[@]}" || echo "selfcheck $root $b run $run exit $?"
@@ -100,21 +112,28 @@ step_fetch() {
 }
 
 run_step() {
-  local s=$1 t=$(date +%s)
+  local s=$1 t
+  t=$(date +%s)
   echo "== $s $(date +%T)"
-  "step_$s" > "$LOG/$s.log" 2>&1
+  "step_$s" >"$LOG/$s.log" 2>&1
   local rc=$?
-  echo "   $s rc=$rc $(( $(date +%s) - t ))s: $(tail -n 1 "$LOG/$s.log" | cut -c1-150)"
+  echo "   $s rc=$rc $(($(date +%s) - t))s: $(tail -n 1 "$LOG/$s.log" | cut -c1-150)"
   return $rc
 }
 
 HOST_STEPS=" projects f1 sweep emit ls api "
 if [[ $KEY == "$CURRENT" ]]; then
   for s in ${STEPS//,/ }; do
-    [[ " prep sync projects f1 fetch " == *" $s "* ]] || { echo "step $s does not run for the current pin $KEY" >&2; exit 2; }
+    [[ " prep sync projects f1 fetch " == *" $s "* ]] || {
+      echo "step $s does not run for the current pin $KEY" >&2
+      exit 2
+    }
   done
 fi
-[[ -n $OSHA && -e $ORACLE ]] || { echo "missing pin oracle $ORACLE" >&2; exit 2; }
+[[ -n $OSHA && -e $ORACLE ]] || {
+  echo "missing pin oracle $ORACLE" >&2
+  exit 2
+}
 [[ $HOST == local && -z ${GOPORT_PIN_ACTIVE:-} ]] || echo "rerecord $KEY on $HOST: $STEPS (pin oracle $OSHA, root $ROOT)"
 if [[ $HOST == local ]]; then
   # Host steps need the pin overlay; pin.py exec starts it once for the whole run.
@@ -127,14 +146,23 @@ if [[ $HOST == local ]]; then
   done
   exit $rc
 fi
-rc=0; batch=()
+rc=0
+batch=()
 flush() {
   [[ ${#batch[@]} -gt 0 ]] || return 0
-  local list; list=$(IFS=,; echo "${batch[*]}"); batch=()
+  local list
+  list=$(
+    IFS=,
+    echo "${batch[*]}"
+  )
+  batch=()
   GOPORT_PIN=$KEY bash scripts/goport/remote.sh run "$HOST" "JOBS=$JOBS nice -n 15 bash scripts/upstream/rerecord.sh $KEY local $list" || rc=1
 }
 for s in ${STEPS//,/ }; do
-  if [[ $HOST_STEPS == *" $s "* ]]; then batch+=("$s"); else flush; run_step "$s" || rc=1; fi
+  if [[ $HOST_STEPS == *" $s "* ]]; then batch+=("$s"); else
+    flush
+    run_step "$s" || rc=1
+  fi
 done
 flush
 exit $rc

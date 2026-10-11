@@ -1,22 +1,22 @@
 # Root workspace verification
 
-Tested source: `1d6c49fd`.
-Result: 6,847 passed and three failed. All 6,811 previous test names remain
-present and pass. Formatting passed. This is not full port approval.
+Tested source: `1d6c49fd`. Result: 6,847 passed and three failed. All 6,811
+previous test names remain present and pass. Formatting passed. This is not full
+port approval.
 
 ## Complete run
 
 Session `6272` exited 101 and is collected. Cargo ran every workspace target
-with `--workspace --no-fail-fast --locked --offline`. All 166 test binaries
-and 32 documentation groups completed. The 6,850 named tests have no ignored,
+with `--workspace --no-fail-fast --locked --offline`. All 166 test binaries and
+32 documentation groups completed. The 6,850 named tests have no ignored,
 measured or filtered cases. The 39 additions have 36 passes and three failures.
 
-Session `86449` exited 0 and is collected. Its read-only workspace format log
-is empty. No source changed while either command was queued or running.
+Session `86449` exited 0 and is collected. Its read-only workspace format log is
+empty. No source changed while either command was queued or running.
 
-The structured report is `docs/typechecker-wave154-root-workspace.json`.
-The log parser checks every section's named-test count against its summary
-and compares all names with the previous complete workspace log.
+The structured report is `docs/typechecker-wave154-root-workspace.json`. The log
+parser checks every section's named-test count against its summary and compares
+all names with the previous complete workspace log.
 
 ## Three new failures
 
@@ -43,10 +43,10 @@ The source includes the prior constructor-span and property/index changes,
 global binding repair `09fb0b96`, unchanged probes `1bc9e76f`, fixture-only
 repair `47eae0c9`, and six new probes `4409589d`.
 
-The two review files match their source commits. The only combined difference
-is the added test-module include at the end of the existing fixture file.
-No review body or assertion was changed. The three production files for the
-binding repair still match `09fb0b96` exactly.
+The two review files match their source commits. The only combined difference is
+the added test-module include at the end of the existing fixture file. No review
+body or assertion was changed. The three production files for the binding repair
+still match `09fb0b96` exactly.
 
 The previous source `ebe995e1` passed all 6,811 workspace tests. Its report
 `5b23c2d3` and independent audit `d25b13f0` remain preserved. That earlier
@@ -56,13 +56,13 @@ earlier test bodies or inputs were unchanged.
 ## Execution and evidence
 
 Worktree: `target/agent-worktrees/wave154/root-global-export-composition`.
-Target: `target/worktrees/wave154-root-global-export-composition`.
-The new target was absent before launch. No build output or fingerprint was
-copied, reflinked, hardlinked or seeded from another physical worktree.
+Target: `target/worktrees/wave154-root-global-export-composition`. The new
+target was absent before launch. No build output or fingerprint was copied,
+reflinked, hardlinked or seeded from another physical worktree.
 
 Both commands used the absolute root capped runner and manifest, 16 GiB memory,
-16 MiB process and Rust stacks, the common lock and unchanged TMPDIR.
-No command was stopped or moved to another lock.
+16 MiB process and Rust stacks, the common lock and unchanged TMPDIR. No command
+was stopped or moved to another lock.
 
 Logs in the primary workspace:
 

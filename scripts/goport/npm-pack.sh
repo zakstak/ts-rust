@@ -33,7 +33,10 @@
 # tsc-rs: <out-dir>/tsc-rs, <out-dir>/tsc-rs-<os>-<arch> and their tarballs.
 set -euo pipefail
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-usage() { sed -n '9,30p' "$0" >&2; exit 2; }
+usage() {
+  sed -n '9,30p' "$0" >&2
+  exit 2
+}
 
 go_version="" name=typescript also=() package_version=()
 while [[ ${1:-} == --name || ${1:-} == --also || ${1:-} == --package-version ]]; do
@@ -63,11 +66,16 @@ read -r pin layout go_toolchain < <("$repo/scripts/upstream/pin.py" show |
 case $layout in
   typescript)
     root=$(dirname "$go_dir") && input=$root/packages/typescript input_modules=$root/node_modules
-    go_cmd=./cmd/tsc go_module=github.com/microsoft/TypeScript/tsc ;;
+    go_cmd=./cmd/tsc go_module=github.com/microsoft/TypeScript/tsc
+    ;;
   typescript-go)
     root=$go_dir input=$go_dir/_packages/native-preview input_modules=$go_dir/_packages/native-preview/node_modules
-    go_cmd=./cmd/tsgo go_module=github.com/microsoft/typescript-go ;;
-  *) echo "unknown pin layout '$layout'" >&2; exit 1 ;;
+    go_cmd=./cmd/tsgo go_module=github.com/microsoft/typescript-go
+    ;;
+  *)
+    echo "unknown pin layout '$layout'" >&2
+    exit 1
+    ;;
 esac
 build="$out/.build"
 rm -rf "$build"
@@ -81,11 +89,17 @@ if [[ -n $go_version ]]; then
   libs="$go_dir/internal/bundled/libs"
   git_head=$(git -C "$go_dir" rev-parse HEAD 2>/dev/null || "$repo/scripts/upstream/pin.py" path commit)
 else
-  [[ -x $exe ]] || { echo "not executable: $exe" >&2; exit 2; }
+  [[ -x $exe ]] || {
+    echo "not executable: $exe" >&2
+    exit 2
+  }
   libs="$build/libs"
   "$repo/crates/ts_goport/scripts/copy-libs.sh" "$libs"
-  diff -rq "$libs" "$go_dir/internal/bundled/libs" > /dev/null ||
-    { echo "the lib files of $repo differ from the pin's ($go_dir): wrong pin?" >&2; exit 1; }
+  diff -rq "$libs" "$go_dir/internal/bundled/libs" >/dev/null ||
+    {
+      echo "the lib files of $repo differ from the pin's ($go_dir): wrong pin?" >&2
+      exit 1
+    }
   if [[ -f $(dirname "$exe")/COMMIT ]]; then git_head=$(cat "$(dirname "$exe")/COMMIT"); else git_head=$(git -C "$repo" rev-parse HEAD); fi
 fi
 
@@ -95,13 +109,22 @@ cp -r "$libs" "$bin"
 cp "$exe" "$bin/tsc"
 reported=$("$bin/tsc" --version)
 version=${reported#Version }
-[[ $reported == "Version $version" && -n $version ]] || { echo "$exe --version printed '$reported'" >&2; exit 1; }
-[[ -z $go_version || $version == "$go_version" ]] || { echo "$exe reports $version, not $go_version" >&2; exit 1; }
+[[ $reported == "Version $version" && -n $version ]] || {
+  echo "$exe --version printed '$reported'" >&2
+  exit 1
+}
+[[ -z $go_version || $version == "$go_version" ]] || {
+  echo "$exe reports $version, not $go_version" >&2
+  exit 1
+}
 # It must be a noembed build: it lists the lib files next to it, not bundled:/// paths.
-echo > "$build/a.ts"
+echo >"$build/a.ts"
 listed=$("$bin/tsc" --listFilesOnly --lib es5 "$build/a.ts")
-grep -q "^$bin/lib.es5.d.ts$" <<< "$listed" ||
-  { echo "$exe is not a noembed build: it lists $(head -1 <<< "$listed")" >&2; exit 1; }
+grep -q "^$bin/lib.es5.d.ts$" <<<"$listed" ||
+  {
+    echo "$exe is not a noembed build: it lists $(head -1 <<<"$listed")" >&2
+    exit 1
+  }
 
 # The JS API (dist), as Go's `npm run -w <input package> build` makes it (tsc -b), in a copy of the
 # input, so the checkout stays read-only. npm finds `tsc` in the root node_modules/.bin:
@@ -123,7 +146,7 @@ node "$repo/npm/pack.mjs" --layout "$layout" --go-dir "$go_dir" --exe "$bin/tsc"
 rm -rf "${out:?}/$name" "$out/$name"-*-*/ "$out/$name"-*.tgz
 for d in "$out"/pkg/*; do
   mv "$d" "$out/"
-  (cd "$out/$(basename "$d")" && npm pack --silent --pack-destination "$out" > /dev/null)
+  (cd "$out/$(basename "$d")" && npm pack --silent --pack-destination "$out" >/dev/null)
 done
 rmdir "$out/pkg"
 rm -rf "$build"

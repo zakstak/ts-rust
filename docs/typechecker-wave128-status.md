@@ -14,8 +14,8 @@ parity and modern-project parity remain incomplete.
 ## Verified results
 
 All 6,173 workspace tests passed at `df2ba7bc`, with zero failures and zero
-ignored tests. The run included the pinned upstream parser cases. Formatting
-and both generated AST checks passed.
+ignored tests. The run included the pinned upstream parser cases. Formatting and
+both generated AST checks passed.
 
 Strict workspace Clippy passed for every target at `f07dc2f1`. The lint changes
 add a `must_use` attribute, use equivalent method references, and extract two
@@ -26,13 +26,13 @@ Formatting passed for all changed Rust files.
 
 The semantic smoke report compares diagnostics, `.types`, and `.symbols`:
 
-| Outcome | Variants |
-| --- | ---: |
-| Executed | 95 |
-| Exact | 47 |
-| Unsupported | 46 |
-| Artifact mismatch | 2 |
-| Fatal invariant | 0 |
+| Outcome           | Variants |
+| ----------------- | -------: |
+| Executed          |       95 |
+| Exact             |       47 |
+| Unsupported       |       46 |
+| Artifact mismatch |        2 |
+| Fatal invariant   |        0 |
 
 One upstream skip remains. Seven cases became exact, with no exact losses:
 
@@ -46,9 +46,9 @@ One upstream skip remains. Seven cases became exact, with no exact losses:
 
 The remaining artifact mismatches are `functionExpandoPropertyDeclaration` and
 `jsDocTypedefTagNamespace`. The diagnostic-only milestone retains 397 exact
-results in 511 executed variants. Its other 114 results remain unsupported.
-It has no status changes, exact losses, supported diagnostic mismatches, or
-fatal invariants. Diagnostic-only equality is not semantic parity.
+results in 511 executed variants. Its other 114 results remain unsupported. It
+has no status changes, exact losses, supported diagnostic mismatches, or fatal
+invariants. Diagnostic-only equality is not semantic parity.
 
 Both fixed reports identify clean source at `df2ba7bc`. The later lint commits
 do not change checker behavior or artifact formatting rules.
@@ -66,9 +66,9 @@ do not change checker behavior or artifact formatting rules.
 - Enum declarations and their names return the declared type. Value queries
   retain the separate value type. The query rejects changed caches, unrelated
   declarations, forged flags, and chained owner redirects before publication.
-- The compiler exposes owned graph observations and forced source replay.
-  The project runner reports available diagnostics and semantic artifacts,
-  checks query identities, and keeps missing evidence explicit.
+- The compiler exposes owned graph observations and forced source replay. The
+  project runner reports available diagnostics and semantic artifacts, checks
+  query identities, and keeps missing evidence explicit.
 - Project reports retain location-specific package choices. Manifest failures
   use stable paths and source ranges instead of process-local node IDs.
 - Test-path replacement uses one ordered pass, matching pinned Go behavior.
@@ -90,28 +90,28 @@ fixtures and review attempts. They are not final verification evidence.
 
 ## Separate work
 
-The held iterator branch at `a39fb88d` passes all 3,734 checker unit tests.
-Its source adapter remains separate and incomplete. Passing kernel tests does
-not establish source-level iterator support.
+The held iterator branch at `a39fb88d` passes all 3,734 checker unit tests. Its
+source adapter remains separate and incomplete. Passing kernel tests does not
+establish source-level iterator support.
 
 Constructor composition, selected member queries, loop effects, expando flow,
 and JSDoc callback aliases still have separate implementation and review work.
-The next project-loading batch contains reviewed `noLib`, dependency-order,
-and mode-specific module-target fixes. It is not part of this checkpoint.
+The next project-loading batch contains reviewed `noLib`, dependency-order, and
+mode-specific module-target fixes. It is not part of this checkpoint.
 
 All seven project dependency inputs now have isolated prepared copies under
-`target/project-inputs`. Their scripts and evidence have separate reviews.
-No complete modern-project manifest or passing project ring is claimed.
+`target/project-inputs`. Their scripts and evidence have separate reviews. No
+complete modern-project manifest or passing project ring is claimed.
 
 Initial Go runs for Hono and ts-pattern are not parity passes. Follow-up probes
 show that artifact queries can add diagnostics and return fresh type objects
-without source reset. The replay contract is under review. Existing reports
-and gates have not been relaxed or relabeled.
+without source reset. The replay contract is under review. Existing reports and
+gates have not been relaxed or relabeled.
 
 The current project runner still lacks the separately developed exact project
 `.errors.txt` renderer. Config parse inputs, package facts, source realpaths,
-fresh diagnostic evidence, and other graph limits remain explicit where they
-are unavailable. Structured diagnostics do not replace exact artifact bytes.
+fresh diagnostic evidence, and other graph limits remain explicit where they are
+unavailable. Structured diagnostics do not replace exact artifact bytes.
 
 ## Build rules
 

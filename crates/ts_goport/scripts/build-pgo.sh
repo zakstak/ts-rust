@@ -179,7 +179,10 @@ case "$link" in
   nopie) link_flags="-Crelocation-model=static" ;;
   static) link_flags="-Crelocation-model=static -Ctarget-feature=+crt-static" ;;
   crt-static) link_flags="-Ctarget-feature=+crt-static" ;;
-  *) echo "error: PGO_LINK must be empty, nopie, static or crt-static (got '$link')" >&2; exit 1 ;;
+  *)
+    echo "error: PGO_LINK must be empty, nopie, static or crt-static (got '$link')" >&2
+    exit 1
+    ;;
 esac
 # With --target, RUSTFLAGS apply only to the target crates, not to build
 # scripts and proc macros (a proc macro cannot be +crt-static).
@@ -197,7 +200,10 @@ build() { # build <target-subdir> <rustflags>
   # shellcheck disable=SC2086
   env CARGO_TARGET_DIR="$target" TS_CARGO_SEPARATE_TARGET=1 TS_CARGO_SCCACHE=0 RUSTFLAGS="$flags" \
     "${cargo_cmd[@]}" build --profile goport --offline --locked -p ts_goport $bin_args $target_args $features \
-    > "$out/build-$1.log" 2>&1 || { tail -20 "$out/build-$1.log" >&2; exit 1; }
+    >"$out/build-$1.log" 2>&1 || {
+    tail -20 "$out/build-$1.log" >&2
+    exit 1
+  }
   # With --target cargo writes the bins to <target>/<triple>/goport. Copy them
   # to <target>/goport, where they are without --target.
   if [[ -n $triple ]]; then
@@ -242,7 +248,7 @@ default_train() {
   )
   for name in query hono zod effect elysia; do
     s=$SECONDS
-    "$gen/goport" -p "${projects[$name]}" > /dev/null 2>&1 || true
+    "$gen/goport" -p "${projects[$name]}" >/dev/null 2>&1 || true
     echo "train goport $name $((SECONDS - s))s"
   done
   # tsgo in the timed form: -p <cfg> --noEmit --pretty false --tsBuildInfoFile
@@ -252,11 +258,11 @@ default_train() {
   for name in query hono zod effect elysia; do
     s=$SECONDS
     "$gen/tsgo" -p "${projects[$name]}" --noEmit --pretty false \
-      --tsBuildInfoFile "$tmp/$name.tsbuildinfo" > /dev/null 2>&1 || true
+      --tsBuildInfoFile "$tmp/$name.tsbuildinfo" >/dev/null 2>&1 || true
     echo "train tsgo $name $((SECONDS - s))s"
   done
   for cfg in "${projects[query]}" "${projects[hono]}"; do
-    "$gen/goport_emit" -p "$cfg" --outDir "$tmp/out" > /dev/null 2>&1 || true
+    "$gen/goport_emit" -p "$cfg" --outDir "$tmp/out" >/dev/null 2>&1 || true
     rm -rf "$tmp/out"
   done
   cases="$data_root/target/continuation-r97-goport/corpus-full/cases"
@@ -265,7 +271,7 @@ default_train() {
     i=0
     for dir in "$cases"/*/; do
       if ((i++ % corpus_step == 0)) && [[ -f "$dir/tsconfig.json" ]]; then
-        (cd "$dir" && timeout 60 "$gen/goport" -p tsconfig.json > /dev/null 2>&1) || true
+        (cd "$dir" && timeout 60 "$gen/goport" -p tsconfig.json >/dev/null 2>&1) || true
         n=$((n + 1))
       fi
     done
@@ -286,13 +292,16 @@ else
 fi
 nprof=$(find "$profiles" -name '*.profraw' | wc -l | tr -d ' ')
 echo "$nprof profraw files"
-((nprof > 0)) || { echo "error: the training wrote no profile" >&2; exit 1; }
+((nprof > 0)) || {
+  echo "error: the training wrote no profile" >&2
+  exit 1
+}
 
 # 3. Merge. The file name holds the profile hash: cargo does not track the
 # profile content, but it rebuilds when RUSTFLAGS change.
 rm -f "$out"/goport-*.profdata
 "$profdata" merge -o "$tmp/merged.profdata" "$profiles"
-merged="$out/goport-$(cksum < "$tmp/merged.profdata" | cut -d' ' -f1).profdata"
+merged="$out/goport-$(cksum <"$tmp/merged.profdata" | cut -d' ' -f1).profdata"
 mv "$tmp/merged.profdata" "$merged"
 echo "merged $(du -h "$merged" | cut -f1) -> $merged"
 

@@ -28,7 +28,10 @@ stale_one() {
   mapfile -t deps < <(git show "$rev:$key" | grep -oP 'include_bytes!\("\K[^"]+' | grep -v '\.bin$' |
     while read -r p; do realpath -m --relative-to="$TOP" "$TOP/$dir/$p"; done)
   c=$(git rev-list -1 "$rev" -- "$blob")
-  [[ -n $c ]] || { echo "lib blob $blob: no commit at ${rev} wrote it"; return; }
+  [[ -n $c ]] || {
+    echo "lib blob $blob: no commit at ${rev} wrote it"
+    return
+  }
   mapfile -t changed < <(git diff --name-only "$c" "$rev" -- "${deps[@]}" "$C/libs")
   n=${#changed[@]}
   ((n)) || return 0
@@ -41,9 +44,14 @@ cargo_test() { scripts/run-cargo-capped.sh test --release -p ts_goport --lib -- 
 case ${1:-} in
   stale)
     rev=$(git rev-parse --verify "${2:-HEAD}^{commit}")
-    out=$(stale_one "$rev" src/frontend/parser/lib_parse.bin src/frontend/parser/lib_parse_snapshot.rs
-      stale_one "$rev" src/binder/lib_bind.bin src/binder/lib_snapshot.rs)
-    [[ -z $out ]] || { echo "$out"; exit 1; }
+    out=$(
+      stale_one "$rev" src/frontend/parser/lib_parse.bin src/frontend/parser/lib_parse_snapshot.rs
+      stale_one "$rev" src/binder/lib_bind.bin src/binder/lib_snapshot.rs
+    )
+    [[ -z $out ]] || {
+      echo "$out"
+      exit 1
+    }
     ;;
   check) cargo_test "$PARSE_TEST::snapshot_matches_live_parse" "$BIND_TEST::snapshot_matches_live_bind" ;;
   write)
@@ -53,5 +61,8 @@ case ${1:-} in
     git status --short -- "$C/src/frontend/parser/lib_parse.bin" "$C/src/binder/lib_bind.bin"
     ;;
   -h | --help | help) sed -n '2,/^set -euo/p' "$0" | sed '$d' ;;
-  *) sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 2 ;;
+  *)
+    sed -n '2,/^set -euo/p' "$0" | sed '$d'
+    exit 2
+    ;;
 esac

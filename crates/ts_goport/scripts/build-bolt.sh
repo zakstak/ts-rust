@@ -85,10 +85,16 @@ bins=(tsgo goport)
 cores=(4 16)
 
 for tool in perf perf2bolt merge-fdata llvm-bolt llvm-objcopy llvm-nm strace readelf taskset; do
-  command -v "$tool" > /dev/null || { echo "error: $tool not found" >&2; exit 1; }
+  command -v "$tool" >/dev/null || {
+    echo "error: $tool not found" >&2
+    exit 1
+  }
 done
 for b in "${bins[@]}"; do
-  [[ -x "$in_dir/$b" ]] || { echo "error: $in_dir/$b not found" >&2; exit 1; }
+  [[ -x "$in_dir/$b" ]] || {
+    echo "error: $in_dir/$b not found" >&2
+    exit 1
+  }
   if [[ "$(readelf -lW "$in_dir/$b")" != *" INTERP "* ]]; then
     echo "error: $in_dir/$b is static; BOLT breaks static glibc bins (see the header)" >&2
     exit 1
@@ -105,7 +111,10 @@ declare -A projects=(
 )
 names=(query hono zod effect elysia)
 for p in "${names[@]}"; do
-  [[ -f "${projects[$p]}" ]] || { echo "error: ${projects[$p]} not found" >&2; exit 1; }
+  [[ -f "${projects[$p]}" ]] || {
+    echo "error: ${projects[$p]} not found" >&2
+    exit 1
+  }
 done
 # Sample periods (cycles): about 10k to 50k samples a run on zbook.
 declare -A period=([query]=20011 [hono]=50021 [zod]=100003 [effect]=100003 [elysia]=1000003)
@@ -148,22 +157,22 @@ for b in "${bins[@]}"; do
   llvm-nm -j --defined-only "$in_dir/$b" | sort -u |
     awk '/\.(cold|warm)/ && !/\.(cold|warm)(\.[0-9]+)?$/ {
       n = $0; gsub(/\.cold/, "_cold", n); gsub(/\.warm/, "_warm", n); print $0, n }' \
-      > "$work/sym/$b.renames"
+      >"$work/sym/$b.renames"
   if [[ -s "$work/sym/$b.renames" ]]; then
     llvm-objcopy --redefine-syms="$work/sym/$b.renames" "$in_dir/$b" "$sym"
     chmod +x "$sym"
   else
     cp -p "$in_dir/$b" "$sym"
   fi
-  say "$b: renamed $(wc -l < "$work/sym/$b.renames") symbols"
+  say "$b: renamed $(wc -l <"$work/sym/$b.renames") symbols"
 
   # 2. The re-exec value at each CPU set.
   for c in "${cores[@]}"; do
     trace="$work/strace-$b-c$c.txt"
     taskset -c "${cpus[$c]}" strace -f -qq -v -s 4096 -e trace=execve -e signal=none -o "$trace" \
-      "$sym" --version > /dev/null 2>&1 || true
-    tunables[$b-$c]="$({ grep -oE '"(GLIBC_TUNABLES|_RJEM_MALLOC_CONF)=[^"]*"' "$trace" || true; } | tail -1 | tr -d '"')"
-    say "$b c$c: re-exec env ${tunables[$b-$c]:-none (no re-exec seen)}"
+      "$sym" --version >/dev/null 2>&1 || true
+    tunables[$b - $c]="$({ grep -oE '"(GLIBC_TUNABLES|_RJEM_MALLOC_CONF)=[^"]*"' "$trace" || true; } | tail -1 | tr -d '"')"
+    say "$b c$c: re-exec env ${tunables[$b - $c]:-none (no re-exec seen)}"
   done
 
   if has_relocs "$sym"; then mode[$b]=relocation; else mode[$b]=non-relocation; fi
@@ -176,14 +185,22 @@ for b in "${bins[@]}"; do
       run="$b-c$c-$p"
       args_of "$b" "$p" "$tmp/$run.tsbuildinfo"
       # perf returns 0 even when the bin exits 1 (projects with diagnostics).
-      (cd "$tmp" && env ${tunables[$b-$c]:+"${tunables[$b-$c]}"} taskset -c "$perf_cpus" \
+      (cd "$tmp" && env ${tunables[$b - $c]:+"${tunables[$b - $c]}"} taskset -c "$perf_cpus" \
         perf record -m 128 -e cycles:u -j any,u -c "${period[$p]}" -o "$work/$run.data" -- \
-        taskset -c "${cpus[$c]}" "$work/sym/$b" "${args[@]}" > /dev/null 2> "$work/$run.err") || true
+        taskset -c "${cpus[$c]}" "$work/sym/$b" "${args[@]}" >/dev/null 2>"$work/$run.err") || true
       rm -f "$tmp/$run.tsbuildinfo"
-      [[ -s "$work/$run.data" ]] || { tail -5 "$work/$run.err" >&2; echo "error: perf record failed for $run" >&2; exit 1; }
+      [[ -s "$work/$run.data" ]] || {
+        tail -5 "$work/$run.err" >&2
+        echo "error: perf record failed for $run" >&2
+        exit 1
+      }
       log="$work/$run.p2b.log"
-      perf2bolt -p "$work/$run.data" -o "$work/$run.fdata" "$work/sym/$b" > "$log" 2>&1 ||
-        { tail -5 "$log" >&2; echo "error: perf2bolt failed for $run" >&2; exit 1; }
+      perf2bolt -p "$work/$run.data" -o "$work/$run.fdata" "$work/sym/$b" >"$log" 2>&1 ||
+        {
+          tail -5 "$log" >&2
+          echo "error: perf2bolt failed for $run" >&2
+          exit 1
+        }
       objects="$(sed -n 's/.*wrote \([0-9]*\) objects.*/\1/p' "$log")"
       if [[ -z "$objects" || "$objects" == 0 ]]; then
         echo "error: perf2bolt mapped no samples for $run (did the bin re-exec?)" >&2
@@ -193,7 +210,7 @@ for b in "${bins[@]}"; do
       rm -f "$work/$run.data"
     done
   done
-  merge-fdata -o "$work/$b.fdata" "$work/$b"-c*.fdata > "$work/$b.merge.log" 2>&1
+  merge-fdata -o "$work/$b.fdata" "$work/$b"-c*.fdata >"$work/$b.merge.log" 2>&1
   rm -f "$work/$b"-c*.fdata
 done
 
@@ -205,8 +222,12 @@ for b in "${bins[@]}"; do
     flags=(-reorder-blocks=ext-tsp -split-functions -split-all-cold -dyno-stats)
   fi
   log="$work/$b.bolt.log"
-  llvm-bolt "$work/sym/$b" -o "$work/bolt/$b" -data="$work/$b.fdata" "${flags[@]}" > "$log" 2>&1 ||
-    { tail -5 "$log" >&2; echo "error: llvm-bolt failed for $b" >&2; exit 1; }
+  llvm-bolt "$work/sym/$b" -o "$work/bolt/$b" -data="$work/$b.fdata" "${flags[@]}" >"$log" 2>&1 ||
+    {
+      tail -5 "$log" >&2
+      echo "error: llvm-bolt failed for $b" >&2
+      exit 1
+    }
   if [[ ${mode[$b]} == relocation ]] && ! grep -q 'enabling relocation mode' "$log"; then
     echo "error: llvm-bolt did not use relocation mode for $b" >&2
     exit 1
@@ -225,11 +246,11 @@ for b in "${bins[@]}"; do
       args_of "$b" "$p" "$tmp/$run-in.tsbuildinfo"
       rc_in=0
       (cd "$tmp" && taskset -c "${cpus[$c]}" "$in_dir/$b" "${args[@]}" \
-        > "$work/ident/$run-in.out" 2> "$work/ident/$run-in.err") || rc_in=$?
+        >"$work/ident/$run-in.out" 2>"$work/ident/$run-in.err") || rc_in=$?
       args_of "$b" "$p" "$tmp/$run-bolt.tsbuildinfo"
       rc_bolt=0
       (cd "$tmp" && taskset -c "${cpus[$c]}" "$work/bolt/$b" "${args[@]}" \
-        > "$work/ident/$run-bolt.out" 2> "$work/ident/$run-bolt.err") || rc_bolt=$?
+        >"$work/ident/$run-bolt.out" 2>"$work/ident/$run-bolt.err") || rc_bolt=$?
       rm -f "$tmp/$run"-*.tsbuildinfo
       same=EQUAL
       if [[ $rc_in != "$rc_bolt" ]] ||
@@ -238,7 +259,7 @@ for b in "${bins[@]}"; do
         same=DIFF
         fail=1
       fi
-      say "identity $run: rc $rc_in/$rc_bolt stdout $(sha256sum < "$work/ident/$run-in.out" | cut -c1-12) $same"
+      say "identity $run: rc $rc_in/$rc_bolt stdout $(sha256sum <"$work/ident/$run-in.out" | cut -c1-12) $same"
     done
   done
 done
@@ -250,6 +271,6 @@ fi
 # 7. Output.
 mkdir "$out/bin"
 mv "${bins[@]/#/$work/bolt/}" "$out/bin/"
-(cd "$out/bin" && sha256sum "${bins[@]}" > bins.sha256)
+(cd "$out/bin" && sha256sum "${bins[@]}" >bins.sha256)
 rm -f "${bins[@]/#/$work/sym/}"
 say "BOLT bins in $out/bin: ${bins[*]}"

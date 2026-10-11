@@ -1,7 +1,7 @@
 // Prints the generated Rust tables in the dump format of main.go (writeDump).
 // gen.sh includes this file after `mod unicode_tables;`.
 
-use unicode_tables::{RangeTable, map_get};
+use unicode_tables::{map_get, RangeTable};
 
 fn dump_table(t: &RangeTable) -> String {
     let mut b = String::from("r16");

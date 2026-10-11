@@ -52,11 +52,11 @@ set -euo pipefail
 ROOT=/home/theo/Code/sandbox/ts-rust
 R=$ROOT/target/continuation-r97-goport
 SELF=$(realpath "${BASH_SOURCE[0]}")
-TOOLS=$(dirname "$(dirname "$(dirname "$SELF")")")  # the checkout of this script
+TOOLS=$(dirname "$(dirname "$(dirname "$SELF")")") # the checkout of this script
 G=$TOOLS/scripts/goport
-EVIDENCE=${CANDIDATE_EVIDENCE:-$R/evidence-cache}  # tests point this at a copy
-TARGET=$R/runtime/cargo-target                     # one warm target for candidate bins (gate.sh's default)
-export REMOTE_USE_RESERVED=1                       # remote.sh keeps dbook-lan for revision evidence
+EVIDENCE=${CANDIDATE_EVIDENCE:-$R/evidence-cache} # tests point this at a copy
+TARGET=$R/runtime/cargo-target                    # one warm target for candidate bins (gate.sh's default)
+export REMOTE_USE_RESERVED=1                      # remote.sh keeps dbook-lan for revision evidence
 BINS=(goport goport_emit goport_typesyms goport_build tsgo)
 LSP_BATTERIES=b1-inline,b1-query-core,b2-query-core,b1-hono,b2-hono,fourslash
 # The API oracle batteries: the 10 of pin 52168999f3dc (bumpA4 verify), and from pin 16c25522e123 (bump B)
@@ -71,19 +71,37 @@ KEPT_CRATES=(ts_scanner ts_ast ts_diagnostics ts_path ts_core ts_jsnum)
 CHECKER_PORT=$ROOT/target/worktrees/checker-port
 cd "$ROOT"
 
-usage() { sed -n '2,/^set -euo/p' "$SELF" | sed '$d'; exit "${1:-2}"; }
-die() { echo "candidate.sh: $*" >&2; exit 1; }
+usage() {
+  sed -n '2,/^set -euo/p' "$SELF" | sed '$d'
+  exit "${1:-2}"
+}
+die() {
+  echo "candidate.sh: $*" >&2
+  exit 1
+}
 say() { echo "== $*"; }
 # need <condition text>: stops, except in a dry run, where an earlier step (open) would fix it.
 need() { if [[ $DRY == 1 ]]; then echo "   (dry run; a real run stops here) $*"; else die "$*"; fi; }
 # run <cmd...>: prints the command, then runs it unless --dry-run.
-run() { printf '+'; printf ' %q' "$@"; printf '\n'; [[ $DRY == 1 ]] || "$@"; }
+run() {
+  printf '+'
+  printf ' %q' "$@"
+  printf '\n'
+  [[ $DRY == 1 ]] || "$@"
+}
 # run_sh <shell text>: the same for a command with redirects or pipes. fd 8 (the target lock) stays closed.
-run_sh() { printf '+ %s\n' "$1"; [[ $DRY == 1 ]] || bash -c "set -euo pipefail; $1" 8>&-; }
-sha() { sha256sum < "$1" | cut -c1-64; }
+run_sh() {
+  printf '+ %s\n' "$1"
+  [[ $DRY == 1 ]] || bash -c "set -euo pipefail; $1" 8>&-
+}
+sha() { sha256sum <"$1" | cut -c1-64; }
 
 # load_state: exports the saved state once; st <jq filter> reads it.
-load_state() { STATE=$(mktemp /tmp/candidate-state.XXXXXX); trap 'rm -f "$STATE"' EXIT; node scripts/state.mjs export > "$STATE"; }
+load_state() {
+  STATE=$(mktemp /tmp/candidate-state.XXXXXX)
+  trap 'rm -f "$STATE"' EXIT
+  node scripts/state.mjs export >"$STATE"
+}
 st() { jq -r "$1" "$STATE"; }
 
 # scope: sets POS and NEG, the include and exclude globs of the next revision's allowedChangedFiles
@@ -128,22 +146,22 @@ oracle_setup() {
   cfg=$(node scripts/state.mjs export | jq -c --argjson base "$base" '{rebase: .batch.oracleRebase,
     sets: ([($base.oracleAnswers // [])[], (.batch.oracleAnswers // [])[]] | unique_by([.kind, .sha256]) | sort_by(.sha256))}')
   for kind in lsp api; do
-    OARGS[$kind]='' OREBASE[$kind]=$(jq -c --arg k "$kind" '.rebase[$k] // empty' <<< "$cfg")
+    OARGS[$kind]='' OREBASE[$kind]=$(jq -c --arg k "$kind" '.rebase[$k] // empty' <<<"$cfg")
     while IFS=$'\t' read -r path hash; do
       [[ $path == /* ]] || path=$ROOT/$path
       [[ -f $path && $(sha "$path") == "$hash" ]] || die "answer set $path does not have the sha256 $hash"
       OARGS[$kind]+="--answers $path@$hash "
-    done < <(jq -r --arg k "$kind" '.sets[] | select(.kind == $k) | [.path, .sha256] | @tsv' <<< "$cfg")
+    done < <(jq -r --arg k "$kind" '.sets[] | select(.kind == $k) | [.path, .sha256] | @tsv' <<<"$cfg")
     if [[ -n ${OREBASE[$kind]} ]]; then
       OBASE[$kind]=''
-      while IFS= read -r dir; do OBASE[$kind]+="${OBASE[$kind]:+ }$dir"; done < <(jq -r '.runs[].dir' <<< "${OREBASE[$kind]}")
-      OARGS[$kind]+="--parity --identity $(jq -r '(.knownDiffs // [])[] | "--known-diff " + (.key | @sh) + " "' <<< "${OREBASE[$kind]}" | tr -d '\n')"
+      while IFS= read -r dir; do OBASE[$kind]+="${OBASE[$kind]:+ }$dir"; done < <(jq -r '.runs[].dir' <<<"${OREBASE[$kind]}")
+      OARGS[$kind]+="--parity --identity $(jq -r '(.knownDiffs // [])[] | "--known-diff " + (.key | @sh) + " "' <<<"${OREBASE[$kind]}" | tr -d '\n')"
     else
-      OBASE[$kind]=$(jq -r --arg k "$kind" '.[$k].dir // empty' <<< "$base")
+      OBASE[$kind]=$(jq -r --arg k "$kind" '.[$k].dir // empty' <<<"$base")
     fi
     [[ -z ${OARGS[$kind]} ]] || OARGS[$kind]+="--kind $kind "
     OKEY[$kind]="${OBASE[$kind]}${OARGS[$kind]:+ ${OARGS[$kind]% }}"
-    [[ -z ${OREBASE[$kind]} ]] || OKEY[$kind]+=" rebase=$(jq -cS . <<< "${OREBASE[$kind]}" | sha256sum | cut -c1-16)"
+    [[ -z ${OREBASE[$kind]} ]] || OKEY[$kind]+=" rebase=$(jq -cS . <<<"${OREBASE[$kind]}" | sha256sum | cut -c1-16)"
   done
 }
 
@@ -159,9 +177,9 @@ pathspecs() {
 fmt_clean() {
   local blob rc=0
   blob=$(mktemp /tmp/candidate-fmt.XXXXXX)
-  git cat-file blob "$1" > "$blob"
+  git cat-file blob "$1" >"$blob"
   # shellcheck disable=SC2094 # both sides only read the file
-  rustfmt --edition 2024 --emit stdout < "$blob" 2> /dev/null | cmp -s - "$blob" || rc=1
+  rustfmt --edition 2024 --emit stdout <"$blob" 2>/dev/null | cmp -s - "$blob" || rc=1
   rm -f "$blob"
   return $rc
 }
@@ -184,12 +202,15 @@ check_branch() {
   mb=$(git merge-base main "$sha")
   local -a own
   local -A main_blob base_blob
-  local mode type obj
+  local _mode _type obj
   mapfile -t own < <(git diff --no-renames --name-only "$mb" "$sha")
-  while IFS=$' \t' read -r -d '' mode type obj path; do main_blob[$path]=$obj; done < <(git ls-tree -r -z main)
-  while IFS=$' \t' read -r -d '' mode type obj path; do base_blob[$path]=$obj; done < <(git ls-tree -r -z "$base")
+  while IFS=$' \t' read -r -d '' _mode _type obj path; do main_blob[$path]=$obj; done < <(git ls-tree -r -z main)
+  while IFS=$' \t' read -r -d '' _mode _type obj path; do base_blob[$path]=$obj; done < <(git ls-tree -r -z "$base")
   while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-    if in_scope "$path" "${NEG[@]}"; then skipped=$((skipped + 1)); continue; fi
+    if in_scope "$path" "${NEG[@]}"; then
+      skipped=$((skipped + 1))
+      continue
+    fi
     n=$((n + 1))
     in_scope "$path" "${POS[@]}" || problems+=("outside allowedChangedFiles: $path")
     if [[ -n ${base_blob[$path]:-} && ${main_blob[$path]:-} == "${base_blob[$path]}" ]] && ! in_list "$path" "${own[@]}"; then
@@ -263,7 +284,7 @@ cmd_open() {
   [[ -z $NEW_BATCH ]] || orv+=(--new-batch "$NEW_BATCH" --origin "$ORIGIN")
   if [[ $fp != '<'* ]]; then
     say "open_revision.py checks (--dry-run, no write)"
-    if [[ $DRY == 1 ]]; then "${orv[@]}" --dry-run; else "${orv[@]}" --dry-run > /dev/null; fi
+    if [[ $DRY == 1 ]]; then "${orv[@]}" --dry-run; else "${orv[@]}" --dry-run >/dev/null; fi
   fi
   run "${orv[@]}"
   say "then: $SELF side $rev; after SIDE DONE: $SELF verdict-request $rev"
@@ -281,7 +302,7 @@ evidence_key() {
     git -C "$wt" status --porcelain --untracked-files=all -- crates Cargo.toml Cargo.lock | while IFS= read -r line; do
       [[ $line != '?? crates/ts_goport/CANDIDATE.md' ]] || continue
       echo "$line"
-      if [[ -f $wt/${line:3} ]]; then sha256sum < "$wt/${line:3}"; fi
+      if [[ -f $wt/${line:3} ]]; then sha256sum <"$wt/${line:3}"; fi
     done
     echo "pin=$pin profile=release toolchain=$(rustc --version 2>/dev/null) incremental=0"
   } | sha256sum | cut -c1-16
@@ -302,12 +323,19 @@ cmd_side() {
   say "side $label in unit $unit, log $log"
   run systemd-run --user --collect --unit="$unit" --working-directory="$ROOT" "${env[@]}" \
     bash -c "exec bash $SELF _side-unit $label $wt ${pin:--} $HOST ${NAME_MAP:--} >> $log 2>&1"
-  if [[ $DRY == 1 ]]; then say "the unit runs:"; side_unit "$label" "$wt" "${pin:--}" "$HOST" "${NAME_MAP:--}"; fi
+  if [[ $DRY == 1 ]]; then
+    say "the unit runs:"
+    side_unit "$label" "$wt" "${pin:--}" "$HOST" "${NAME_MAP:--}"
+  fi
   echo "monitor: until grep -qE '^SIDE (DONE|FAIL)' $log || ! systemctl --user is-active -q $unit; do sleep 30; done; tail -8 $log"
 }
 
 # free_name <dir> <name>: <name>, or <name>-2, -3, ... when <dir>/<name> exists (gate labels are never reused).
-free_name() { local n=$2 i=2; while [[ -e $1/$n ]]; do n=$2-$i i=$((i + 1)); done; echo "$n"; }
+free_name() {
+  local n=$2 i=2
+  while [[ -e $1/$n ]]; do n=$2-$i i=$((i + 1)); done
+  echo "$n"
+}
 
 # side_unit <label> <checkout> <pin|-> <host|local> <name map|->: body of the side unit. Each finished step
 # is a file in the cache dir (bins/, testbin/, tests-run/, tests.json, bound.json, gate.json,
@@ -331,11 +359,11 @@ side_unit() {
   # The base: the last accepted revision's goport test results and gate manifest, pinned by sha256.
   # The base LSP and API results are results dirs (bl, ba), compared per request.
   if base=$(python3 "$G/open_revision.py" --base); then
-    bt=$(jq -r .tests.path <<< "$base") bts=$(jq -r .tests.sha256 <<< "$base")
-    bg=$(jq -r .gate.path <<< "$base") bgs=$(jq -r .gate.sha256 <<< "$base")
-    bl=$(jq -r '.lsp.dir // empty' <<< "$base") ba=$(jq -r '.api.dir // empty' <<< "$base")
+    bt=$(jq -r .tests.path <<<"$base") bts=$(jq -r .tests.sha256 <<<"$base")
+    bg=$(jq -r .gate.path <<<"$base") bgs=$(jq -r .gate.sha256 <<<"$base")
+    bl=$(jq -r '.lsp.dir // empty' <<<"$base") ba=$(jq -r '.api.dir // empty' <<<"$base")
     [[ $(sha "$bt") == "$bts" && $(sha "$bg") == "$bgs" ]] || die "the base files differ from their sha256: $base"
-    say "base $(jq -r '"\(.batch) R\(.revision)"' <<< "$base"): tests $bt, gate $bg, LSP ${bl:-none}, API ${ba:-none}"
+    say "base $(jq -r '"\(.batch) R\(.revision)"' <<<"$base"): tests $bt, gate $bg, LSP ${bl:-none}, API ${ba:-none}"
   else
     need "no protected base (open_revision.py --base)"
     bt='<base results.json>' bg='<base gate manifest>' bl='<base LSP results>' ba='<base API results>'
@@ -352,7 +380,10 @@ side_unit() {
     local target=$TARGET
     [[ $(realpath "$wt") == "$(realpath "$CHECKER_PORT")" ]] || target=$wt/target/candidate-side
     say "$(date -u +%FT%TZ) build release bins in $target"
-    if [[ $DRY == 0 ]]; then exec 8> /tmp/ts-rust-candidate-target.lock; flock 8; fi
+    if [[ $DRY == 0 ]]; then
+      exec 8>/tmp/ts-rust-candidate-target.lock
+      flock 8
+    fi
     # Evidence bins: the shipped toolchain (not the nightly edit-loop default) and no incremental cache.
     # Units whose dep-info names another checkout's files (a crate with sources outside its package dir,
     # like goport_util) are removed first, so cargo builds them again from this checkout.
@@ -398,14 +429,18 @@ side_unit() {
     rc=0
     run_sh "python3 $G/compare-tests.py $bt $C/tests-run/results.json ${map:+--name-map $map }--out $C/tests-compare.json" || rc=$?
     if [[ $DRY == 0 ]]; then
-      g=$C/tests.json; ((rc == 0)) || { g=$C/tests-fail.json; fails+="${fails:+; }goport tests: compare-tests.py rc $rc ($C/tests-compare.json)"; }
+      g=$C/tests.json
+      ((rc == 0)) || {
+        g=$C/tests-fail.json
+        fails+="${fails:+; }goport tests: compare-tests.py rc $rc ($C/tests-compare.json)"
+      }
       jq --arg r "$C/tests-run/results.json" --arg s "$(sha "$C/tests-run/results.json")" --arg b "$(realpath "$bt")" --arg bs "$bts" \
         --arg tb "$C/testbin" --arg c "$(cat "$C/testbin/COMMIT")" --arg o "$C/tests-compare.json" \
         '{results: $r, sha256: $s, base: $b, baseSha256: $bs, testbin: $tb, commit: $c, compareOutput: $o, verdict,
           compare: (.total | {lost: (.lost | length), absent: (.absent | length), unrun: (.unrun | length), retained, recovered,
                               newNames, removedByMap, newFailed}),
           nameMap: (if .nameMap then {path: .nameMap.path, sha256: .nameMap.sha256} else null end),
-          incomplete: .new.incomplete}' "$C/tests-compare.json" > "$g"
+          incomplete: .new.incomplete}' "$C/tests-compare.json" >"$g"
       ((rc)) || rm -f "$C/tests-fail.json"
     fi
   fi
@@ -417,7 +452,10 @@ side_unit() {
       say "reuse bound runs $(jq -r '.rounds | join(" ")' "$C/bound.json")"
     else
       n=0
-      for r in "$R"/measure/r*; do r=${r##*/r}; if [[ $r =~ ^[0-9]+$ ]] && ((r > n)); then n=$r; fi; done
+      for r in "$R"/measure/r*; do
+        r=${r##*/r}
+        if [[ $r =~ ^[0-9]+$ ]] && ((r > n)); then n=$r; fi
+      done
       n=r$((n + 1))
       for r in "$n" "${n}b"; do
         say "$(date -u +%FT%TZ) bound run $r"
@@ -429,7 +467,7 @@ side_unit() {
           cmp -s "$R/measure/$n/$r.out" "$R/measure/${n}b/$r.out" || die "$r differs between $n and ${n}b"
         done
         jq -n --arg fp "$fp" --arg c "$commit" --arg a "$n" --arg b "${n}b" --arg m "$R/measure" \
-          '{sourceFingerprint: $fp, commit: $c, rounds: [$a, $b], manifests: [$m + "/" + $a + "/manifest.json", $m + "/" + $b + "/manifest.json"]}' > "$C/bound.json"
+          '{sourceFingerprint: $fp, commit: $c, rounds: [$a, $b], manifests: [$m + "/" + $a + "/manifest.json", $m + "/" + $b + "/manifest.json"]}' >"$C/bound.json"
       fi
     fi
   fi
@@ -445,7 +483,8 @@ side_unit() {
   # on_host <GOPORT_PIN value> <command text> <log>: runs the command in the repo root, on zbook or under
   # the host lock.
   on_host() {
-    if [[ $host == local ]]; then run_sh "export GOPORT_PIN=$1; ($2) < /dev/null > $3 2>&1"
+    if [[ $host == local ]]; then
+      run_sh "export GOPORT_PIN=$1; ($2) < /dev/null > $3 2>&1"
     else run_sh "flock $lock env GOPORT_PIN=$1 scripts/goport/remote.sh run $host $(printf %q "$2") < /dev/null > $3 2>&1"; fi
   }
 
@@ -463,7 +502,7 @@ side_unit() {
         '{label: $l, manifest: $m, sha256: $s, host: $h, exit: $rc, verdict, commit, upstreamPin,
           counts: ([.results[].status] | group_by(.) | map({(.[0]): length}) | add),
           failing: [.results[] | select(.status == "FAIL") | {id, detail}]}' \
-        "$R/compat/gate/$gl/manifest.json" > "$C/gate.json"
+        "$R/compat/gate/$gl/manifest.json" >"$C/gate.json"
     fi
   fi
 
@@ -483,7 +522,10 @@ side_unit() {
     run_sh "python3 $G/gate-compare.py $bg \$(jq -r .manifest $C/gate.json) --out $C/gate-compare.json > /dev/null" || rc=$?
     if [[ $DRY == 0 ]] && ((rc)); then
       # Exit 2 is bad input, not a failed run: nothing moves, and the next run compares the same gate again.
-      [[ $rc == 1 && -f $C/gate-compare.json ]] || { rm -f "$C/gate-compare.json"; die "gate-compare.py rc $rc (bad input)"; }
+      [[ $rc == 1 && -f $C/gate-compare.json ]] || {
+        rm -f "$C/gate-compare.json"
+        die "gate-compare.py rc $rc (bad input)"
+      }
       gl=$(jq -r .label "$C/gate.json")
       fails+="${fails:+; }gate $gl compare rc $rc (kept as gate-fail-$gl.json): $(jq -r '[.regressions[] | "\(.id) (\(.why))"] | .[:10] | join(", ")' "$C/gate-compare.json")"
       if [[ -e $C/gate-fail-$gl.json ]]; then
@@ -504,7 +546,7 @@ side_unit() {
   # stops the side run. The finished run's label stays in <record>-run, so a rerun only compares again.
   oracle_json() {
     local kind=$1 root=$2 lab=$3 base=$4 rec=$5 rc=0 prc=0 out
-    [[ $DRY == 1 ]] || echo "$lab" > "$C/$rec-run"
+    [[ $DRY == 1 ]] || echo "$lab" >"$C/$rec-run"
     if [[ -z $base ]]; then
       # The other steps still run. The first goport batch needs the rule's apiBaseline (an API run of the R131 bins).
       echo "   no base $kind results (open_revision.py --base .$rec.dir); $lab is kept, a rerun compares it"
@@ -517,8 +559,11 @@ side_unit() {
     ((rc < 2)) && [[ -f $C/$rec-compare.new.json ]] || die "$kind compare rc $rc: bad input or a refused answer set (see this log)"
     mv "$C/$rec-compare.new.json" "$C/$rec-compare.json"
     out=$C/$rec.json
-    ((rc == 0)) || { out=$C/$rec-fail.json; fails+="${fails:+; }$kind oracle: oracle-compare.py rc $rc ($C/$rec-compare.json)"; }
-    python3 - "$kind" "$root/results/$lab" "$lab" "$host" "${OKEY[$rec]}" "$C/$rec-compare.json" "${OREBASE[$rec]:-null}" "$bg" > "$C/$rec.new.json" <<'PY' || prc=$?
+    ((rc == 0)) || {
+      out=$C/$rec-fail.json
+      fails+="${fails:+; }$kind oracle: oracle-compare.py rc $rc ($C/$rec-compare.json)"
+    }
+    python3 - "$kind" "$root/results/$lab" "$lab" "$host" "${OKEY[$rec]}" "$C/$rec-compare.json" "${OREBASE[$rec]:-null}" "$bg" >"$C/$rec.new.json" <<'PY' || prc=$?
 import collections, json, sys
 kind, rdir, label, host, key, cmp_path, rebase, gate = sys.argv[1:]
 s, c, rebase = json.load(open(f'{rdir}/summary.json')), json.load(open(cmp_path)), json.loads(rebase)
@@ -554,7 +599,9 @@ print(json.dumps({'label': label, 'host': host, 'resultsDir': rdir, 'summary': f
                   **({'rebaseProblems': problems} if problems else {})}))
 sys.exit(3 if problems else 0)
 PY
-    if ((prc == 3)); then out=$C/$rec-fail.json; fails+="${fails:+; }$kind oracle: the rebase runs are not the base bins at the batch pin ($C/$rec-fail.json)"
+    if ((prc == 3)); then
+      out=$C/$rec-fail.json
+      fails+="${fails:+; }$kind oracle: the rebase runs are not the base bins at the batch pin ($C/$rec-fail.json)"
     elif ((prc)); then die "$kind oracle record rc $prc"; fi
     mv "$C/$rec.new.json" "$out"
     if [[ $out == "$C/$rec.json" ]]; then rm -f "$C/$rec-fail.json"; else rm -f "$C/$rec.json"; fi
@@ -562,7 +609,7 @@ PY
   # oracle_done <record>: true when <record>.json is a passing compare with the current OKEY (an older record without
   # compareKey was a compare with its base dir alone).
   oracle_done() {
-    [[ -f $C/$1.json ]] && jq -e .compare "$C/$1.json" > /dev/null && [[ $(jq -r '.compareKey // .base.dir' "$C/$1.json") == "${OKEY[$1]}" ]]
+    [[ -f $C/$1.json ]] && jq -e .compare "$C/$1.json" >/dev/null && [[ $(jq -r '.compareKey // .base.dir' "$C/$1.json") == "${OKEY[$1]}" ]]
   }
   if [[ -n $base ]]; then
     oracle_setup "$base"
@@ -573,8 +620,11 @@ PY
   fi
 
   # LSP oracle (the batteries of the R121 to R125 side scripts).
-  if oracle_done lsp; then say "reuse LSP oracle $(jq -r .label "$C/lsp.json")"
-  elif [[ -f $C/lsp-run ]]; then say "reuse LSP run $(cat "$C/lsp-run")"; oracle_json LSP "$R/ls-oracle/battery" "$(cat "$C/lsp-run")" "${OBASE[lsp]}" lsp
+  if oracle_done lsp; then
+    say "reuse LSP oracle $(jq -r .label "$C/lsp.json")"
+  elif [[ -f $C/lsp-run ]]; then
+    say "reuse LSP run $(cat "$C/lsp-run")"
+    oracle_json LSP "$R/ls-oracle/battery" "$(cat "$C/lsp-run")" "${OBASE[lsp]}" lsp
   else
     ll=$(free_name "$R/ls-oracle/battery/results" "lsp-$label") rc=0
     oracle=$(python3 scripts/upstream/pin.py path oracle ${pin:+"$pin"})
@@ -584,7 +634,7 @@ PY
     say "$(date -u +%FT%TZ) LSP oracle $ll on $host"
     l="python3 scripts/goport/lsp_oracle.py check --out-root $R/ls-oracle/battery"
     l+=" --battery $LSP_BATTERIES --goport $B/tsgo --oracle $oracle --label $ll --jobs 12"
-    on_host "" "$l" "$C/lsp-$ll.log" || rc=$?  # the oracle path carries the pin
+    on_host "" "$l" "$C/lsp-$ll.log" || rc=$? # the oracle path carries the pin
     [[ $host == local ]] || run_sh "scripts/goport/remote.sh fetch $host $R/ls-oracle/battery/results/$ll >> $C/sync.log 2>&1"
     [[ $DRY == 1 || $rc == 0 ]] || die "LSP oracle $ll rc $rc (log $C/lsp-$ll.log)"
     oracle_json LSP "$R/ls-oracle/battery" "$ll" "${OBASE[lsp]}" lsp
@@ -593,8 +643,11 @@ PY
   # API oracle (api_oracle.py, the batteries of API_BATTERIES, and API_EXT_BATTERIES unless the pin's oracle is
   # in API_NO_EXT_ORACLES): one check per battery. GOPORT_PIN selects the pin's traces (a pin cache); the goldens
   # are golden/<oracle sha256 prefix>.
-  if oracle_done api; then say "reuse API oracle $(jq -r .label "$C/api.json")"
-  elif [[ -f $C/api-run ]]; then say "reuse API run $(cat "$C/api-run")"; oracle_json API "$R/tests2/api" "$(cat "$C/api-run")" "${OBASE[api]}" api
+  if oracle_done api; then
+    say "reuse API oracle $(jq -r .label "$C/api.json")"
+  elif [[ -f $C/api-run ]]; then
+    say "reuse API run $(cat "$C/api-run")"
+    oracle_json API "$R/tests2/api" "$(cat "$C/api-run")" "${OBASE[api]}" api
   else
     al=$(free_name "$R/tests2/api/results" "api-$label") rc=0
     oracle=$(python3 scripts/upstream/pin.py path oracle ${pin:+"$pin"})
@@ -617,7 +670,7 @@ PY
   # Quality on the checkout: rustfmt and clippy (R114 and R124 were refused for quality alone).
   # Fingerprint before and after.
   # A record without .crates predates the kept crate check (R131 and older), so it runs again.
-  if [[ -f $C/quality.json ]] && jq -e .crates "$C/quality.json" > /dev/null; then say "reuse quality $(jq -c . "$C/quality.json")"; else
+  if [[ -f $C/quality.json ]] && jq -e .crates "$C/quality.json" >/dev/null; then say "reuse quality $(jq -c . "$C/quality.json")"; else
     say "$(date -u +%FT%TZ) quality: rustfmt and clippy"
     if [[ $DRY == 0 ]]; then
       local fpa fpb fmt=0 cl=0 warn
@@ -627,17 +680,20 @@ PY
       local pkgs=(-p ts_goport) dirs=(crates/ts_goport) p
       for p in goport_util goport_lsproto; do grep -q "\"crates/ts_goport/parts/$p\"" "$wt/Cargo.toml" && pkgs+=(-p "$p"); done
       for p in "${KEPT_CRATES[@]}"; do grep -q "\"crates/$p\"" "$wt/Cargo.toml" && pkgs+=(-p "$p") dirs+=("crates/$p"); done
-      (cd "$wt" && rustfmt --edition 2024 --check $(git ls-files "${dirs[@]/%//**/*.rs}") > "$C/rustfmt.log" 2>&1) || fmt=$?
+      (cd "$wt" && mapfile -d '' -t fmt_files < <(git ls-files -z "${dirs[@]/%//**/*.rs}") && rustfmt --edition 2024 --check "${fmt_files[@]}" >"$C/rustfmt.log" 2>&1) || fmt=$?
       (cd "$wt" && TS_CARGO_LOCK_ID=candidate-side TS_CARGO_SEPARATE_TARGET=1 CARGO_TARGET_DIR=$R/runtime/cargo-r113-clippy \
-        "$ROOT/scripts/run-cargo-capped.sh" clippy --locked "${pkgs[@]}" --all-targets > "$C/clippy.log" 2>&1) || cl=$?
+        "$ROOT/scripts/run-cargo-capped.sh" clippy --locked "${pkgs[@]}" --all-targets >"$C/clippy.log" 2>&1) || cl=$?
       fpa=$(python3 "$G/fp.py" "$wt" | cut -d' ' -f1)
       local kept
       warn=$(grep -E '^(warning|error)' -A4 "$C/clippy.log" | grep -c -- '--> crates/ts_goport' || true)
-      kept=$(grep -E '^(warning|error)' -A4 "$C/clippy.log" | grep -cE -- "--> crates/($(IFS='|'; echo "${KEPT_CRATES[*]}"))/" || true)
+      kept=$(grep -E '^(warning|error)' -A4 "$C/clippy.log" | grep -cE -- "--> crates/($(
+        IFS='|'
+        echo "${KEPT_CRATES[*]}"
+      ))/" || true)
       jq -n --arg fp "$fpa" --argjson fmt "$fmt" --argjson cl "$cl" --argjson w "$warn" --argjson k "$kept" \
         --argjson same "$([[ $fpa == "$fpb" ]] && echo true || echo false)" --arg dirs "${dirs[*]}" \
         '{sourceFingerprint: $fp, rustfmtExit: $fmt, clippyExit: $cl, tsGoportWarnings: $w, keptCrateWarnings: $k,
-          fingerprintUnchanged: $same, crates: ($dirs | split(" "))}' > "$C/quality.json"
+          fingerprintUnchanged: $same, crates: ($dirs | split(" "))}' >"$C/quality.json"
       [[ $fmt == 0 && $cl == 0 && $warn == 0 && $kept == 0 && $fpa == "$fpb" ]] ||
         fails+="${fails:+; }quality: rustfmt $fmt, clippy $cl, warnings $warn ts_goport, $kept kept crates"
     fi
@@ -830,18 +886,50 @@ DRY=0 HYP='' CHANGE='' MESSAGE='' NEW_BATCH='' ORIGIN='' CHECKOUT='' HOST=dbook-
 args=()
 while (($#)); do
   case $1 in
-    --dry-run) DRY=1; shift ;;
-    -h|--help) usage 0 ;;
-    --hypothesis) HYP=${2:?--hypothesis needs a value}; shift 2 ;;
-    --change) CHANGE=${2:?--change needs a value}; shift 2 ;;
-    --message) MESSAGE=${2:?--message needs a value}; shift 2 ;;
-    --new-batch) NEW_BATCH=${2:?--new-batch needs a value}; shift 2 ;;
-    --origin) ORIGIN=${2:?--origin needs a value}; shift 2 ;;
-    --checkout) CHECKOUT=${2:?--checkout needs a value}; shift 2 ;;
-    --name-map) NAME_MAP=$(realpath "${2:?--name-map needs a value}"); [[ -f $NAME_MAP ]] || die "no name map $2"; shift 2 ;;
-    --gate-host) HOST=${2:?--gate-host needs a value}; [[ $HOST != auto ]] || die "--gate-host auto is not supported (sync-pin and fetch need one host); pick a free one with remote.sh status"; shift 2 ;;
+    --dry-run)
+      DRY=1
+      shift
+      ;;
+    -h | --help) usage 0 ;;
+    --hypothesis)
+      HYP=${2:?--hypothesis needs a value}
+      shift 2
+      ;;
+    --change)
+      CHANGE=${2:?--change needs a value}
+      shift 2
+      ;;
+    --message)
+      MESSAGE=${2:?--message needs a value}
+      shift 2
+      ;;
+    --new-batch)
+      NEW_BATCH=${2:?--new-batch needs a value}
+      shift 2
+      ;;
+    --origin)
+      ORIGIN=${2:?--origin needs a value}
+      shift 2
+      ;;
+    --checkout)
+      CHECKOUT=${2:?--checkout needs a value}
+      shift 2
+      ;;
+    --name-map)
+      NAME_MAP=$(realpath "${2:?--name-map needs a value}")
+      [[ -f $NAME_MAP ]] || die "no name map $2"
+      shift 2
+      ;;
+    --gate-host)
+      HOST=${2:?--gate-host needs a value}
+      [[ $HOST != auto ]] || die "--gate-host auto is not supported (sync-pin and fetch need one host); pick a free one with remote.sh status"
+      shift 2
+      ;;
     --*) die "unknown option $1" ;;
-    *) args+=("$1"); shift ;;
+    *)
+      args+=("$1")
+      shift
+      ;;
   esac
 done
 set -- "${args[@]}"
@@ -849,10 +937,25 @@ cmd=${1:-}
 (($#)) && shift
 case $cmd:$# in
   help:0) usage 0 ;;
-  check:1) load_state; check_branch "$1" ;;
-  open:2) load_state; cmd_open "$@" ;;
-  side:1) load_state; cmd_side "$1" ;;
-  verdict-request:1) load_state; cmd_verdict "$1" ;;
-  _side-unit:5) side_unit "$@"; exit 0 ;;
+  check:1)
+    load_state
+    check_branch "$1"
+    ;;
+  open:2)
+    load_state
+    cmd_open "$@"
+    ;;
+  side:1)
+    load_state
+    cmd_side "$1"
+    ;;
+  verdict-request:1)
+    load_state
+    cmd_verdict "$1"
+    ;;
+  _side-unit:5)
+    side_unit "$@"
+    exit 0
+    ;;
   *) usage ;;
 esac

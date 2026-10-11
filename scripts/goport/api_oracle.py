@@ -145,6 +145,17 @@ import tempfile
 import threading
 import time
 
+
+def _read_file(path, *args, **kwargs):
+    with open(path, *args, **kwargs) as stream:
+        return stream.read()
+
+
+def _iter_lines(path, *args, **kwargs):
+    with open(path, *args, **kwargs) as stream:
+        yield from stream
+
+
 TRACE_FORMAT = "goport-api-trace/1"
 GOLDEN_FORMAT = "goport-api-golden/1"
 FLAKY_FORMAT = "goport-api-flaky/1"
@@ -210,49 +221,107 @@ PRESETS = {
         "tsconfig2": "tsconfig.prod.json",
         "include": ["src/**/*.ts"],
         "exclude": ["src/__tests__/**"],
-        "caps": {"ids": 10, "calls": 4, "typeNodes": 4, "fnExprs": 3, "shorthand": 2, "sigDecls": 2,
-                 "memberCompletions": 2, "globalCompletions": 1, "refsForNode": 2, "sigUsages": 2},
+        "caps": {
+            "ids": 10,
+            "calls": 4,
+            "typeNodes": 4,
+            "fnExprs": 3,
+            "shorthand": 2,
+            "sigDecls": 2,
+            "memberCompletions": 2,
+            "globalCompletions": 1,
+            "refsForNode": 2,
+            "sigUsages": 2,
+        },
     },
     "hono": {
         "dir": PROJECT_INPUTS + "/hono/source",
         "tsconfig": "tsconfig.build.json",
         "include": ["src/**/*.ts", "src/**/*.mts"],
         "exclude": ["**/*.test.ts", "**/*.test.tsx"],
-        "caps": {"ids": 5, "calls": 3, "typeNodes": 3, "fnExprs": 2, "shorthand": 1, "sigDecls": 1,
-                 "memberCompletions": 1, "globalCompletions": 0, "refsForNode": 1, "sigUsages": 1},
+        "caps": {
+            "ids": 5,
+            "calls": 3,
+            "typeNodes": 3,
+            "fnExprs": 2,
+            "shorthand": 1,
+            "sigDecls": 1,
+            "memberCompletions": 1,
+            "globalCompletions": 0,
+            "refsForNode": 1,
+            "sigUsages": 1,
+        },
     },
     "ts-pattern": {
         "dir": PROJECT_INPUTS + "/ts-pattern/source",
         "tsconfig": "tsconfig.json",
         "include": ["src/**/*.ts"],
         "exclude": [],
-        "caps": {"ids": 6, "calls": 3, "typeNodes": 3, "fnExprs": 2, "shorthand": 1, "sigDecls": 1,
-                 "memberCompletions": 1, "globalCompletions": 0, "refsForNode": 1, "sigUsages": 1},
+        "caps": {
+            "ids": 6,
+            "calls": 3,
+            "typeNodes": 3,
+            "fnExprs": 2,
+            "shorthand": 1,
+            "sigDecls": 1,
+            "memberCompletions": 1,
+            "globalCompletions": 0,
+            "refsForNode": 1,
+            "sigUsages": 1,
+        },
     },
     "zod": {
         "dir": PROJECT_INPUTS + "/zod/source/packages/zod",
         "tsconfig": "tsconfig.json",
         "include": ["src/**/*.ts"],
         "exclude": ["**/tests/**", "**/*.test.ts"],
-        "caps": {"ids": 5, "calls": 3, "typeNodes": 3, "fnExprs": 2, "shorthand": 1, "sigDecls": 1,
-                 "memberCompletions": 1, "globalCompletions": 0, "refsForNode": 1, "sigUsages": 1},
+        "caps": {
+            "ids": 5,
+            "calls": 3,
+            "typeNodes": 3,
+            "fnExprs": 2,
+            "shorthand": 1,
+            "sigDecls": 1,
+            "memberCompletions": 1,
+            "globalCompletions": 0,
+            "refsForNode": 1,
+            "sigUsages": 1,
+        },
     },
     "effect": {
         "dir": PROJECT_INPUTS + "/effect/source/packages/effect",
         "tsconfig": "tsconfig.json",
         "include": ["src/**/*.ts"],
         "exclude": [],
-        "caps": {"ids": 3, "calls": 2, "typeNodes": 2, "fnExprs": 1, "shorthand": 1, "sigDecls": 1,
-                 "memberCompletions": 1, "globalCompletions": 0, "refsForNode": 0, "sigUsages": 0},
+        "caps": {
+            "ids": 3,
+            "calls": 2,
+            "typeNodes": 2,
+            "fnExprs": 1,
+            "shorthand": 1,
+            "sigDecls": 1,
+            "memberCompletions": 1,
+            "globalCompletions": 0,
+            "refsForNode": 0,
+            "sigUsages": 0,
+        },
     },
 }
 
 # `build --kind ext` settings (api-battery/design.md section 4.1): ext_file sample count, files the samples skip,
 # the emit fixture sources and the JSX files that transpile reads.
 EXT_PRESETS = {
-    "query-core": {"files": 8, "sampleExclude": [],
-                   "fixture": ["src/subscribable.ts", "src/timeoutManager.ts", "src/focusManager.ts",
-                               "src/onlineManager.ts", "src/notifyManager.ts"]},
+    "query-core": {
+        "files": 8,
+        "sampleExclude": [],
+        "fixture": [
+            "src/subscribable.ts",
+            "src/timeoutManager.ts",
+            "src/focusManager.ts",
+            "src/onlineManager.ts",
+            "src/notifyManager.ts",
+        ],
+    },
     "hono": {"files": 12, "sampleExclude": [], "jsx": ["src/**/*.tsx"]},
     # 50 of zod's 131 roots are near-identical locale tables; the zod battery covers them.
     "zod": {"files": 10, "sampleExclude": ["src/v4/locales/**"]},
@@ -421,12 +490,16 @@ def find_unstable(a0, b0, max_rounds=64):
         for k in range(len(d), -1, -1):
             p = d[:k]
             va, vb = pointer_get(a, p), pointer_get(b, p)
-            if not (isinstance(va, list) and isinstance(vb, list)) or len(va) != len(vb):
+            if not (isinstance(va, list) and isinstance(vb, list)) or len(va) != len(
+                vb
+            ):
                 continue
             pat = pattern_string(generalize(p))
             if pat in patterns:
                 continue
-            if sorted(canon(deep_sort(e)) for e in va) == sorted(canon(deep_sort(e)) for e in vb):
+            if sorted(canon(deep_sort(e)) for e in va) == sorted(
+                canon(deep_sort(e)) for e in vb
+            ):
                 patterns.append(pat)
                 found = True
                 break
@@ -441,58 +514,175 @@ def find_unstable(a0, b0, max_rounds=64):
 
 # Walk order matters: "name" is last, so an id embedded in a name is usually known by then.
 SYM = {"id": "sym", "parent": "sym", "exportSymbol": "sym", "name": "symname"}
-TYPE = {"id": "type", "symbol": "sym", "aliasSymbol": "sym", "aliasTypeArguments": ["type"], "target": "type",
-        "typeParameters": ["type"], "outerTypeParameters": ["type"], "localTypeParameters": ["type"],
-        "objectType": "type", "indexType": "type", "checkType": "type", "extendsType": "type", "baseType": "type",
-        "substConstraint": "type", "freshType": "type", "regularType": "type",
-        # protocol 4 (TypeResponse at N); B answers never have these keys
-        "typeParameter": "type", "constraintType": "type", "nameType": "type", "templateType": "type",
-        "thisType": "type"}
-SIG = {"id": "sig", "typeParameters": ["type"], "parameters": ["sym"], "thisParameter": "sym", "target": "sig"}
+TYPE = {
+    "id": "type",
+    "symbol": "sym",
+    "aliasSymbol": "sym",
+    "aliasTypeArguments": ["type"],
+    "target": "type",
+    "typeParameters": ["type"],
+    "outerTypeParameters": ["type"],
+    "localTypeParameters": ["type"],
+    "objectType": "type",
+    "indexType": "type",
+    "checkType": "type",
+    "extendsType": "type",
+    "baseType": "type",
+    "substConstraint": "type",
+    "freshType": "type",
+    "regularType": "type",
+    # protocol 4 (TypeResponse at N); B answers never have these keys
+    "typeParameter": "type",
+    "constraintType": "type",
+    "nameType": "type",
+    "templateType": "type",
+    "thisType": "type",
+}
+SIG = {
+    "id": "sig",
+    "typeParameters": ["type"],
+    "parameters": ["sym"],
+    "thisParameter": "sym",
+    "target": "sig",
+}
 INDEX_INFO = {"keyType": TYPE, "valueType": TYPE}
 PREDICATE = {"type": TYPE}
 COMPLETIONS = {"entries": [{"symbol": SYM}]}
 REF_SYMBOL = {"symbol": SYM}
 
-SYM_METHODS = ["getSymbolAtPosition", "getSymbolAtLocation", "resolveName", "getParentOfSymbol",
-               "getExportSymbolOfSymbol", "getSymbolOfType", "getAliasSymbolOfType", "getThisParameterOfSignature",
-               "getShorthandAssignmentValueSymbol"]
-SYM_LIST_METHODS = ["getSymbolsAtPositions", "getSymbolsAtLocations", "getMembersOfSymbol", "getExportsOfSymbol",
-                    "getParametersOfSignature", "getPropertiesOfType"]
-TYPE_METHODS = ["getTypeOfSymbol", "getDeclaredTypeOfSymbol", "getTypeAtLocation", "getTypeAtPosition",
-                "getTargetOfType", "getFreshTypeOfType", "getRegularTypeOfType", "getObjectTypeOfType",
-                "getIndexTypeOfType", "getCheckTypeOfType", "getExtendsTypeOfType", "getBaseTypeOfType",
-                "getConstraintOfType", "getContextualType", "getBaseTypeOfLiteralType", "getNonNullableType",
-                "getTypeFromTypeNode", "getWidenedType", "getParameterType", "getTypeOfSymbolAtLocation",
-                "getReturnTypeOfSignature", "getRestTypeOfSignature", "getConstraintOfTypeParameter",
-                "getAnyType", "getStringType", "getNumberType", "getBooleanType", "getVoidType", "getUndefinedType",
-                "getNullType", "getNeverType", "getUnknownType", "getBigIntType", "getESSymbolType"]
-TYPE_LIST_METHODS = ["getTypesOfSymbols", "getTypeAtLocations", "getTypesAtPositions", "getTypesOfType",
-                     "getTypeParametersOfType", "getOuterTypeParametersOfType", "getLocalTypeParametersOfType",
-                     "getAliasTypeArgumentsOfType", "getTypeParametersOfSignature", "getBaseTypes",
-                     "getTypeArguments"]
-INTRINSICS = ["getAnyType", "getStringType", "getNumberType", "getBooleanType", "getVoidType", "getUndefinedType",
-              "getNullType", "getNeverType", "getUnknownType", "getBigIntType", "getESSymbolType"]
+SYM_METHODS = [
+    "getSymbolAtPosition",
+    "getSymbolAtLocation",
+    "resolveName",
+    "getParentOfSymbol",
+    "getExportSymbolOfSymbol",
+    "getSymbolOfType",
+    "getAliasSymbolOfType",
+    "getThisParameterOfSignature",
+    "getShorthandAssignmentValueSymbol",
+]
+SYM_LIST_METHODS = [
+    "getSymbolsAtPositions",
+    "getSymbolsAtLocations",
+    "getMembersOfSymbol",
+    "getExportsOfSymbol",
+    "getParametersOfSignature",
+    "getPropertiesOfType",
+]
+TYPE_METHODS = [
+    "getTypeOfSymbol",
+    "getDeclaredTypeOfSymbol",
+    "getTypeAtLocation",
+    "getTypeAtPosition",
+    "getTargetOfType",
+    "getFreshTypeOfType",
+    "getRegularTypeOfType",
+    "getObjectTypeOfType",
+    "getIndexTypeOfType",
+    "getCheckTypeOfType",
+    "getExtendsTypeOfType",
+    "getBaseTypeOfType",
+    "getConstraintOfType",
+    "getContextualType",
+    "getBaseTypeOfLiteralType",
+    "getNonNullableType",
+    "getTypeFromTypeNode",
+    "getWidenedType",
+    "getParameterType",
+    "getTypeOfSymbolAtLocation",
+    "getReturnTypeOfSignature",
+    "getRestTypeOfSignature",
+    "getConstraintOfTypeParameter",
+    "getAnyType",
+    "getStringType",
+    "getNumberType",
+    "getBooleanType",
+    "getVoidType",
+    "getUndefinedType",
+    "getNullType",
+    "getNeverType",
+    "getUnknownType",
+    "getBigIntType",
+    "getESSymbolType",
+]
+TYPE_LIST_METHODS = [
+    "getTypesOfSymbols",
+    "getTypeAtLocations",
+    "getTypesAtPositions",
+    "getTypesOfType",
+    "getTypeParametersOfType",
+    "getOuterTypeParametersOfType",
+    "getLocalTypeParametersOfType",
+    "getAliasTypeArgumentsOfType",
+    "getTypeParametersOfSignature",
+    "getBaseTypes",
+    "getTypeArguments",
+]
+INTRINSICS = [
+    "getAnyType",
+    "getStringType",
+    "getNumberType",
+    "getBooleanType",
+    "getVoidType",
+    "getUndefinedType",
+    "getNullType",
+    "getNeverType",
+    "getUnknownType",
+    "getBigIntType",
+    "getESSymbolType",
+]
 
 SHAPES = {}
 SHAPES.update({m: SYM for m in SYM_METHODS})
 SHAPES.update({m: [SYM] for m in SYM_LIST_METHODS})
 SHAPES.update({m: TYPE for m in TYPE_METHODS})
 SHAPES.update({m: [TYPE] for m in TYPE_LIST_METHODS})
-SHAPES.update({"getResolvedSignature": SIG, "getTargetOfSignature": SIG, "getSignaturesOfType": [SIG],
-               "getTypePredicateOfSignature": PREDICATE, "getIndexInfosOfType": [INDEX_INFO],
-               "getCompletionsAtPosition": COMPLETIONS, "getReferencedSymbolsForNode": [REF_SYMBOL]})
+SHAPES.update(
+    {
+        "getResolvedSignature": SIG,
+        "getTargetOfSignature": SIG,
+        "getSignaturesOfType": [SIG],
+        "getTypePredicateOfSignature": PREDICATE,
+        "getIndexInfosOfType": [INDEX_INFO],
+        "getCompletionsAtPosition": COMPLETIONS,
+        "getReferencedSymbolsForNode": [REF_SYMBOL],
+    }
+)
 # Methods that only `build --kind ext` sends (protocol 3).
-SHAPES.update({"getSymbolOfSourceFile": SYM, "getSymbolsOfSourceFiles": [SYM], "getSymbolsInScope": [SYM],
-               "getApparentPropertiesOfType": [SYM], "getApparentType": TYPE, "getDefaultFromTypeParameter": TYPE,
-               "getTypeParameterAtPosition": TYPE, "getNonPrimitiveType": TYPE})
+SHAPES.update(
+    {
+        "getSymbolOfSourceFile": SYM,
+        "getSymbolsOfSourceFiles": [SYM],
+        "getSymbolsInScope": [SYM],
+        "getApparentPropertiesOfType": [SYM],
+        "getApparentType": TYPE,
+        "getDefaultFromTypeParameter": TYPE,
+        "getTypeParameterAtPosition": TYPE,
+        "getNonPrimitiveType": TYPE,
+    }
+)
 # Lists that come from Go map iteration (random order). Sorted before renumbering.
-UNORDERED = {"getMembersOfSymbol": "", "getExportsOfSymbol": "", "getCompletionsAtPosition": "/entries",
-             "getSymbolsInScope": ""}
+UNORDERED = {
+    "getMembersOfSymbol": "",
+    "getExportsOfSymbol": "",
+    "getCompletionsAtPosition": "/entries",
+    "getSymbolsInScope": "",
+}
 # Methods that answer {snapshot, projects, changes?}: protocol 3 sends the last two, protocol 4 the first three.
-SNAPSHOT_METHODS = ("createSnapshot", "updateSnapshot", "getCurrentLanguageServerSnapshot", "updateTemporarySnapshot")
+SNAPSHOT_METHODS = (
+    "createSnapshot",
+    "updateSnapshot",
+    "getCurrentLanguageServerSnapshot",
+    "updateTemporarySnapshot",
+)
 # Methods whose msgpack answer is raw bytes (Go: RawBinary in session.go).
-BINARY_METHODS = {"getSourceFile", "typeToTypeNode", "signatureToSignatureDeclaration", "echo", "getConfigSourceFile"}
+BINARY_METHODS = {
+    "getSourceFile",
+    "typeToTypeNode",
+    "signatureToSignatureDeclaration",
+    "echo",
+    "getConfigSourceFile",
+}
 # tsgo#4699 emit methods: files emit in parallel, so these lists come in any order.
 EMIT_METHODS = {"emit", "emitToString", "getJavaScriptEmit", "getDeclarationEmit"}
 
@@ -501,8 +691,8 @@ EMIT_METHODS = {"emit", "emitToString", "getJavaScriptEmit", "getDeclarationEmit
 # the escaped name, "__" for the \xFE byte (ast.EscapeSymbolName; a user name that starts with "__"
 # gets one more "_", so it never matches).
 _PREFIX = "__" if PROTOCOL2 else "."
-_INTERNAL_AT = re.compile(rf"^({_PREFIX})@(.*)@(\d+)$", re.S)
-_INTERNAL_PRIVATE = re.compile(rf"^({_PREFIX})#(\d+)@(.*)$", re.S)
+_INTERNAL_AT = re.compile(rf"^({_PREFIX})@(.*)@(\d+)$", re.DOTALL)
+_INTERNAL_PRIVATE = re.compile(rf"^({_PREFIX})#(\d+)@(.*)$", re.DOTALL)
 _EMBEDDED = re.compile("\u27e8[^\u27e9]*\u27e9")
 # The same internal names inside a getFullyQualifiedName answer ("A.__@iterator@123"): the id is masked.
 _FQN_AT = re.compile(rf"({re.escape(_PREFIX)}@[^@]*@)\d+")
@@ -515,7 +705,11 @@ def walk_shape(shape, v, f, on_object=None):
     if v is None:
         return None
     if isinstance(shape, list):
-        return [walk_shape(shape[0], e, f, on_object) for e in v] if isinstance(v, list) else v
+        return (
+            [walk_shape(shape[0], e, f, on_object) for e in v]
+            if isinstance(v, list)
+            else v
+        )
     if not isinstance(v, dict):
         return v
     if on_object is not None:
@@ -539,7 +733,9 @@ def mask_name(val):
         return val
     val = _EMBEDDED.sub("\u27e8#\u27e9", val)
     val = _INTERNAL_AT.sub(lambda m: f"{m.group(1)}@{m.group(2)}@\u27e8#\u27e9", val)
-    return _INTERNAL_PRIVATE.sub(lambda m: f"{m.group(1)}#\u27e8#\u27e9@{m.group(3)}", val)
+    return _INTERNAL_PRIVATE.sub(
+        lambda m: f"{m.group(1)}#\u27e8#\u27e9@{m.group(3)}", val
+    )
 
 
 def mask_name_ids(method, v):
@@ -547,7 +743,9 @@ def mask_name_ids(method, v):
     shape = SHAPES.get(method)
     if shape is None:
         return v
-    return walk_shape(shape, v, lambda kind, val: mask_name(val) if kind == "symname" else val)
+    return walk_shape(
+        shape, v, lambda kind, val: mask_name(val) if kind == "symname" else val
+    )
 
 
 def mask_ids(method, v):
@@ -555,8 +753,15 @@ def mask_ids(method, v):
     shape = SHAPES.get(method)
     if shape is None:
         return v
-    return walk_shape(shape, v, lambda kind, val: mask_name(val) if kind == "symname"
-                      else ("#" if val not in (None, 0) else val))
+    return walk_shape(
+        shape,
+        v,
+        lambda kind, val: (
+            mask_name(val)
+            if kind == "symname"
+            else ("#" if val not in (None, 0) else val)
+        ),
+    )
 
 
 class Normalizer:
@@ -590,8 +795,11 @@ class Normalizer:
             ptr = UNORDERED[method]
             lst = pointer_get(v, ptr)
             if isinstance(lst, list):
-                key = (lambda e: canon(mask_ids(method, {"entries": [e]}))) if ptr else \
-                      (lambda e: canon(mask_ids(method, [e])))
+                key = (
+                    (lambda e: canon(mask_ids(method, {"entries": [e]})))
+                    if ptr
+                    else (lambda e: canon(mask_ids(method, [e])))
+                )
                 lst = sorted(lst, key=key)
                 v = pointer_set(v, ptr, lst) if ptr else lst
         if method in EMIT_METHODS and isinstance(v, dict):
@@ -601,8 +809,11 @@ class Normalizer:
         if method == "getFullyQualifiedName" and isinstance(v, str):
             v = _FQN_AT.sub(lambda m: m.group(1) + "⟨#⟩", v)
             v = _FQN_PRIVATE.sub(lambda m: m.group(1) + "⟨#⟩@", v)
-        if method in SNAPSHOT_METHODS and isinstance(v, dict) \
-                and isinstance(v.get("changes"), dict):
+        if (
+            method in SNAPSHOT_METHODS
+            and isinstance(v, dict)
+            and isinstance(v.get("changes"), dict)
+        ):
             ch = v["changes"]
             for proj in (ch.get("changedProjects") or {}).values():
                 for k in ("changedFiles", "deletedFiles"):
@@ -656,15 +867,19 @@ class Normalizer:
                     return f"{m.group(1)}#\u27e8{cid(int(m.group(2)), True)}\u27e9@{m.group(3)}"
             return val
 
-        return [walk_shape(SHAPES[m], v, f) if SHAPES.get(m) is not None else v for m, v in pre]
+        return [
+            walk_shape(SHAPES[m], v, f) if SHAPES.get(m) is not None else v
+            for m, v in pre
+        ]
 
     def error(self, err):
         err = err if isinstance(err, dict) else {"message": str(err)}
         message = self.strings(str(err.get("message", "")).split("\n", 1)[0])
         message = re.sub(r"handle (\d+)", "handle #", message)
         # Go json v2 picks "cannot" or "unable to" at random (go-json-experiment errors.go:318).
-        message = message.replace("unable to unmarshal", "cannot unmarshal").replace("unable to marshal",
-                                                                                     "cannot marshal")
+        message = message.replace("unable to unmarshal", "cannot unmarshal").replace(
+            "unable to marshal", "cannot marshal"
+        )
         return {"code": err.get("code"), "message": message}
 
 
@@ -765,7 +980,9 @@ class Channel:
         self._write(b"Content-Length: %d\r\n\r\n" % len(body) + body)
 
     def _write_msgpack(self, mtype, method, payload: bytes):
-        self._write(b"\x93" + bytes([mtype]) + self._bin(method.encode()) + self._bin(payload))
+        self._write(
+            b"\x93" + bytes([mtype]) + self._bin(method.encode()) + self._bin(payload)
+        )
 
     # -- loop --
     def _deliver(self, key, value):
@@ -784,18 +1001,28 @@ class Channel:
                             params = json.loads(m["payload"] or b"null")
                         except ValueError:
                             params = None
-                        result = self.handler(m["method"], params) if self.handler else None
+                        result = (
+                            self.handler(m["method"], params) if self.handler else None
+                        )
                         self._write_msgpack(2, m["method"], json.dumps(result).encode())
                     elif m["mp"] in (4, 5):
                         self._deliver(m["method"], m)
                     continue
                 msg = self._read_jsonrpc()
                 if "method" in msg and "id" in msg:
-                    result = self.handler(msg["method"], msg.get("params")) if self.handler else None
-                    self._write_jsonrpc({"jsonrpc": "2.0", "id": msg["id"], "result": result})
+                    result = (
+                        self.handler(msg["method"], msg.get("params"))
+                        if self.handler
+                        else None
+                    )
+                    self._write_jsonrpc(
+                        {"jsonrpc": "2.0", "id": msg["id"], "result": result}
+                    )
                 elif "method" in msg:
                     if self.handler:
-                        self.handler("#notification:" + msg["method"], msg.get("params"))
+                        self.handler(
+                            "#notification:" + msg["method"], msg.get("params")
+                        )
                 elif "id" in msg:
                     self._deliver(msg["id"], msg)
         except (EOFError, OSError, ValueError, HarnessError) as e:
@@ -818,7 +1045,11 @@ class Channel:
                 return "crash", self.close_reason or "closed"
             try:
                 if self.protocol == "msgpack":
-                    payload = json.dumps(params, ensure_ascii=False).encode() if params is not None else b"null"
+                    payload = (
+                        json.dumps(params, ensure_ascii=False).encode()
+                        if params is not None
+                        else b"null"
+                    )
                     self._write_msgpack(1, method, payload)
                 else:
                     msg = {"jsonrpc": "2.0", "id": rid, "method": method}
@@ -835,7 +1066,10 @@ class Channel:
                 return "crash", self.close_reason or "closed"
             if self.protocol == "msgpack":
                 if ans["mp"] == 5:
-                    return "error", {"code": -32603, "message": ans["payload"].decode("utf-8", "replace")}
+                    return "error", {
+                        "code": -32603,
+                        "message": ans["payload"].decode("utf-8", "replace"),
+                    }
                 payload = ans["payload"]
                 if method in BINARY_METHODS:
                     if method == "echo":
@@ -859,7 +1093,13 @@ class Channel:
 # Callback FS (Go: api/callbackfs.go). Answers from the real read-only FS or an overlay.
 # ---------------------------------------------------------------------------
 
-CALLBACK_NAMES = ("readFile", "fileExists", "directoryExists", "getAccessibleEntries", "realpath")
+CALLBACK_NAMES = (
+    "readFile",
+    "fileExists",
+    "directoryExists",
+    "getAccessibleEntries",
+    "realpath",
+)
 
 
 class CallbackFS:
@@ -891,7 +1131,13 @@ class CallbackFS:
             data = str(arg.get("data") or "").encode("utf-8")
             with self.lock:
                 self.calls.add((method, str(arg.get("path") or "")))
-                self.writes.append({"path": arg.get("path"), "bytes": len(data), "sha256": sha256_bytes(data)})
+                self.writes.append(
+                    {
+                        "path": arg.get("path"),
+                        "bytes": len(data),
+                        "sha256": sha256_bytes(data),
+                    }
+                )
             return None
         if method.startswith("#notification:") or method not in CALLBACK_NAMES:
             return None
@@ -915,12 +1161,19 @@ class CallbackFS:
                 return ov[path] is not None
             return os.path.isfile(path) if real else None
         if method == "directoryExists":
-            if any(p.startswith(path.rstrip("/") + "/") and c is not None for p, c in ov.items()):
+            if any(
+                p.startswith(path.rstrip("/") + "/") and c is not None
+                for p, c in ov.items()
+            ):
                 return True
             return os.path.isdir(path) if real else None
         if method == "getAccessibleEntries":
             base = path.rstrip("/") + "/"
-            extra = {p[len(base):]: c for p, c in ov.items() if p.startswith(base) and "/" not in p[len(base):]}
+            extra = {
+                p[len(base) :]: c
+                for p, c in ov.items()
+                if p.startswith(base) and "/" not in p[len(base) :]
+            }
             if not real and not extra:
                 return None
             files, dirs = [], []
@@ -960,7 +1213,13 @@ class Server:
     """A running server: stdio API (`--api [--async]`) or an LSP server with an API socket."""
 
     def __init__(self, binary, header, run_dir, cbfs, label):
-        self.binary, self.header, self.run_dir, self.cbfs, self.label = binary, header, run_dir, cbfs, label
+        self.binary, self.header, self.run_dir, self.cbfs, self.label = (
+            binary,
+            header,
+            run_dir,
+            cbfs,
+            label,
+        )
         self.proc = None
         self.api = None
         self.lsp = None
@@ -977,11 +1236,16 @@ class Server:
     def start(self):
         h = self.header
         cwd = h.get("cwd") or h["project"]["dir"]
-        stderr = open(self.stderr_path, "ab")
         if h.get("transport", "stdio") == "lsp":
-            self.proc = subprocess.Popen([self.binary, "--lsp", "--stdio"], stdin=subprocess.PIPE,
-                                         stdout=subprocess.PIPE, stderr=stderr, cwd=cwd, env=self.env())
-            stderr.close()
+            with open(self.stderr_path, "ab") as stderr:
+                self.proc = subprocess.Popen(
+                    [self.binary, "--lsp", "--stdio"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=stderr,
+                    cwd=cwd,
+                    env=self.env(),
+                )
             self._start_lsp(cwd)
             return
         argv = [self.binary, "--api", "--cwd", cwd]
@@ -989,11 +1253,21 @@ class Server:
             argv.append("--async")
         if h.get("callbacks"):
             argv += ["--callbacks", ",".join(h["callbacks"])]
-        self.proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
-                                     cwd=cwd, env=self.env())
-        stderr.close()
-        self.api = Channel(self.proc.stdout, self.proc.stdin, h.get("protocol", "jsonrpc"),
-                           self.cbfs.handle if self.cbfs else None)
+        with open(self.stderr_path, "ab") as stderr:
+            self.proc = subprocess.Popen(
+                argv,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=stderr,
+                cwd=cwd,
+                env=self.env(),
+            )
+        self.api = Channel(
+            self.proc.stdout,
+            self.proc.stdin,
+            h.get("protocol", "jsonrpc"),
+            self.cbfs.handle if self.cbfs else None,
+        )
 
     def _lsp_handler(self, method, params):
         if method.startswith("#notification:"):
@@ -1006,10 +1280,16 @@ class Server:
         return None
 
     def _start_lsp(self, cwd):
-        self.lsp = Channel(self.proc.stdout, self.proc.stdin, "jsonrpc", self._lsp_handler, name="lsp")
+        self.lsp = Channel(
+            self.proc.stdout, self.proc.stdin, "jsonrpc", self._lsp_handler, name="lsp"
+        )
         root_uri = "file://" + cwd
-        init = {"processId": None, "rootUri": root_uri, "capabilities": {},
-                "workspaceFolders": [{"uri": root_uri, "name": os.path.basename(cwd)}]}
+        init = {
+            "processId": None,
+            "rootUri": root_uri,
+            "capabilities": {},
+            "workspaceFolders": [{"uri": root_uri, "name": os.path.basename(cwd)}],
+        }
         st, res = self.lsp.request(1, "initialize", init, START_TIMEOUT)
         if st != "ok":
             raise HarnessError(f"lsp initialize: {st} {res}")
@@ -1018,17 +1298,36 @@ class Server:
             path = os.path.join(self.header["project"]["dir"], rel)
             with open(path, encoding="utf-8") as f:
                 text = f.read()
-            self.lsp.notify("textDocument/didOpen", {"textDocument": {
-                "uri": "file://" + path, "languageId": "typescript", "version": 1, "text": text}})
+            self.lsp.notify(
+                "textDocument/didOpen",
+                {
+                    "textDocument": {
+                        "uri": "file://" + path,
+                        "languageId": "typescript",
+                        "version": 1,
+                        "text": text,
+                    }
+                },
+            )
         # Go creates the project session in handleInitialized (lsp/server.go:1238), and
         # initializeAPISession captures it. A request that needs the session waits for it.
         for n, rel in enumerate(self.header.get("lspOpen", [])):
             uri = "file://" + os.path.join(self.header["project"]["dir"], rel)
-            st, res = self.lsp.request(100 + n, "textDocument/documentSymbol", {"textDocument": {"uri": uri}},
-                                       START_TIMEOUT * 2)
-            self.lsp_records.append(("textDocument/documentSymbol", st, None if st == "ok" else res))
-        pipe = os.path.join(self.run_dir, f"api{self.label.lstrip('abcdefghijklmnopqrstuvwxyz')}.sock")
-        st, res = self.lsp.request(2, "custom/initializeAPISession", {"pipe": pipe}, START_TIMEOUT)
+            st, res = self.lsp.request(
+                100 + n,
+                "textDocument/documentSymbol",
+                {"textDocument": {"uri": uri}},
+                START_TIMEOUT * 2,
+            )
+            self.lsp_records.append(
+                ("textDocument/documentSymbol", st, None if st == "ok" else res)
+            )
+        pipe = os.path.join(
+            self.run_dir, f"api{self.label.lstrip('abcdefghijklmnopqrstuvwxyz')}.sock"
+        )
+        st, res = self.lsp.request(
+            2, "custom/initializeAPISession", {"pipe": pipe}, START_TIMEOUT
+        )
         self.lsp_records.append(("custom/initializeAPISession", st, res))
         if st != "ok":
             raise HarnessError(f"custom/initializeAPISession: {st} {res}")
@@ -1043,7 +1342,9 @@ class Server:
                 if time.time() > deadline:
                     raise HarnessError(f"cannot connect to {pipe}")
                 time.sleep(0.05)
-        self.api = Channel(self.sock.makefile("rb"), self.sock.makefile("wb"), "jsonrpc", None)
+        self.api = Channel(
+            self.sock.makefile("rb"), self.sock.makefile("wb"), "jsonrpc", None
+        )
 
     def stop(self):
         """Ends the session. Returns the exit code (None if killed)."""
@@ -1143,10 +1444,21 @@ def resolve_spec(spec, raw_results):
         items = value
         if "where" in pick:
             w = pick["where"]
-            items = [e for e in items if isinstance(e, dict) and isinstance(pointer_get(e, "/" + w["field"]), int)
-                     and pointer_get(e, "/" + w["field"]) & w["mask"]]
+            items = [
+                e
+                for e in items
+                if isinstance(e, dict)
+                and isinstance(pointer_get(e, "/" + w["field"]), int)
+                and pointer_get(e, "/" + w["field"]) & w["mask"]
+            ]
         if "sortBy" in pick:
-            items = sorted(items, key=lambda e: [canon(e.get(f)) if isinstance(e, dict) else "" for f in pick["sortBy"]])
+            items = sorted(
+                items,
+                key=lambda e: [
+                    canon(e.get(f)) if isinstance(e, dict) else ""
+                    for f in pick["sortBy"]
+                ],
+            )
         idx = pick.get("index", 0)
         if not -len(items) <= idx < len(items):
             return MISSING, f"index {idx} of {len(items)}"
@@ -1202,11 +1514,15 @@ def expand(v, ctx):
                 if p.get("configFileName") == want:
                     return p.get("id")
             return projects[0].get("id") if projects and not m.group(1) else v
-        return v.replace("@PROJECT_DIR@", ctx["project_dir"]).replace("@RUN_DIR@", ctx["run_dir"])
+        return v.replace("@PROJECT_DIR@", ctx["project_dir"]).replace(
+            "@RUN_DIR@", ctx["run_dir"]
+        )
     if isinstance(v, list):
         return [expand(e, ctx) for e in v]
     if isinstance(v, dict):
-        return {expand(k, ctx): expand(e, ctx) for k, e in v.items()}  # keys: the files of a layer
+        return {
+            expand(k, ctx): expand(e, ctx) for k, e in v.items()
+        }  # keys: the files of a layer
     return v
 
 
@@ -1219,11 +1535,22 @@ def wire3(method, params):
     p = params or {}
     changes = p if method == "createSnapshot" else p.get("changes") or {}
     fs = changes.get("fileSystem")
-    if method == "updateSnapshot" and isinstance(fs, dict) and fs.get("kind") == "layer":
-        (file, text), = fs["files"].items()
-        return "updateTemporarySnapshot", {**({"snapshot": p["snapshot"]} if "snapshot" in p else {}),
-                                           "file": file, "newText": text}
-    b = {k: v for k, v in changes.items() if k not in ("fileNotifications", "ensurePrograms")}
+    if (
+        method == "updateSnapshot"
+        and isinstance(fs, dict)
+        and fs.get("kind") == "layer"
+    ):
+        ((file, text),) = fs["files"].items()
+        return "updateTemporarySnapshot", {
+            **({"snapshot": p["snapshot"]} if "snapshot" in p else {}),
+            "file": file,
+            "newText": text,
+        }
+    b = {
+        k: v
+        for k, v in changes.items()
+        if k not in ("fileNotifications", "ensurePrograms")
+    }
     if "fileNotifications" in changes:
         b["fileChanges"] = changes["fileNotifications"]
     return "updateSnapshot", b
@@ -1243,7 +1570,18 @@ class SessionRun:
     """Runs one trace against one server. mode "record" keeps every answer; mode "check"
     follows the golden's skip decisions."""
 
-    def __init__(self, header, events, binary, role, tmp_root, golden=None, timeout=None, keep=False, wire=None):
+    def __init__(
+        self,
+        header,
+        events,
+        binary,
+        role,
+        tmp_root,
+        golden=None,
+        timeout=None,
+        keep=False,
+        wire=None,
+    ):
         self.header, self.events, self.binary, self.role = header, events, binary, role
         self.wire = wire  # 3: send the snapshot events of protocol 4 traces in their protocol 3 form
         if wire == 3:
@@ -1256,9 +1594,18 @@ class SessionRun:
         h = self.header
         run_dir = tempfile.mkdtemp(prefix="api-", dir=self.tmp_root)
         pdir = h["project"]["dir"]
-        self.ctx = {"project_dir": pdir, "tsconfig": h["project"]["tsconfig"], "run_dir": run_dir,
-                    "snapshot": None, "projects": []}
-        cbfs = CallbackFS(h.get("callbacks") or [], h.get("callbackMode", "fallback")) if h.get("callbacks") else None
+        self.ctx = {
+            "project_dir": pdir,
+            "tsconfig": h["project"]["tsconfig"],
+            "run_dir": run_dir,
+            "snapshot": None,
+            "projects": [],
+        }
+        cbfs = (
+            CallbackFS(h.get("callbacks") or [], h.get("callbackMode", "fallback"))
+            if h.get("callbacks")
+            else None
+        )
         norm = Normalizer([(run_dir, "@RUN_DIR@"), (pdir, "@PROJECT_DIR@")])
         records = []
         epochs = [[]]  # answers of each server process, for Normalizer.finalize
@@ -1270,7 +1617,9 @@ class SessionRun:
         server = self._start(run_dir, cbfs, 0)
         try:
             if server is None:
-                return self._all_failed("start failed", run_dir), {"exitCodes": exit_codes}
+                return self._all_failed("start failed", run_dir), {
+                    "exitCodes": exit_codes
+                }
             self._lsp_records(server, norm, records)
             raw = {}
             k = 0
@@ -1278,26 +1627,44 @@ class SessionRun:
                 ev = self.events[k]
                 if ev.get("kind") == "overlay":
                     if cbfs:
-                        cbfs.set_overlay(expand(ev["path"], self.ctx), ev.get("content"))
+                        cbfs.set_overlay(
+                            expand(ev["path"], self.ctx), ev.get("content")
+                        )
                     records.append({"event": k, "method": "@overlay", "status": "fs"})
                     k += 1
                     continue
                 method = ev["method"]
                 g = (self.golden or {}).get(k)
                 if g is not None and g.get("status") == "skipped":
-                    records.append({"event": k, "method": method, "status": "skipped", "reason": "golden skipped"})
+                    records.append(
+                        {
+                            "event": k,
+                            "method": method,
+                            "status": "skipped",
+                            "reason": "golden skipped",
+                        }
+                    )
                     k += 1
                     continue
                 params, reason = build_params(ev, raw, self.ctx)
                 if params is MISSING:
                     st = "not_run" if g is not None else "skipped"
-                    records.append({"event": k, "method": method, "status": st, "reason": reason})
+                    records.append(
+                        {"event": k, "method": method, "status": st, "reason": reason}
+                    )
                     k += 1
                     continue
                 guard = self._emit_guard(method, params, run_dir)
                 if guard:
                     log(f"{h['name']} event {k}: {guard}")
-                    records.append({"event": k, "method": method, "status": "not_run", "reason": guard})
+                    records.append(
+                        {
+                            "event": k,
+                            "method": method,
+                            "status": "not_run",
+                            "reason": guard,
+                        }
+                    )
                     k += 1
                     continue
                 if cbfs is not None:
@@ -1306,9 +1673,19 @@ class SessionRun:
                 status, ans = server.api.request(k + 1, method, params, self.timeout)
                 ms = int((time.time() - t0) * 1000)
                 writes = cbfs.take_writes() if cbfs is not None else []
-                if status == "ok" and isinstance(ans, dict) and (method == "emit" or writes):
+                if (
+                    status == "ok"
+                    and isinstance(ans, dict)
+                    and (method == "emit" or writes)
+                ):
                     ans = {**ans, "@writes": writes}
-                rec = {"event": k, "method": method, "status": status, "ms": ms, "sent": norm.strings(params)}
+                rec = {
+                    "event": k,
+                    "method": method,
+                    "status": status,
+                    "ms": ms,
+                    "sent": norm.strings(params),
+                }
                 if restarts:
                     rec["epoch"] = restarts
                 if status == "ok":
@@ -1318,7 +1695,11 @@ class SessionRun:
                     epochs[-1].append((method, ans))
                 elif status == "error":
                     rec["response"] = {"error": norm.error(ans)}
-                    name = unported_name(str(ans.get("message", "")) if isinstance(ans, dict) else str(ans))
+                    name = unported_name(
+                        str(ans.get("message", ""))
+                        if isinstance(ans, dict)
+                        else str(ans)
+                    )
                     if name:
                         rec["unported"] = name
                 if status in ("crash", "timeout"):
@@ -1336,17 +1717,31 @@ class SessionRun:
                     if restarts > MAX_RESTARTS:
                         for j in range(k + 1, len(self.events)):
                             e = self.events[j]
-                            records.append({"event": j, "method": e.get("method", "@overlay"),
-                                            "status": "not_run", "reason": "restart limit"})
+                            records.append(
+                                {
+                                    "event": j,
+                                    "method": e.get("method", "@overlay"),
+                                    "status": "not_run",
+                                    "reason": "restart limit",
+                                }
+                            )
                         server = None
                         break
                     epochs.append([])
-                    server, raw = self._restart(run_dir, cbfs, restarts, k, crashed, epochs[-1])
+                    server, raw = self._restart(
+                        run_dir, cbfs, restarts, k, crashed, epochs[-1]
+                    )
                     if server is None:
                         for j in range(k + 1, len(self.events)):
                             e = self.events[j]
-                            records.append({"event": j, "method": e.get("method", "@overlay"),
-                                            "status": "not_run", "reason": "restart failed"})
+                            records.append(
+                                {
+                                    "event": j,
+                                    "method": e.get("method", "@overlay"),
+                                    "status": "not_run",
+                                    "reason": "restart failed",
+                                }
+                            )
                         break
                     k += 1
                     continue
@@ -1355,8 +1750,14 @@ class SessionRun:
             if server is not None:
                 exit_codes.append(server.stop())
             if cbfs is not None:
-                records.append({"event": len(self.events), "method": "@callbacks", "status": "ok",
-                                "response": {"result": cbfs.summary(norm)}})
+                records.append(
+                    {
+                        "event": len(self.events),
+                        "method": "@callbacks",
+                        "status": "ok",
+                        "response": {"result": cbfs.summary(norm)},
+                    }
+                )
             finals = [norm.finalize(e) for e in epochs]
             for rec in records:
                 ref = rec.pop("_ref", None)
@@ -1367,7 +1768,11 @@ class SessionRun:
                 server.kill()
             if not self.keep:
                 shutil.rmtree(run_dir, ignore_errors=True)
-        meta = {"exitCodes": exit_codes, "restarts": restarts, "seconds": round(time.time() - t_start, 1)}
+        meta = {
+            "exitCodes": exit_codes,
+            "restarts": restarts,
+            "seconds": round(time.time() - t_start, 1),
+        }
         return records, meta
 
     def _track(self, ev, params, ans):
@@ -1387,10 +1792,16 @@ class SessionRun:
         if method not in SNAPSHOT_METHODS:
             return
         projects = ans.get("projects") or []
-        if method == "updateSnapshot" or (isinstance(params, dict) and params.get("baseSnapshot")):
+        if method == "updateSnapshot" or (
+            isinstance(params, dict) and params.get("baseSnapshot")
+        ):
             removed = set((ans.get("changes") or {}).get("removedProjects") or [])
             new = {p.get("id"): p for p in projects}
-            projects = [new.pop(p.get("id"), p) for p in self.ctx["projects"] if p.get("id") not in removed]
+            projects = [
+                new.pop(p.get("id"), p)
+                for p in self.ctx["projects"]
+                if p.get("id") not in removed
+            ]
             projects += new.values()
         self.ctx["snapshot"] = ans.get("snapshot")
         self.ctx["projects"] = projects
@@ -1424,7 +1835,11 @@ class SessionRun:
     def _lsp_records(self, server, norm, records):
         for method, st, res in server.lsp_records:
             rec = {"event": -1, "method": "@lsp:" + method, "status": st}
-            rec["response"] = {"result": norm.strings(res)} if st == "ok" else {"error": norm.error(res)}
+            rec["response"] = (
+                {"result": norm.strings(res)}
+                if st == "ok"
+                else {"error": norm.error(res)}
+            )
             records.append(rec)
 
     def _restart(self, run_dir, cbfs, n, upto, crashed, epoch):
@@ -1454,14 +1869,25 @@ class SessionRun:
             elif st in ("crash", "timeout"):
                 crashed.add(j)
                 server.kill()
-                return self._restart(run_dir, cbfs, n + 1, upto, crashed, epoch) if n < MAX_RESTARTS else (None, None)
+                return (
+                    self._restart(run_dir, cbfs, n + 1, upto, crashed, epoch)
+                    if n < MAX_RESTARTS
+                    else (None, None)
+                )
         return server, raw
 
     def _all_failed(self, reason, run_dir):
         if not self.keep:
             shutil.rmtree(run_dir, ignore_errors=True)
-        return [{"event": k, "method": e.get("method", "@overlay"), "status": "crash", "reason": reason}
-                for k, e in enumerate(self.events)]
+        return [
+            {
+                "event": k,
+                "method": e.get("method", "@overlay"),
+                "status": "crash",
+                "reason": reason,
+            }
+            for k, e in enumerate(self.events)
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -1477,9 +1903,17 @@ def classify(g, r, flaky_ev):
     if gs == "fs":
         return "fs", None, None
     if gs in ("crash", "timeout", "not_run"):
-        return ("oracle_crash", gs, None) if rs == "ok" else ("oracle_error_same", gs, None)
+        return (
+            ("oracle_crash", gs, None)
+            if rs == "ok"
+            else ("oracle_error_same", gs, None)
+        )
     if rs in ("crash", "timeout"):
-        sub = "unported:" + r["unported"] if r.get("unported") else f"exit {r.get('exitCode')}"
+        sub = (
+            "unported:" + r["unported"]
+            if r.get("unported")
+            else f"exit {r.get('exitCode')}"
+        )
         return rs, sub, None
     if rs == "not_run":
         return "not_run", r.get("reason"), None
@@ -1565,11 +1999,19 @@ def golden_dir(out_root, oracle_sha, battery):
 
 
 def records_by_event(records):
-    return {r["event"]: r for r in records if r.get("event", -1) >= 0 and not r["method"].startswith("@callbacks")}
+    return {
+        r["event"]: r
+        for r in records
+        if r.get("event", -1) >= 0 and not r["method"].startswith("@callbacks")
+    }
 
 
 def special_records(records):
-    return {r["method"]: r for r in records if r["method"].startswith("@lsp:") or r["method"] == "@callbacks"}
+    return {
+        r["method"]: r
+        for r in records
+        if r["method"].startswith("@lsp:") or r["method"] == "@callbacks"
+    }
 
 
 def input_fingerprint(project_dir, rels):
@@ -1592,9 +2034,13 @@ def trace_inputs(header, events):
         for key in ("file", "fileName"):
             f = params.get(key)
             if isinstance(f, str) and f.startswith("@PROJECT_DIR@/"):
-                rels.add(f[len("@PROJECT_DIR@/"):])
-            elif key == "file" and ev.get("method") == "readConfigFile" and isinstance(f, str) \
-                    and not f.startswith(("/", "@", "bundled:")):
+                rels.add(f[len("@PROJECT_DIR@/") :])
+            elif (
+                key == "file"
+                and ev.get("method") == "readConfigFile"
+                and isinstance(f, str)
+                and not f.startswith(("/", "@", "bundled:"))
+            ):
                 rels.add(f)  # relative to the cwd, the project dir
     return pdir, sorted(rels)
 
@@ -1647,13 +2093,27 @@ def cmd_record(args):
         header, events = load_trace(path)
         pdir, rels = trace_inputs(header, events)
         fp0 = input_fingerprint(pdir, rels)
-        records, meta = SessionRun(header, events, args.oracle, "oracle", tmp_root,
-                                   timeout=args.request_timeout, keep=args.keep_temp).run()
+        records, meta = SessionRun(
+            header,
+            events,
+            args.oracle,
+            "oracle",
+            tmp_root,
+            timeout=args.request_timeout,
+            keep=args.keep_temp,
+        ).run()
         if input_fingerprint(pdir, rels) != fp0:
             raise InputChanged(f"{pdir} changed while recording {name}")
-        gh = {"format": GOLDEN_FORMAT, "trace": name, "battery": args.battery, "traceSha": tsha,
-              "oracle": args.oracle, "oracleSha": oracle_sha, "date": time.strftime("%Y-%m-%d %H:%M:%S"),
-              "meta": meta}
+        gh = {
+            "format": GOLDEN_FORMAT,
+            "trace": name,
+            "battery": args.battery,
+            "traceSha": tsha,
+            "oracle": args.oracle,
+            "oracleSha": oracle_sha,
+            "date": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "meta": meta,
+        }
         write_gz_jsonl(out, gh, records)
         st = collections.Counter(r["status"] for r in records)
         log(f"record {name}: {dict(st)} {meta.get('seconds')}s")
@@ -1669,8 +2129,15 @@ def cmd_record(args):
                     failed.append(name)
     finally:
         cleanup_tmp(tmp_root, args.keep_temp)
-    summary = {"battery": args.battery, "oracle": args.oracle, "oracleSha": oracle_sha, "traces": len(traces),
-               "counts": dict(counts), "oracleCrashTraces": sorted(failed), "date": time.strftime("%Y-%m-%d %H:%M:%S")}
+    summary = {
+        "battery": args.battery,
+        "oracle": args.oracle,
+        "oracleSha": oracle_sha,
+        "traces": len(traces),
+        "counts": dict(counts),
+        "oracleCrashTraces": sorted(failed),
+        "date": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
     write_json(os.path.join(gdir, "record-summary.json"), summary)
     print(json.dumps(summary, indent=1, sort_keys=True))
     return EXIT_OK
@@ -1694,8 +2161,15 @@ def cmd_selfcheck(args):
         gspecial = special_records(grecs)
         flaky = {}
         for run in range(args.runs):
-            recs, _ = SessionRun(header, events, args.oracle, "oracle", tmp_root, golden=gmap,
-                                 timeout=args.request_timeout).run()
+            recs, _ = SessionRun(
+                header,
+                events,
+                args.oracle,
+                "oracle",
+                tmp_root,
+                golden=gmap,
+                timeout=args.request_timeout,
+            ).run()
             rmap = records_by_event(recs)
             rsp = special_records(recs)
             pairs = [(k, g, rmap.get(k)) for k, g in gmap.items()]
@@ -1711,7 +2185,9 @@ def cmd_selfcheck(args):
                     a, b = g["response"].get("result"), r["response"].get("result")
                     pats, ptr = find_unstable(a, b)
                     if pats:
-                        entry["multiset"] = sorted(set(entry.get("multiset", [])) | set(pats))
+                        entry["multiset"] = sorted(
+                            set(entry.get("multiset", [])) | set(pats)
+                        )
                     if ptr is not None:
                         entry["unstable"] = ptr
                 elif canon(g.get("response")) != canon(r.get("response")):
@@ -1719,8 +2195,10 @@ def cmd_selfcheck(args):
                 if entry:
                     entry["method"] = g.get("method")
                     flaky[key] = entry
-        write_json(os.path.join(gdir, name + ".flaky.json"),
-                   {"format": FLAKY_FORMAT, "trace": name, "runs": args.runs, "events": flaky})
+        write_json(
+            os.path.join(gdir, name + ".flaky.json"),
+            {"format": FLAKY_FORMAT, "trace": name, "runs": args.runs, "events": flaky},
+        )
         log(f"selfcheck {name}: {len(flaky)} unstable events")
         return name, flaky
 
@@ -1735,8 +2213,12 @@ def cmd_selfcheck(args):
                 totals["method:" + str(e.get("method"))] += 1
     finally:
         shutil.rmtree(tmp_root, ignore_errors=True)
-    summary = {"battery": args.battery, "runs": args.runs, "totals": dict(totals),
-               "tracesWithUnstable": {k: v for k, v in sorted(per.items()) if v}}
+    summary = {
+        "battery": args.battery,
+        "runs": args.runs,
+        "totals": dict(totals),
+        "tracesWithUnstable": {k: v for k, v in sorted(per.items()) if v},
+    }
     write_json(os.path.join(gdir, "selfcheck-summary.json"), summary)
     print(json.dumps(summary, indent=1, sort_keys=True))
     return EXIT_OK
@@ -1744,7 +2226,9 @@ def cmd_selfcheck(args):
 
 def cmd_check(args):
     if args.wire and PROTOCOL < 4:
-        raise UsageError(f"--wire {args.wire} needs protocol 4 traces (pin {PIN} has protocol {PROTOCOL})")
+        raise UsageError(
+            f"--wire {args.wire} needs protocol 4 traces (pin {PIN} has protocol {PROTOCOL})"
+        )
     oracle_sha = args.oracle_sha or sha256_file(args.oracle)
     traces = list_traces(args.out_root, args.battery, args.only)
     gdir = golden_dir(args.out_root, oracle_sha, args.battery)
@@ -1767,8 +2251,17 @@ def cmd_check(args):
         gmap = records_by_event(grecs)
         pdir, rels = trace_inputs(header, events)
         fp0 = input_fingerprint(pdir, rels)
-        recs, meta = SessionRun(header, events, args.goport, "goport", tmp_root, golden=gmap,
-                                timeout=args.request_timeout, keep=args.keep_temp, wire=args.wire).run()
+        recs, meta = SessionRun(
+            header,
+            events,
+            args.goport,
+            "goport",
+            tmp_root,
+            golden=gmap,
+            timeout=args.request_timeout,
+            keep=args.keep_temp,
+            wire=args.wire,
+        ).run()
         if args.wire:
             meta["wire"] = args.wire
         if input_fingerprint(pdir, rels) != fp0:
@@ -1781,19 +2274,47 @@ def cmd_check(args):
             cls, sub, ptr = classify(g, r, flaky.get(str(k)))
             if cls == "id_only" and sub is None and earlier:
                 sub = "after an earlier difference"
-            if cls not in ("same", "skipped", "fs", "oracle_error_same", "id_only", "flaky_oracle"):
+            if cls not in (
+                "same",
+                "skipped",
+                "fs",
+                "oracle_error_same",
+                "id_only",
+                "flaky_oracle",
+            ):
                 earlier = True
-            out.append({"event": k, "method": g.get("method"), "class": cls, "sub": sub, "pointer": ptr,
-                        "ms": [g.get("ms"), r.get("ms")]})
+            out.append(
+                {
+                    "event": k,
+                    "method": g.get("method"),
+                    "class": cls,
+                    "sub": sub,
+                    "pointer": ptr,
+                    "ms": [g.get("ms"), r.get("ms")],
+                }
+            )
         gsp, rsp = special_records(grecs), special_records(recs)
         for m, g in gsp.items():
             r = rsp.get(m, {"status": "not_run", "reason": "no record"})
             cls, sub, ptr = classify(g, r, flaky.get(m))
-            out.append({"event": m, "method": m, "class": cls, "sub": sub, "pointer": ptr})
-        write_json(os.path.join(rdir, "traces", args.battery, name + ".json"),
-                   {"format": RESULT_FORMAT, "trace": name, "battery": args.battery, "meta": meta, "events": out})
-        write_gz_jsonl(os.path.join(rdir, "responses", args.battery, name + ".jsonl.gz"),
-                       {"trace": name, "goport": args.goport, "goportSha": goport_sha}, recs)
+            out.append(
+                {"event": m, "method": m, "class": cls, "sub": sub, "pointer": ptr}
+            )
+        write_json(
+            os.path.join(rdir, "traces", args.battery, name + ".json"),
+            {
+                "format": RESULT_FORMAT,
+                "trace": name,
+                "battery": args.battery,
+                "meta": meta,
+                "events": out,
+            },
+        )
+        write_gz_jsonl(
+            os.path.join(rdir, "responses", args.battery, name + ".jsonl.gz"),
+            {"trace": name, "goport": args.goport, "goportSha": goport_sha},
+            recs,
+        )
         c = collections.Counter(e["class"] for e in out)
         log(f"check {name}: {dict(c)} {meta.get('seconds')}s")
         return name, c
@@ -1803,11 +2324,18 @@ def cmd_check(args):
     finally:
         cleanup_tmp(tmp_root, args.keep_temp)
     manifest_path = os.path.join(rdir, "manifest.json")
-    manifest = read_json(manifest_path) if os.path.exists(manifest_path) else {"batteries": {}}
-    manifest["batteries"][args.battery] = {"goport": args.goport, "goportSha": goport_sha, "oracleSha": oracle_sha,
-                                           "traces": len(traces), "date": time.strftime("%Y-%m-%d %H:%M:%S"),
-                                           "script": os.path.abspath(__file__),
-                                           "scriptSha": sha256_file(os.path.abspath(__file__))}
+    manifest = (
+        read_json(manifest_path) if os.path.exists(manifest_path) else {"batteries": {}}
+    )
+    manifest["batteries"][args.battery] = {
+        "goport": args.goport,
+        "goportSha": goport_sha,
+        "oracleSha": oracle_sha,
+        "traces": len(traces),
+        "date": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "script": os.path.abspath(__file__),
+        "scriptSha": sha256_file(os.path.abspath(__file__)),
+    }
     if args.wire:
         manifest["batteries"][args.battery]["wire"] = args.wire
     write_json(manifest_path, manifest)
@@ -1820,8 +2348,19 @@ def cmd_check(args):
 # summary / show
 # ---------------------------------------------------------------------------
 
-COUNTED = ["same", "id_only", "diff", "goport_error", "oracle_error_same", "oracle_error_diff", "crash", "timeout",
-           "not_run", "flaky_oracle", "oracle_crash"]
+COUNTED = [
+    "same",
+    "id_only",
+    "diff",
+    "goport_error",
+    "oracle_error_same",
+    "oracle_error_diff",
+    "crash",
+    "timeout",
+    "not_run",
+    "flaky_oracle",
+    "oracle_crash",
+]
 
 
 def load_label(out_root, label):
@@ -1844,14 +2383,26 @@ def build_summary(out_root, label, baseline):
     subs = collections.Counter()
     examples = {}
     first_id_only = collections.Counter()
-    ms = collections.defaultdict(lambda: [0, 0, 0])  # method -> [oracle ms, goport ms, requests]
+    ms = collections.defaultdict(
+        lambda: [0, 0, 0]
+    )  # method -> [oracle ms, goport ms, requests]
     skipped = 0
     for (battery, trace), r in res.items():
         seen_id_only = False
         # Symbols are named over the whole session, so a later goport error (a symbol never
         # answered in full) can also change earlier answers. Such id_only is not a root.
-        other = any(e["class"] not in ("same", "skipped", "fs", "oracle_error_same", "id_only", "flaky_oracle")
-                    for e in r["events"])
+        other = any(
+            e["class"]
+            not in (
+                "same",
+                "skipped",
+                "fs",
+                "oracle_error_same",
+                "id_only",
+                "flaky_oracle",
+            )
+            for e in r["events"]
+        )
         for e in r["events"]:
             if e["class"] == "id_only" and not e.get("sub") and other:
                 e = dict(e, sub="trace has another difference")
@@ -1868,24 +2419,45 @@ def build_summary(out_root, label, baseline):
                 ms[e["method"]][2] += 1
             per_method[e["method"]][cls] += 1
             if cls not in ("same", "oracle_error_same"):
-                key = f"{cls} {e['method']}" + (f" | {e['sub']}" if e.get("sub") else "") + \
-                      (f" @ {e['pointer']}" if e.get("pointer") is not None and cls != "id_only" else "")
+                key = (
+                    f"{cls} {e['method']}"
+                    + (f" | {e['sub']}" if e.get("sub") else "")
+                    + (
+                        f" @ {e['pointer']}"
+                        if e.get("pointer") is not None and cls != "id_only"
+                        else ""
+                    )
+                )
                 subs[key] += 1
                 examples.setdefault(key, f"{battery}/{trace}#{e['event']}")
             if cls == "id_only" and not seen_id_only and not e.get("sub"):
                 seen_id_only = True
                 first_id_only[e["method"]] += 1
-    s = {"format": SUMMARY_FORMAT, "label": label, "traces": len(res), "total": dict(total), "skipped": skipped,
-         "batteries": {b: dict(c) for b, c in sorted(per_battery.items())},
-         "methods": {m: dict(c) for m, c in sorted(per_method.items())},
-         "groups": [{"key": k, "count": n, "example": examples[k]} for k, n in subs.most_common()],
-         "firstIdOnlyMethod": dict(first_id_only),
-         "ms": {m: {"oracle": v[0], "goport": v[1], "requests": v[2]} for m, v in sorted(ms.items())}}
+    s = {
+        "format": SUMMARY_FORMAT,
+        "label": label,
+        "traces": len(res),
+        "total": dict(total),
+        "skipped": skipped,
+        "batteries": {b: dict(c) for b, c in sorted(per_battery.items())},
+        "methods": {m: dict(c) for m, c in sorted(per_method.items())},
+        "groups": [
+            {"key": k, "count": n, "example": examples[k]}
+            for k, n in subs.most_common()
+        ],
+        "firstIdOnlyMethod": dict(first_id_only),
+        "ms": {
+            m: {"oracle": v[0], "goport": v[1], "requests": v[2]}
+            for m, v in sorted(ms.items())
+        },
+    }
     if baseline:
         base = load_label(out_root, baseline)
         cmp = collections.Counter()
         for key, r in res.items():
-            b = {str(e["event"]): e["class"] for e in base.get(key, {}).get("events", [])}
+            b = {
+                str(e["event"]): e["class"] for e in base.get(key, {}).get("events", [])
+            }
             for e in r["events"]:
                 old = b.get(str(e["event"]))
                 if e["class"] in ("skipped", "fs"):
@@ -1909,32 +2481,67 @@ def build_summary(out_root, label, baseline):
 
 
 def summary_markdown(s):
-    lines = [f"# API oracle: {s['label']}", "", f"Traces: {s['traces']}. Skipped requests (golden skipped): "
-             f"{s['skipped']}.", "", "| Class | Requests |", "|---|---:|"]
+    lines = [
+        f"# API oracle: {s['label']}",
+        "",
+        f"Traces: {s['traces']}. Skipped requests (golden skipped): {s['skipped']}.",
+        "",
+        "| Class | Requests |",
+        "|---|---:|",
+    ]
     for c in COUNTED:
         if s["total"].get(c):
             lines.append(f"| {c} | {s['total'][c]} |")
-    lines += ["", "| Battery | " + " | ".join(COUNTED) + " |", "|---|" + "---:|" * len(COUNTED)]
+    lines += [
+        "",
+        "| Battery | " + " | ".join(COUNTED) + " |",
+        "|---|" + "---:|" * len(COUNTED),
+    ]
     for b, c in s["batteries"].items():
         lines.append(f"| {b} | " + " | ".join(str(c.get(k, 0)) for k in COUNTED) + " |")
-    lines += ["", "## Groups (not same)", "", "| Count | Class, method, detail | Example |", "|---:|---|---|"]
+    lines += [
+        "",
+        "## Groups (not same)",
+        "",
+        "| Count | Class, method, detail | Example |",
+        "|---:|---|---|",
+    ]
     for g in s["groups"][:80]:
         key = g["key"].replace("|", "\\|")
         if len(key) > 160:
             key = key[:157] + "..."
         lines.append(f"| {g['count']} | {key} | {g['example']} |")
     if s.get("firstIdOnlyMethod"):
-        lines += ["", "First root id_only request (no other difference in the trace), by method: " +
-                  ", ".join(f"{m} {n}" for m, n in sorted(s["firstIdOnlyMethod"].items(), key=lambda x: -x[1]))]
-    slow = [(m, v) for m, v in (s.get("ms") or {}).items() if v["goport"] >= 200 and v["goport"] > 2 * max(1, v["oracle"])]
+        lines += [
+            "",
+            "First root id_only request (no other difference in the trace), by method: "
+            + ", ".join(
+                f"{m} {n}"
+                for m, n in sorted(s["firstIdOnlyMethod"].items(), key=lambda x: -x[1])
+            ),
+        ]
+    slow = [
+        (m, v)
+        for m, v in (s.get("ms") or {}).items()
+        if v["goport"] >= 200 and v["goport"] > 2 * max(1, v["oracle"])
+    ]
     if slow:
-        lines += ["", "Request time, oracle and goport runs at different times (rough; not a perf measurement):", "",
-                  "| Method | Requests | Oracle ms | Goport ms |", "|---|---:|---:|---:|"]
+        lines += [
+            "",
+            "Request time, oracle and goport runs at different times (rough; not a perf measurement):",
+            "",
+            "| Method | Requests | Oracle ms | Goport ms |",
+            "|---|---:|---:|---:|",
+        ]
         for m, v in sorted(slow, key=lambda x: -x[1]["goport"])[:15]:
             lines.append(f"| {m} | {v['requests']} | {v['oracle']} | {v['goport']} |")
     if s.get("baseline"):
         b = s["baseline"]
-        lines += ["", f"Against {b['label']}: " + ", ".join(f"{k} {v}" for k, v in b.items() if k != "label")]
+        lines += [
+            "",
+            f"Against {b['label']}: "
+            + ", ".join(f"{k} {v}" for k, v in b.items() if k != "label"),
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -1946,15 +2553,19 @@ def cmd_summary(args):
 
 def first_byte_diff(a_b64, b_b64):
     a, b = base64.b64decode(a_b64), base64.b64decode(b_b64)
-    n = next((i for i in range(min(len(a), len(b))) if a[i] != b[i]), min(len(a), len(b)))
+    n = next(
+        (i for i in range(min(len(a), len(b))) if a[i] != b[i]), min(len(a), len(b))
+    )
     info = f"first differing byte {n} (lengths {len(a)} and {len(b)})"
     if len(a) >= 44:
         nodes = struct.unpack_from("<I", a, 40)[0]
         if n >= nodes:
             idx, off = divmod(n - nodes, 28)
             field = ["kind", "pos", "end", "next", "parent", "data", "flags"][off // 4]
-            info += f"; node {idx} field {field}: oracle {a[nodes + idx * 28:nodes + idx * 28 + 28].hex()} " \
-                    f"goport {b[nodes + idx * 28:nodes + idx * 28 + 28].hex()}"
+            info += (
+                f"; node {idx} field {field}: oracle {a[nodes + idx * 28 : nodes + idx * 28 + 28].hex()} "
+                f"goport {b[nodes + idx * 28 : nodes + idx * 28 + 28].hex()}"
+            )
         else:
             info += "; before the nodes section"
     return info
@@ -1964,9 +2575,15 @@ def cmd_show(args):
     rdir = os.path.join(args.out_root, "results", args.label)
     manifest = read_json(os.path.join(rdir, "manifest.json"))
     oracle_sha = manifest["batteries"][args.battery]["oracleSha"]
-    _, grecs = read_gz_jsonl(os.path.join(golden_dir(args.out_root, oracle_sha, args.battery),
-                                          args.trace + ".golden.jsonl.gz"))
-    _, rrecs = read_gz_jsonl(os.path.join(rdir, "responses", args.battery, args.trace + ".jsonl.gz"))
+    _, grecs = read_gz_jsonl(
+        os.path.join(
+            golden_dir(args.out_root, oracle_sha, args.battery),
+            args.trace + ".golden.jsonl.gz",
+        )
+    )
+    _, rrecs = read_gz_jsonl(
+        os.path.join(rdir, "responses", args.battery, args.trace + ".jsonl.gz")
+    )
     key = int(args.event) if str(args.event).lstrip("-").isdigit() else args.event
     g = records_by_event(grecs).get(key) or special_records(grecs).get(key)
     r = records_by_event(rrecs).get(key) or special_records(rrecs).get(key)
@@ -1976,9 +2593,16 @@ def cmd_show(args):
     print(f"goport sent: {canon((r or {}).get('sent'))[:400]}")
     ga = (g.get("response") or {}).get("result")
     ra = ((r or {}).get("response") or {}).get("result")
-    if isinstance(ga, dict) and isinstance(ra, dict) and "data" in ga and "data" in ra and ga != ra:
+    if (
+        isinstance(ga, dict)
+        and isinstance(ra, dict)
+        and "data" in ga
+        and "data" in ra
+        and ga != ra
+    ):
         print(first_byte_diff(ga["data"], ra["data"]))
         return EXIT_OK
+
     def short(v):
         if isinstance(v, str) and len(v) > 300:
             return v[:300] + f"...({len(v)} chars)"
@@ -1988,12 +2612,25 @@ def cmd_show(args):
             return {k: short(e) for k, e in v.items()}
         return v
 
-    a = json.dumps(short({k: g.get(k) for k in ("status", "response", "reason")}), indent=1, sort_keys=True,
-                   ensure_ascii=False).splitlines()
-    b = json.dumps(short({k: (r or {}).get(k) for k in ("status", "response", "reason", "stderr", "unported")}),
-                   indent=1, sort_keys=True, ensure_ascii=False).splitlines()
+    a = json.dumps(
+        short({k: g.get(k) for k in ("status", "response", "reason")}),
+        indent=1,
+        sort_keys=True,
+        ensure_ascii=False,
+    ).splitlines()
+    b = json.dumps(
+        short(
+            {
+                k: (r or {}).get(k)
+                for k in ("status", "response", "reason", "stderr", "unported")
+            }
+        ),
+        indent=1,
+        sort_keys=True,
+        ensure_ascii=False,
+    ).splitlines()
     diff = list(difflib.unified_diff(a, b, "oracle", "goport", lineterm="", n=3))
-    print("\n".join(diff[:args.max_lines]) if diff else "(equal)")
+    print("\n".join(diff[: args.max_lines]) if diff else "(equal)")
     return EXIT_OK
 
 
@@ -2004,8 +2641,10 @@ def cmd_show(args):
 
 def go_kinds():
     """Go ast.Kind values (ast/kind_generated.go, iota order)."""
-    src = open(os.path.join(GO_REPO, "internal/ast/kind_generated.go"), encoding="utf-8").read()
-    m = re.search(r"const \(\n(.*?)\n\)", src, re.S)
+    src = _read_file(
+        os.path.join(GO_REPO, "internal/ast/kind_generated.go"), encoding="utf-8"
+    )
+    m = re.search(r"const \(\n(.*?)\n\)", src, re.DOTALL)
     kinds, val = {}, -1
     for line in m.group(1).split("\n"):
         line = line.split("//")[0].strip()
@@ -2030,8 +2669,13 @@ class EncodedFile:
 
     def __init__(self, data: bytes):
         self.data = data
-        (self.str_offsets, self.str_data, self.ext_data, self.struct_data,
-         self.nodes_off) = struct.unpack_from("<5I", data, 24)
+        (
+            self.str_offsets,
+            self.str_data,
+            self.ext_data,
+            self.struct_data,
+            self.nodes_off,
+        ) = struct.unpack_from("<5I", data, 24)
         self.count = (len(data) - self.nodes_off) // 28
 
     def node(self, i):
@@ -2039,7 +2683,9 @@ class EncodedFile:
 
     def string(self, idx):
         start, end = struct.unpack_from("<2I", self.data, self.str_offsets + idx * 4)
-        return self.data[self.str_data + start:self.str_data + end].decode("utf-8", "replace")
+        return self.data[self.str_data + start : self.str_data + end].decode(
+            "utf-8", "replace"
+        )
 
 
 def spread(items, cap):
@@ -2096,7 +2742,9 @@ def glob_files(pdir, include, exclude):
     exc = [glob_regex(p) for p in exclude]
     out = []
     for root, dirs, files in os.walk(pdir):
-        dirs[:] = sorted(d for d in dirs if d != "node_modules" and not d.startswith("."))
+        dirs[:] = sorted(
+            d for d in dirs if d != "node_modules" and not d.startswith(".")
+        )
         for f in sorted(files):
             rel = os.path.relpath(os.path.join(root, f), pdir)
             if any(r.match(rel) for r in inc) and not any(r.match(rel) for r in exc):
@@ -2106,7 +2754,12 @@ def glob_files(pdir, include, exclude):
 
 # Methods that take their type or signature as "objectId" from protocol 3 on (tsgo#4689). The builders write
 # "type" or "signature"; TraceBuilder.req moves the value to "objectId" in a protocol 3 run.
-OBJECT_ID_METHODS = {"getConstraintOfTypeParameter", "getNonNullableType", "getApparentType", "getReturnTypeOfSignature"}
+OBJECT_ID_METHODS = {
+    "getConstraintOfTypeParameter",
+    "getNonNullableType",
+    "getApparentType",
+    "getReturnTypeOfSignature",
+}
 
 
 class TraceBuilder:
@@ -2117,8 +2770,12 @@ class TraceBuilder:
         self.snaps = 0  # snapshot events so far (snap)
 
     def req(self, method, params=None, pf=None):
-        if PROTOCOL >= 3 and method in OBJECT_ID_METHODS and isinstance(pf, dict) \
-                and pf.get("into") in ("/type", "/signature"):
+        if (
+            PROTOCOL >= 3
+            and method in OBJECT_ID_METHODS
+            and isinstance(pf, dict)
+            and pf.get("into") in ("/type", "/signature")
+        ):
             pf = {**pf, "into": "/objectId"}
         ev = {"kind": "request", "method": method}
         if params is not None:
@@ -2141,65 +2798,142 @@ class TraceBuilder:
             changes.update(fileNotifications=b["fileChanges"], ensurePrograms=True)
         if lsp:
             base = {"baseSnapshot": "@SNAPSHOT@"} if self.snaps > 1 else {}
-            return self.req("getCurrentLanguageServerSnapshot", {**base, **({"changes": changes} if changes else {})})
+            return self.req(
+                "getCurrentLanguageServerSnapshot",
+                {**base, **({"changes": changes} if changes else {})},
+            )
         if self.snaps == 1:
             return self.req("createSnapshot", changes)
-        return self.req("updateSnapshot", {"snapshot": "@SNAPSHOT@", **({"changes": changes} if changes else {})})
+        return self.req(
+            "updateSnapshot",
+            {"snapshot": "@SNAPSHOT@", **({"changes": changes} if changes else {})},
+        )
 
     def temp(self, b, pf):
         """updateTemporarySnapshot {file, newText[, snapshot]} with paramsFrom pf. Protocol 4: updateSnapshot with
         a layer that holds the file, ensurePrograms: true and "track": false (the base comes from snapshot or pf)."""
         if PROTOCOL < 4:
             return self.req("updateTemporarySnapshot", b, pf)
-        changes = {"fileSystem": {"kind": "layer", "files": {b["file"]: b["newText"]}}, "ensurePrograms": True}
-        ev = self.req("updateSnapshot", {**({"snapshot": b["snapshot"]} if "snapshot" in b else {}),
-                                         "changes": changes}, pf)
+        changes = {
+            "fileSystem": {"kind": "layer", "files": {b["file"]: b["newText"]}},
+            "ensurePrograms": True,
+        }
+        ev = self.req(
+            "updateSnapshot",
+            {
+                **({"snapshot": b["snapshot"]} if "snapshot" in b else {}),
+                "changes": changes,
+            },
+            pf,
+        )
         self.events[ev]["track"] = False
         return ev
 
     @staticmethod
     def ck(**kw):
-        return {"snapshot": "@SNAPSHOT@", "project": kw.pop("project", "@PROJECT@"), **kw}
+        return {
+            "snapshot": "@SNAPSHOT@",
+            "project": kw.pop("project", "@PROJECT@"),
+            **kw,
+        }
 
     @staticmethod
     def diag(file):
         """Params of a per-file diagnostics request. Protocol 3 sends a file list (tsgo#4552)."""
-        return TraceBuilder.ck(files=[file]) if PROTOCOL >= 3 else TraceBuilder.ck(file=file)
+        return (
+            TraceBuilder.ck(files=[file])
+            if PROTOCOL >= 3
+            else TraceBuilder.ck(file=file)
+        )
 
     @staticmethod
     def obj(project="@PROJECT@"):
         """Params of an objectId request (a type, symbol or signature property). Protocol 2 needs the project."""
-        return {"snapshot": "@SNAPSHOT@", "project": project} if PROTOCOL2 else {"snapshot": "@SNAPSHOT@"}
+        return (
+            {"snapshot": "@SNAPSHOT@", "project": project}
+            if PROTOCOL2
+            else {"snapshot": "@SNAPSHOT@"}
+        )
 
-    def type_chain(self, ev, ptr, loc=None, depth=0, project="@PROJECT@", other_type=None, string_type=None):
+    def type_chain(
+        self,
+        ev,
+        ptr,
+        loc=None,
+        depth=0,
+        project="@PROJECT@",
+        other_type=None,
+        string_type=None,
+    ):
         """Requests about the type at `ptr` in the answer of event `ev`. The field getters
         (Go: proto.go:86-101) run at every depth, gated like the TS client (api.ts: only
         when the handle field is set). Depth 0 adds checker queries and one more level."""
-        tid = lambda into, **kw: {"event": ev, "pointer": ptr + "/id", "into": into, **kw}  # noqa: E731
-        ck = lambda **kw: self.ck(project=project, **kw)  # noqa: E731
+        tid = lambda into, **kw: {
+            "event": ev,
+            "pointer": ptr + "/id",
+            "into": into,
+            **kw,
+        }
+        ck = lambda **kw: self.ck(project=project, **kw)
         self.req("typeToString", ck(), tid("/type"))
-        oid = lambda field: {"event": ev, "pointer": ptr + "/id", "into": "/objectId",  # noqa: E731
-                             "when": [{"pointer": ptr + "/" + field, "nonzero": True}]}
-        getters = [("symbol", "getSymbolOfType"), ("aliasSymbol", "getAliasSymbolOfType"),
-                   ("aliasTypeArguments", "getAliasTypeArgumentsOfType"), ("target", "getTargetOfType"),
-                   ("freshType", "getFreshTypeOfType"), ("regularType", "getRegularTypeOfType"),
-                   ("typeParameters", "getTypeParametersOfType"),
-                   ("outerTypeParameters", "getOuterTypeParametersOfType"),
-                   ("localTypeParameters", "getLocalTypeParametersOfType"), ("objectType", "getObjectTypeOfType"),
-                   ("indexType", "getIndexTypeOfType"), ("checkType", "getCheckTypeOfType"),
-                   ("extendsType", "getExtendsTypeOfType"), ("baseType", "getBaseTypeOfType"),
-                   ("substConstraint", "getConstraintOfType")]
+        oid = lambda field: {
+            "event": ev,
+            "pointer": ptr + "/id",
+            "into": "/objectId",
+            "when": [{"pointer": ptr + "/" + field, "nonzero": True}],
+        }
+        getters = [
+            ("symbol", "getSymbolOfType"),
+            ("aliasSymbol", "getAliasSymbolOfType"),
+            ("aliasTypeArguments", "getAliasTypeArgumentsOfType"),
+            ("target", "getTargetOfType"),
+            ("freshType", "getFreshTypeOfType"),
+            ("regularType", "getRegularTypeOfType"),
+            ("typeParameters", "getTypeParametersOfType"),
+            ("outerTypeParameters", "getOuterTypeParametersOfType"),
+            ("localTypeParameters", "getLocalTypeParametersOfType"),
+            ("objectType", "getObjectTypeOfType"),
+            ("indexType", "getIndexTypeOfType"),
+            ("checkType", "getCheckTypeOfType"),
+            ("extendsType", "getExtendsTypeOfType"),
+            ("baseType", "getBaseTypeOfType"),
+            ("substConstraint", "getConstraintOfType"),
+        ]
         for field, m in getters:
             g = self.req(m, self.obj(project), oid(field))
-            if m not in ("getSymbolOfType", "getAliasSymbolOfType") and "TypeArguments" not in m \
-                    and "TypeParameters" not in m:
-                self.req("typeToString", ck(), {"event": g, "pointer": "/id", "into": "/type"})
-        types = self.req("getTypesOfType", self.obj(project),
-                         {"event": ev, "pointer": ptr + "/id", "into": "/objectId",
-                          "when": [{"pointer": ptr + "/flags", "mask": TF_UNION | TF_INTERSECTION | TF_TEMPLATE_LITERAL}]})
-        self.req("typeToString", ck(), {"event": types, "pointer": "/0/id", "into": "/type"})
-        self.req("getConstraintOfTypeParameter", ck(),
-                 tid("/type", when=[{"pointer": ptr + "/flags", "mask": TF_TYPE_PARAMETER}]))
+            if (
+                m not in ("getSymbolOfType", "getAliasSymbolOfType")
+                and "TypeArguments" not in m
+                and "TypeParameters" not in m
+            ):
+                self.req(
+                    "typeToString",
+                    ck(),
+                    {"event": g, "pointer": "/id", "into": "/type"},
+                )
+        types = self.req(
+            "getTypesOfType",
+            self.obj(project),
+            {
+                "event": ev,
+                "pointer": ptr + "/id",
+                "into": "/objectId",
+                "when": [
+                    {
+                        "pointer": ptr + "/flags",
+                        "mask": TF_UNION | TF_INTERSECTION | TF_TEMPLATE_LITERAL,
+                    }
+                ],
+            },
+        )
+        self.req(
+            "typeToString", ck(), {"event": types, "pointer": "/0/id", "into": "/type"}
+        )
+        self.req(
+            "getConstraintOfTypeParameter",
+            ck(),
+            tid("/type", when=[{"pointer": ptr + "/flags", "mask": TF_TYPE_PARAMETER}]),
+        )
         if depth > 0:
             return
         extra = {"location": loc} if loc else {}
@@ -2208,35 +2942,84 @@ class TraceBuilder:
         self.req("printNode", {}, {"event": tn, "pointer": "/data", "into": "/data"})
         props = self.req("getPropertiesOfType", ck(), tid("/type"))
         for i in range(2):
-            t = self.req("getTypeOfSymbol", ck(), {"event": props, "pointer": f"/{i}/id", "into": "/symbol"})
-            self.req("typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"})
+            t = self.req(
+                "getTypeOfSymbol",
+                ck(),
+                {"event": props, "pointer": f"/{i}/id", "into": "/symbol"},
+            )
+            self.req(
+                "typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"}
+            )
             if loc:
-                self.req("getTypeOfSymbolAtLocation", ck(location=loc),
-                         {"event": props, "pointer": f"/{i}/id", "into": "/symbol"})
+                self.req(
+                    "getTypeOfSymbolAtLocation",
+                    ck(location=loc),
+                    {"event": props, "pointer": f"/{i}/id", "into": "/symbol"},
+                )
         call = self.req("getSignaturesOfType", ck(kind=SIG_CALL), tid("/type"))
         self.sig_chain(call, "/0", project=project)
-        construct = self.req("getSignaturesOfType", ck(kind=SIG_CONSTRUCT), tid("/type"))
+        construct = self.req(
+            "getSignaturesOfType", ck(kind=SIG_CONSTRUCT), tid("/type")
+        )
         self.sig_chain(construct, "/0", project=project, short=True)
         ii = self.req("getIndexInfosOfType", ck(), tid("/type"))
-        self.req("typeToString", ck(), {"event": ii, "pointer": "/0/keyType/id", "into": "/type"})
-        self.req("typeToString", ck(), {"event": ii, "pointer": "/0/valueType/id", "into": "/type"})
+        self.req(
+            "typeToString",
+            ck(),
+            {"event": ii, "pointer": "/0/keyType/id", "into": "/type"},
+        )
+        self.req(
+            "typeToString",
+            ck(),
+            {"event": ii, "pointer": "/0/valueType/id", "into": "/type"},
+        )
         for m in ("getBaseTypeOfLiteralType", "getNonNullableType", "getWidenedType"):
             t = self.req(m, ck(), tid("/type"))
-            self.req("typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"})
+            self.req(
+                "typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"}
+            )
         self.req("isArrayLikeType", ck(), tid("/type"))
-        bt = self.req("getBaseTypes", ck(), tid("/type", when=[{"pointer": ptr + "/objectFlags", "mask": OF_CLASS_OR_INTERFACE}]))
+        bt = self.req(
+            "getBaseTypes",
+            ck(),
+            tid(
+                "/type",
+                when=[{"pointer": ptr + "/objectFlags", "mask": OF_CLASS_OR_INTERFACE}],
+            ),
+        )
         self.type_chain(bt, "/0", depth=1, project=project)
-        ta = self.req("getTypeArguments", ck(), tid("/type", when=[{"pointer": ptr + "/objectFlags", "mask": OF_REFERENCE}]))
+        ta = self.req(
+            "getTypeArguments",
+            ck(),
+            tid(
+                "/type", when=[{"pointer": ptr + "/objectFlags", "mask": OF_REFERENCE}]
+            ),
+        )
         self.type_chain(ta, "/0", depth=1, project=project)
         self.type_chain(types, "/0", depth=1, project=project)
         for target in (string_type, other_type):
             if target is not None:
-                self.req("isTypeAssignableTo", ck(),
-                         [tid("/source"), {"event": target[0], "pointer": target[1] + "/id", "into": "/target"}])
+                self.req(
+                    "isTypeAssignableTo",
+                    ck(),
+                    [
+                        tid("/source"),
+                        {
+                            "event": target[0],
+                            "pointer": target[1] + "/id",
+                            "into": "/target",
+                        },
+                    ],
+                )
 
     def sig_chain(self, ev, ptr, project="@PROJECT@", short=False):
-        ck = lambda **kw: self.ck(project=project, **kw)  # noqa: E731
-        gid = lambda into, **kw: {"event": ev, "pointer": ptr + "/id", "into": into, **kw}  # noqa: E731
+        ck = lambda **kw: self.ck(project=project, **kw)
+        gid = lambda into, **kw: {
+            "event": ev,
+            "pointer": ptr + "/id",
+            "into": into,
+            **kw,
+        }
         rt = self.req("getReturnTypeOfSignature", ck(), gid("/signature"))
         self.req("typeToString", ck(), {"event": rt, "pointer": "/id", "into": "/type"})
         if short:
@@ -2245,39 +3028,99 @@ class TraceBuilder:
         self.req("getRestTypeOfSignature", ck(), gid("/signature"))
         self.req("getTypePredicateOfSignature", ck(), gid("/signature"))
         self.req("getParametersOfSignature", self.obj(project), gid("/objectId"))
-        for field, m in (("typeParameters", "getTypeParametersOfSignature"),
-                         ("thisParameter", "getThisParameterOfSignature"), ("target", "getTargetOfSignature")):
-            self.req(m, self.obj(project), gid("/objectId", when=[{"pointer": ptr + "/" + field, "nonzero": True}]))
-        decl = self.req("signatureToSignatureDeclaration", ck(kind=GO_KIND_CALL_SIGNATURE), gid("/signature"))
+        for field, m in (
+            ("typeParameters", "getTypeParametersOfSignature"),
+            ("thisParameter", "getThisParameterOfSignature"),
+            ("target", "getTargetOfSignature"),
+        ):
+            self.req(
+                m,
+                self.obj(project),
+                gid(
+                    "/objectId", when=[{"pointer": ptr + "/" + field, "nonzero": True}]
+                ),
+            )
+        decl = self.req(
+            "signatureToSignatureDeclaration",
+            ck(kind=GO_KIND_CALL_SIGNATURE),
+            gid("/signature"),
+        )
         self.req("printNode", {}, {"event": decl, "pointer": "/data", "into": "/data"})
-        self.req("getParameterType", ck(index=0),
-                 gid("/signature", when=[{"pointer": ptr + "/parameters", "nonzero": True}]))
+        self.req(
+            "getParameterType",
+            ck(index=0),
+            gid("/signature", when=[{"pointer": ptr + "/parameters", "nonzero": True}]),
+        )
 
     def symbol_chain(self, ev, ptr, loc, file, pos, with_usages):
         ck = self.ck
-        sid = lambda into, **kw: {"event": ev, "pointer": ptr + "/id", "into": into, **kw}  # noqa: E731
+        sid = lambda into, **kw: {
+            "event": ev,
+            "pointer": ptr + "/id",
+            "into": into,
+            **kw,
+        }
         for m in ("getTypeOfSymbol", "getDeclaredTypeOfSymbol"):
             t = self.req(m, ck(), sid("/symbol"))
-            self.req("typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"})
-        for field, m in (("parent", "getParentOfSymbol"), ("exportSymbol", "getExportSymbolOfSymbol")):
-            self.req(m, self.obj(), sid("/objectId", when=[{"pointer": ptr + "/" + field, "nonzero": True}]))
+            self.req(
+                "typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"}
+            )
+        for field, m in (
+            ("parent", "getParentOfSymbol"),
+            ("exportSymbol", "getExportSymbolOfSymbol"),
+        ):
+            self.req(
+                m,
+                self.obj(),
+                sid(
+                    "/objectId", when=[{"pointer": ptr + "/" + field, "nonzero": True}]
+                ),
+            )
         self.req("getMembersOfSymbol", self.obj(), sid("/objectId"))
         self.req("getExportsOfSymbol", self.obj(), sid("/objectId"))
         name = {"event": ev, "pointer": ptr + "/name", "into": "/name"}
         if loc:
-            self.req("resolveName", ck(location=loc, meaning=SF_VALUE | SF_TYPE | SF_NAMESPACE), name)
-        rn = self.req("resolveName", ck(file=file, position=pos, meaning=SF_VALUE, excludeGlobals=True), name)
+            self.req(
+                "resolveName",
+                ck(location=loc, meaning=SF_VALUE | SF_TYPE | SF_NAMESPACE),
+                name,
+            )
+        rn = self.req(
+            "resolveName",
+            ck(file=file, position=pos, meaning=SF_VALUE, excludeGlobals=True),
+            name,
+        )
         # A local symbol of an exported declaration has exportSymbol set.
-        for field, m in (("exportSymbol", "getExportSymbolOfSymbol"), ("parent", "getParentOfSymbol")):
-            self.req(m, self.obj(), {"event": rn, "pointer": "/id", "into": "/objectId",
-                                     "when": [{"pointer": "/" + field, "nonzero": True}]})
+        for field, m in (
+            ("exportSymbol", "getExportSymbolOfSymbol"),
+            ("parent", "getParentOfSymbol"),
+        ):
+            self.req(
+                m,
+                self.obj(),
+                {
+                    "event": rn,
+                    "pointer": "/id",
+                    "into": "/objectId",
+                    "when": [{"pointer": "/" + field, "nonzero": True}],
+                },
+            )
         self.req("getReferencesToSymbolInFile", ck(file=file), sid("/symbol"))
         if loc:
             self.req("getTypeOfSymbolAtLocation", ck(location=loc), sid("/symbol"))
         if with_usages:
-            self.req("getSignatureUsages", ck(),
-                     {"event": ev, "pointer": ptr + "/valueDeclaration", "into": "/signatureDecl",
-                      "when": [{"pointer": ptr + "/flags", "mask": SF_FUNCTION | SF_METHOD}]})
+            self.req(
+                "getSignatureUsages",
+                ck(),
+                {
+                    "event": ev,
+                    "pointer": ptr + "/valueDeclaration",
+                    "into": "/signatureDecl",
+                    "when": [
+                        {"pointer": ptr + "/flags", "mask": SF_FUNCTION | SF_METHOD}
+                    ],
+                },
+            )
 
 
 GO_KIND_CALL_SIGNATURE = 180  # checked against kind_generated.go in `build`
@@ -2293,18 +3136,31 @@ def oracle_session(oracle, pdir, tsconfig, files, tmp_root, project_out=None):
     try:
         st, _ = srv.api.request(1, "initialize", None, START_TIMEOUT)
         method = "createSnapshot" if PROTOCOL >= 4 else "updateSnapshot"
-        st, snap = srv.api.request(2, method, open_params(os.path.join(pdir, tsconfig)), START_TIMEOUT * 4)
+        st, snap = srv.api.request(
+            2, method, open_params(os.path.join(pdir, tsconfig)), START_TIMEOUT * 4
+        )
         if st != "ok":
             raise HarnessError(f"{method}: {snap}")
         want = os.path.join(pdir, tsconfig)
-        proj = next((p for p in snap["projects"] if p["configFileName"] == want), snap["projects"][0])
+        proj = next(
+            (p for p in snap["projects"] if p["configFileName"] == want),
+            snap["projects"][0],
+        )
         if project_out is not None:
             project_out.update(proj)
         roots = set(proj["rootFiles"])
         encoded = {}
         for n, rel in enumerate(files):
-            st, ans = srv.api.request(3 + n, "getSourceFile", {"snapshot": snap["snapshot"], "project": proj["id"],
-                                                               "file": os.path.join(pdir, rel)}, START_TIMEOUT)
+            st, ans = srv.api.request(
+                3 + n,
+                "getSourceFile",
+                {
+                    "snapshot": snap["snapshot"],
+                    "project": proj["id"],
+                    "file": os.path.join(pdir, rel),
+                },
+                START_TIMEOUT,
+            )
             if st == "ok" and ans:
                 encoded[rel] = base64.b64decode(ans["data"])
         return roots, encoded
@@ -2316,11 +3172,34 @@ def oracle_session(oracle, pdir, tsconfig, files, tmp_root, project_out=None):
 class FileSamples:
     def __init__(self, enc: EncodedFile, rel, kinds, caps):
         K = kinds
-        ids, members, calls, type_nodes, fn_exprs, shorthand, sig_decls = [], [], [], [], [], [], []
-        type_kinds = {K[k] for k in ("KindTypeReference", "KindUnionType", "KindIntersectionType", "KindFunctionType",
-                                     "KindTypeLiteral", "KindArrayType", "KindTupleType", "KindIndexedAccessType",
-                                     "KindMappedType", "KindConditionalType", "KindTypeQuery", "KindTypeOperator",
-                                     "KindLiteralType", "KindTemplateLiteralType")}
+        ids, members, calls, type_nodes, fn_exprs, shorthand, sig_decls = (
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
+        type_kinds = {
+            K[k]
+            for k in (
+                "KindTypeReference",
+                "KindUnionType",
+                "KindIntersectionType",
+                "KindFunctionType",
+                "KindTypeLiteral",
+                "KindArrayType",
+                "KindTupleType",
+                "KindIndexedAccessType",
+                "KindMappedType",
+                "KindConditionalType",
+                "KindTypeQuery",
+                "KindTypeOperator",
+                "KindLiteralType",
+                "KindTemplateLiteralType",
+            )
+        }
         records = [enc.node(i) for i in range(enc.count)]
         for i, (kind, pos, end, _next, parent, data, _flags) in enumerate(records):
             if i == 0 or kind == 0xFFFFFFFF:
@@ -2334,7 +3213,10 @@ class FileSamples:
             if kind == K["KindIdentifier"] and (data >> 30) == 1:
                 text = enc.string(data & 0x00FFFFFF)
                 start = end - utf16_len(text)
-                if start < 0 or pkind_real in (K.get("KindJSDoc"), K.get("KindJSDocTypeExpression")):
+                if start < 0 or pkind_real in (
+                    K.get("KindJSDoc"),
+                    K.get("KindJSDocTypeExpression"),
+                ):
                     continue
                 ids.append((i, start))
                 if pkind == K["KindPropertyAccessExpression"] and i != parent + 1:
@@ -2344,7 +3226,11 @@ class FileSamples:
                 calls.append(i)
             elif kind in type_kinds:
                 type_nodes.append(i)
-            elif kind in (K["KindArrowFunction"], K["KindFunctionExpression"], K["KindObjectLiteralExpression"]):
+            elif kind in (
+                K["KindArrowFunction"],
+                K["KindFunctionExpression"],
+                K["KindObjectLiteralExpression"],
+            ):
                 fn_exprs.append(i)
             elif kind == K["KindShorthandPropertyAssignment"]:
                 shorthand.append(i)
@@ -2352,7 +3238,9 @@ class FileSamples:
                 sig_decls.append(i)
         self.kinds = {i: rec[0] for i, rec in enumerate(records)}
         self.ids = spread(ids, caps["ids"])
-        self.members = spread([m for m in members if m not in self.ids], caps["memberCompletions"])
+        self.members = spread(
+            [m for m in members if m not in self.ids], caps["memberCompletions"]
+        )
         self.calls = spread(calls, caps["calls"])
         self.type_nodes = by_kind(type_nodes, self.kinds, caps["typeNodes"])
         self.fn_exprs = spread(fn_exprs, caps["fnExprs"])
@@ -2365,9 +3253,16 @@ class FileSamples:
 
 
 def trace_header(name, battery, preset, **extra):
-    h = {"format": TRACE_FORMAT, "name": name, "battery": battery,
-         "project": {"dir": preset["dir"], "tsconfig": preset["tsconfig"]}, "protocol": "jsonrpc",
-         "callbacks": [], "callbackMode": "fallback", "transport": "stdio"}
+    h = {
+        "format": TRACE_FORMAT,
+        "name": name,
+        "battery": battery,
+        "project": {"dir": preset["dir"], "tsconfig": preset["tsconfig"]},
+        "protocol": "jsonrpc",
+        "callbacks": [],
+        "callbackMode": "fallback",
+        "transport": "stdio",
+    }
     h.update(extra)
     return h
 
@@ -2393,11 +3288,15 @@ def file_trace(preset, rel, s: FileSamples, caps, apath):
     ck = tb.ck
     tb.req("getDefaultProjectForFile", {"snapshot": "@SNAPSHOT@", "file": file})
     tb.req("getSourceFile", ck(file=file))
-    for m in ("getSyntacticDiagnostics", "getSemanticDiagnostics", "getSuggestionDiagnostics",
-              "getDeclarationDiagnostics"):
+    for m in (
+        "getSyntacticDiagnostics",
+        "getSemanticDiagnostics",
+        "getSuggestionDiagnostics",
+        "getDeclarationDiagnostics",
+    ):
         tb.req(m, tb.diag(file))
     string_type = (tb.req("getStringType", ck()), "")
-    h = lambda i: s.handle(i, apath)  # noqa: E731
+    h = lambda i: s.handle(i, apath)
     prev_type = None
     sym_events = []
     for n, (i, pos) in enumerate(s.ids):
@@ -2418,15 +3317,25 @@ def file_trace(preset, rel, s: FileSamples, caps, apath):
         tb.req("getTypesAtPositions", ck(file=file, positions=[p for _, p in s.ids]))
         tb.req("getSymbolsAtLocations", ck(locations=[h(i) for i, _ in s.ids]))
         tb.req("getTypeAtLocations", ck(locations=[h(i) for i, _ in s.ids]))
-        tb.req("getTypesOfSymbols", ck(symbols=[]),
-               [{"event": a, "pointer": "/id", "append": "/symbols", "optional": True} for a in sym_events])
+        tb.req(
+            "getTypesOfSymbols",
+            ck(symbols=[]),
+            [
+                {"event": a, "pointer": "/id", "append": "/symbols", "optional": True}
+                for a in sym_events
+            ],
+        )
     for i in s.calls:
         g = tb.req("getResolvedSignature", ck(location=h(i)))
         tb.sig_chain(g, "")
     for i in s.type_nodes:
         t = tb.req("getTypeFromTypeNode", ck(location=h(i)))
         tb.type_chain(t, "", depth=1)
-        tn = tb.req("typeToTypeNode", ck(location=h(i)), {"event": t, "pointer": "/id", "into": "/type"})
+        tn = tb.req(
+            "typeToTypeNode",
+            ck(location=h(i)),
+            {"event": t, "pointer": "/id", "into": "/type"},
+        )
         tb.req("printNode", {}, {"event": tn, "pointer": "/data", "into": "/data"})
     for i in s.fn_exprs:
         c = tb.req("getContextualType", ck(location=h(i)))
@@ -2438,10 +3347,17 @@ def file_trace(preset, rel, s: FileSamples, caps, apath):
         tb.req("getShorthandAssignmentValueSymbol", ck(location=h(i)))
     for i in s.sig_decls:
         u = tb.req("getSignatureUsages", ck(signatureDecl=h(i)))
-        g = tb.req("getResolvedSignature", ck(), {"event": u, "pointer": "/0/call", "into": "/location"})
+        g = tb.req(
+            "getResolvedSignature",
+            ck(),
+            {"event": u, "pointer": "/0/call", "into": "/location"},
+        )
         tb.sig_chain(g, "")
     for i, pos in s.members:
-        tb.req("getCompletionsAtPosition", ck(file=file, position=pos, triggerCharacter=".", includeSymbol=True))
+        tb.req(
+            "getCompletionsAtPosition",
+            ck(file=file, position=pos, triggerCharacter=".", includeSymbol=True),
+        )
     for pos in s.global_positions:
         tb.req("getCompletionsAtPosition", ck(file=file, position=pos))
     return tb.events
@@ -2454,38 +3370,70 @@ def misc_trace(preset, files):
     ck = tb.ck
     first = "@PROJECT_DIR@/" + files[0]
     tb.req("getDefaultProjectForFile", {"snapshot": "@SNAPSHOT@", "file": first})
-    tb.req("getDefaultProjectForFile", {"snapshot": "@SNAPSHOT@", "file": {"uri": "file://" + preset["dir"] + "/" + files[0]}})
+    tb.req(
+        "getDefaultProjectForFile",
+        {
+            "snapshot": "@SNAPSHOT@",
+            "file": {"uri": "file://" + preset["dir"] + "/" + files[0]},
+        },
+    )
     tb.req("parseConfigFile", {"file": "@PROJECT_DIR@/" + preset["tsconfig"]})
     tb.req("parseConfigFile", {"file": preset["tsconfig"]})
     tb.req("getConfigFileParsingDiagnostics", ck())
     for m in INTRINSICS:
         t = tb.req(m, ck())
         tb.req("typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"})
-        tb.req("getPropertiesOfType", ck(), {"event": t, "pointer": "/id", "into": "/type"})
-    for payload in ({"a": [1, "x", None, True]}, "text é中\U0001F600", 12.5, [], None):
+        tb.req(
+            "getPropertiesOfType", ck(), {"event": t, "pointer": "/id", "into": "/type"}
+        )
+    for payload in ({"a": [1, "x", None, True]}, "text é中\U0001f600", 12.5, [], None):
         tb.req("echo", payload)
     tb.req("ping")
-    for name, meaning in (("Promise", SF_TYPE), ("Array", SF_VALUE), ("console", SF_VALUE), ("Map", SF_TYPE)):
+    for name, meaning in (
+        ("Promise", SF_TYPE),
+        ("Array", SF_VALUE),
+        ("console", SF_VALUE),
+        ("Map", SF_TYPE),
+    ):
         r = tb.req("resolveName", ck(name=name, meaning=meaning))
         tb.symbol_chain(r, "", None, first, 0, with_usages=False)
-        t = tb.req("getDeclaredTypeOfSymbol", ck(), {"event": r, "pointer": "/id", "into": "/symbol"})
+        t = tb.req(
+            "getDeclaredTypeOfSymbol",
+            ck(),
+            {"event": r, "pointer": "/id", "into": "/symbol"},
+        )
         tb.type_chain(t, "", depth=0)
     tb.req("getSourceFile", ck(file="@PROJECT_DIR@/does/not/exist.ts"))
     tb.req("getSourceFile", ck(file="bundled:///libs/lib.es5.d.ts"))
-    for m in ("getSyntacticDiagnostics", "getSemanticDiagnostics", "getSuggestionDiagnostics",
-              "getDeclarationDiagnostics"):
+    for m in (
+        "getSyntacticDiagnostics",
+        "getSemanticDiagnostics",
+        "getSuggestionDiagnostics",
+        "getDeclarationDiagnostics",
+    ):
         tb.req(m, ck())
     tb.req("getCompletionsAtPosition", ck(file=first, position=0))
     # errors
-    tb.req("getSymbolAtPosition", {"snapshot": 999, "project": "@PROJECT@", "file": first, "position": 0})
-    tb.req("getSymbolAtPosition", ck(project="/no/such/tsconfig.json", file=first, position=0))
-    tb.req("getSymbolAtPosition", ck(file="@PROJECT_DIR@/does/not/exist.ts", position=0))
+    tb.req(
+        "getSymbolAtPosition",
+        {"snapshot": 999, "project": "@PROJECT@", "file": first, "position": 0},
+    )
+    tb.req(
+        "getSymbolAtPosition",
+        ck(project="/no/such/tsconfig.json", file=first, position=0),
+    )
+    tb.req(
+        "getSymbolAtPosition", ck(file="@PROJECT_DIR@/does/not/exist.ts", position=0)
+    )
     tb.req("getTypeOfSymbol", ck(symbol=0))
     tb.req("getTypeOfSymbol", ck(symbol=987654321))
     tb.req("typeToString", ck(type=4000000000))
     tb.req("getSignaturesOfType", ck(type=0, kind=0))
     tb.req("getSymbolAtLocation", ck(location="bad-handle"))
-    tb.req("getSymbolAtLocation", ck(location="999999.79." + preset["dir"] + "/" + files[0]))
+    tb.req(
+        "getSymbolAtLocation",
+        ck(location="999999.79." + preset["dir"] + "/" + files[0]),
+    )
     tb.req("getSymbolAtPosition", ck(file=first, position="x"))
     tb.req("noSuchMethod", {"x": 1})
     tb.req("printNode", {"data": "not base64!"})
@@ -2497,10 +3445,15 @@ def misc_trace(preset, files):
     tb.req("getSymbolAtPosition", ck(file=first, position=0))
     s5 = tb.snap(open_params("@PROJECT_DIR@/" + preset["tsconfig"]))
     for ev in (snap, s2, s3, s4, s5):
-        tb.req("release", {}, {"event": ev, "pointer": "/snapshot", "into": "/snapshot"})
+        tb.req(
+            "release", {}, {"event": ev, "pointer": "/snapshot", "into": "/snapshot"}
+        )
     tb.req("release", {}, {"event": snap, "pointer": "/snapshot", "into": "/snapshot"})
-    tb.req("getSymbolAtPosition", {"project": "@PROJECT@", "file": first, "position": 0},
-           {"event": snap, "pointer": "/snapshot", "into": "/snapshot"})
+    tb.req(
+        "getSymbolAtPosition",
+        {"project": "@PROJECT@", "file": first, "position": 0},
+        {"event": snap, "pointer": "/snapshot", "into": "/snapshot"},
+    )
     return tb.events
 
 
@@ -2509,8 +3462,7 @@ def write_trace(out_dir, header, events):
     path = os.path.join(out_dir, header["name"] + ".jsonl")
     with open(path, "w", encoding="utf-8") as f:
         f.write(json.dumps(header, ensure_ascii=False) + "\n")
-        for ev in events:
-            f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(ev, ensure_ascii=False) + "\n" for ev in events)
     return path
 
 
@@ -2524,8 +3476,10 @@ def cmd_build(args):
         raise UsageError(f"unknown preset {args.preset}")
     preset = dict(PRESETS[args.preset])
     if args.kind == "ext" and (PROTOCOL < 3 or args.preset not in EXT_PRESETS):
-        raise UsageError(f"--kind ext needs protocol 3 (pin {PIN} has {PROTOCOL}) and a preset in "
-                         f"{', '.join(EXT_PRESETS)}")
+        raise UsageError(
+            f"--kind ext needs protocol 3 (pin {PIN} has {PROTOCOL}) and a preset in "
+            f"{', '.join(EXT_PRESETS)}"
+        )
     kinds = go_kinds()
     GO_KIND_CALL_SIGNATURE = kinds["KindCallSignature"]
     caps = dict(preset["caps"])
@@ -2536,12 +3490,16 @@ def cmd_build(args):
     tmp_root = make_tmp_root()
     project = {}
     try:
-        roots, encoded = oracle_session(args.oracle, preset["dir"], preset["tsconfig"], files, tmp_root, project)
+        roots, encoded = oracle_session(
+            args.oracle, preset["dir"], preset["tsconfig"], files, tmp_root, project
+        )
     finally:
         shutil.rmtree(tmp_root, ignore_errors=True)
-    files = [f for f in files if os.path.join(preset["dir"], f) in roots and f in encoded]
+    files = [
+        f for f in files if os.path.join(preset["dir"], f) in roots and f in encoded
+    ]
     if args.limit:
-        files = files[:args.limit]
+        files = files[: args.limit]
     if args.sample:
         files = spread(files, args.sample)
     out_dir = os.path.join(args.out_root, "traces", args.battery)
@@ -2552,8 +3510,10 @@ def cmd_build(args):
         if f.endswith(".jsonl"):
             os.remove(os.path.join(out_dir, f))
     written = []
-    samples = {rel: FileSamples(EncodedFile(encoded[rel]), rel, kinds, caps) for rel in files}
-    apath = lambda rel: os.path.join(preset["dir"], rel)  # noqa: E731
+    samples = {
+        rel: FileSamples(EncodedFile(encoded[rel]), rel, kinds, caps) for rel in files
+    }
+    apath = lambda rel: os.path.join(preset["dir"], rel)
     kind = args.kind
     if kind in ("files", "proto", "callbacks"):
         chosen = files if kind == "files" else files[:2]
@@ -2564,26 +3524,49 @@ def cmd_build(args):
             extra = {"callbacks": list(CALLBACK_NAMES), "callbackMode": "real"}
         for rel in chosen:
             ev = file_trace(preset, rel, samples[rel], caps, apath(rel))
-            written.append(write_trace(out_dir, trace_header(slug(rel), args.battery, preset, file=rel, **extra), ev))
+            written.append(
+                write_trace(
+                    out_dir,
+                    trace_header(slug(rel), args.battery, preset, file=rel, **extra),
+                    ev,
+                )
+            )
         ev = misc_trace(preset, files)
-        written.append(write_trace(out_dir, trace_header("_misc", args.battery, preset, **extra), ev))
+        written.append(
+            write_trace(
+                out_dir, trace_header("_misc", args.battery, preset, **extra), ev
+            )
+        )
         if kind == "callbacks":
-            written.append(write_trace(out_dir, *changes_trace(preset, args.battery, files)))
+            written.append(
+                write_trace(out_dir, *changes_trace(preset, args.battery, files))
+            )
     elif kind == "lsp":
-        written.append(write_trace(out_dir, *lsp_trace(preset, args.battery, files, samples)))
+        written.append(
+            write_trace(out_dir, *lsp_trace(preset, args.battery, files, samples))
+        )
     elif kind == "xchecker":
         for header, ev in xchecker_traces(preset, args.battery, files, samples, apath):
             written.append(write_trace(out_dir, header, ev))
     elif kind == "ext":
-        ext = ExtPlan(args.preset, preset, files, encoded, kinds, caps, project, samples)
+        ext = ExtPlan(
+            args.preset, preset, files, encoded, kinds, caps, project, samples
+        )
         for header, ev in ext_traces(ext, args.battery):
             check_emit_guard(header, ev)
             written.append(write_trace(out_dir, header, ev))
     else:
         raise UsageError(f"unknown kind {kind}")
-    index = {"preset": args.preset, "kind": kind, "caps": caps, "files": files, "traces": len(written),
-             "oracle": args.oracle, "oracleSha": sha256_file(args.oracle),
-             "requests": sum(sum(1 for _ in open(p)) - 1 for p in written)}
+    index = {
+        "preset": args.preset,
+        "kind": kind,
+        "caps": caps,
+        "files": files,
+        "traces": len(written),
+        "oracle": args.oracle,
+        "oracleSha": sha256_file(args.oracle),
+        "requests": sum(sum(1 for _ in _iter_lines(p)) - 1 for p in written),
+    }
     if kind == "ext":
         index["ext"] = ext.summary()
     write_json(os.path.join(out_dir, "index.json"), index)
@@ -2611,12 +3594,23 @@ def changes_trace(preset, battery, files):
         tb.req("typeToString", ck(), {"event": t, "pointer": "/id", "into": "/type"})
 
     probe(path, pos)
-    tb.events.append({"kind": "overlay", "path": path,
-                      "content": text + "\nexport const __apiOracleProbe: number = \"x\" as any as 5;\n"})
+    tb.events.append(
+        {
+            "kind": "overlay",
+            "path": path,
+            "content": text
+            + '\nexport const __apiOracleProbe: number = "x" as any as 5;\n',
+        }
+    )
     tb.snap({"fileChanges": {"changed": [path]}})
     probe(path, pos)
-    tb.events.append({"kind": "overlay", "path": new_path,
-                      "content": "export const created = [1, 2] as const;\nexport type C = typeof created;\n"})
+    tb.events.append(
+        {
+            "kind": "overlay",
+            "path": new_path,
+            "content": "export const created = [1, 2] as const;\nexport type C = typeof created;\n",
+        }
+    )
     tb.snap({"fileChanges": {"created": [new_path]}})
     tb.req("getDefaultProjectForFile", {"snapshot": "@SNAPSHOT@", "file": new_path})
     probe(new_path, 14)
@@ -2628,8 +3622,13 @@ def changes_trace(preset, battery, files):
     probe(path, pos)
     tb.snap({"fileChanges": {"invalidateAll": True}})
     probe(path, 0)
-    header = trace_header("_changes", battery, preset, callbacks=["readFile", "fileExists", "directoryExists",
-                                                                   "getAccessibleEntries"], callbackMode="fallback")
+    header = trace_header(
+        "_changes",
+        battery,
+        preset,
+        callbacks=["readFile", "fileExists", "directoryExists", "getAccessibleEntries"],
+        callbackMode="fallback",
+    )
     return header, tb.events
 
 
@@ -2638,7 +3637,9 @@ def lsp_trace(preset, battery, files, samples):
     s = samples[rel]
     tb = TraceBuilder()
     tb.req("initialize")
-    tb.snap({}, lsp=True)  # adopt the LSP state (Go answers a nil-pointer panic here at B)
+    tb.snap(
+        {}, lsp=True
+    )  # adopt the LSP state (Go answers a nil-pointer panic here at B)
     tb.snap(open_params("@PROJECT_DIR@/" + preset["tsconfig"]), lsp=True)
     file = "@PROJECT_DIR@/" + rel
     ck = tb.ck
@@ -2647,7 +3648,9 @@ def lsp_trace(preset, battery, files, samples):
     tb.req("getSemanticDiagnostics", tb.diag(file))
     for i, pos in s.ids[:4]:
         a = tb.req("getSymbolAtPosition", ck(file=file, position=pos))
-        tb.req("getTypeOfSymbol", ck(), {"event": a, "pointer": "/id", "into": "/symbol"})
+        tb.req(
+            "getTypeOfSymbol", ck(), {"event": a, "pointer": "/id", "into": "/symbol"}
+        )
         b = tb.req("getTypeAtPosition", ck(file=file, position=pos))
         tb.type_chain(b, "", depth=1)
     tb.snap({}, lsp=True)
@@ -2672,20 +3675,63 @@ def xchecker_traces(preset, battery, files, samples, apath):
             s = samples[rel]
             for i, pos in s.ids[:4]:
                 t = tb.req("getTypeAtPosition", tb.ck(file=file, position=pos))
-                tb.req("typeToString", tb.ck(project=p2), {"event": t, "pointer": "/id", "into": "/type"})
-                tb.req("getPropertiesOfType", tb.ck(project=p2), {"event": t, "pointer": "/id", "into": "/type"})
-                tb.req("isTypeAssignableTo", tb.ck(project=p2),
-                       [{"event": t, "pointer": "/id", "into": "/source"},
-                        {"event": str2, "pointer": "/id", "into": "/target"}])
-                sg = tb.req("getSignaturesOfType", tb.ck(kind=0), {"event": t, "pointer": "/id", "into": "/type"})
-                rt = tb.req("getReturnTypeOfSignature", tb.ck(project=p2),
-                            {"event": sg, "pointer": "/0/id", "into": "/signature"})
-                tb.req("typeToString", tb.ck(project=p2), {"event": rt, "pointer": "/id", "into": "/type"})
-                props = tb.req("getPropertiesOfType", tb.ck(), {"event": t, "pointer": "/id", "into": "/type"})
-                pt = tb.req("getTypeOfSymbol", tb.ck(project=p2),
-                            {"event": props, "pointer": "", "into": "/symbol",
-                             "pick": {"where": {"field": "flags", "mask": SF_TRANSIENT}, "index": 0, "then": "/id"}})
-                tb.req("typeToString", tb.ck(project=p2), {"event": pt, "pointer": "/id", "into": "/type"})
+                tb.req(
+                    "typeToString",
+                    tb.ck(project=p2),
+                    {"event": t, "pointer": "/id", "into": "/type"},
+                )
+                tb.req(
+                    "getPropertiesOfType",
+                    tb.ck(project=p2),
+                    {"event": t, "pointer": "/id", "into": "/type"},
+                )
+                tb.req(
+                    "isTypeAssignableTo",
+                    tb.ck(project=p2),
+                    [
+                        {"event": t, "pointer": "/id", "into": "/source"},
+                        {"event": str2, "pointer": "/id", "into": "/target"},
+                    ],
+                )
+                sg = tb.req(
+                    "getSignaturesOfType",
+                    tb.ck(kind=0),
+                    {"event": t, "pointer": "/id", "into": "/type"},
+                )
+                rt = tb.req(
+                    "getReturnTypeOfSignature",
+                    tb.ck(project=p2),
+                    {"event": sg, "pointer": "/0/id", "into": "/signature"},
+                )
+                tb.req(
+                    "typeToString",
+                    tb.ck(project=p2),
+                    {"event": rt, "pointer": "/id", "into": "/type"},
+                )
+                props = tb.req(
+                    "getPropertiesOfType",
+                    tb.ck(),
+                    {"event": t, "pointer": "/id", "into": "/type"},
+                )
+                pt = tb.req(
+                    "getTypeOfSymbol",
+                    tb.ck(project=p2),
+                    {
+                        "event": props,
+                        "pointer": "",
+                        "into": "/symbol",
+                        "pick": {
+                            "where": {"field": "flags", "mask": SF_TRANSIENT},
+                            "index": 0,
+                            "then": "/id",
+                        },
+                    },
+                )
+                tb.req(
+                    "typeToString",
+                    tb.ck(project=p2),
+                    {"event": pt, "pointer": "/id", "into": "/type"},
+                )
         out.append((trace_header("x_two_projects", battery, preset), tb.events))
     # 2. Symbols from language service checkers (completions, find references) used with the API checker.
     tb = TraceBuilder()
@@ -2694,18 +3740,48 @@ def xchecker_traces(preset, battery, files, samples, apath):
         file = "@PROJECT_DIR@/" + rel
         s = samples[rel]
         for i, pos in (s.members or s.ids)[:3]:
-            c = tb.req("getCompletionsAtPosition", tb.ck(file=file, position=pos, triggerCharacter=".", includeSymbol=True))
+            c = tb.req(
+                "getCompletionsAtPosition",
+                tb.ck(
+                    file=file, position=pos, triggerCharacter=".", includeSymbol=True
+                ),
+            )
             for mask in (SF_TRANSIENT, SF_VALUE):
-                sym = {"event": c, "pointer": "/entries", "into": "/symbol",
-                       "pick": {"where": {"field": "symbol/flags", "mask": mask}, "sortBy": ["name"], "index": 0,
-                                "then": "/symbol/id"}}
+                sym = {
+                    "event": c,
+                    "pointer": "/entries",
+                    "into": "/symbol",
+                    "pick": {
+                        "where": {"field": "symbol/flags", "mask": mask},
+                        "sortBy": ["name"],
+                        "index": 0,
+                        "then": "/symbol/id",
+                    },
+                }
                 t = tb.req("getTypeOfSymbol", tb.ck(), sym)
-                tb.req("typeToString", tb.ck(), {"event": t, "pointer": "/id", "into": "/type"})
-                tb.req("getTypeOfSymbolAtLocation", tb.ck(location=s.handle(i, apath(rel))), sym)
+                tb.req(
+                    "typeToString",
+                    tb.ck(),
+                    {"event": t, "pointer": "/id", "into": "/type"},
+                )
+                tb.req(
+                    "getTypeOfSymbolAtLocation",
+                    tb.ck(location=s.handle(i, apath(rel))),
+                    sym,
+                )
         for i, pos in s.ids[:2]:
-            r = tb.req("getReferencedSymbolsForNode", tb.ck(node=s.handle(i, apath(rel)), position=pos))
-            t = tb.req("getTypeOfSymbol", tb.ck(), {"event": r, "pointer": "/0/symbol/id", "into": "/symbol"})
-            tb.req("typeToString", tb.ck(), {"event": t, "pointer": "/id", "into": "/type"})
+            r = tb.req(
+                "getReferencedSymbolsForNode",
+                tb.ck(node=s.handle(i, apath(rel)), position=pos),
+            )
+            t = tb.req(
+                "getTypeOfSymbol",
+                tb.ck(),
+                {"event": r, "pointer": "/0/symbol/id", "into": "/symbol"},
+            )
+            tb.req(
+                "typeToString", tb.ck(), {"event": t, "pointer": "/id", "into": "/type"}
+            )
     out.append((trace_header("x_ls_symbols", battery, preset), tb.events))
     # 3. File A handles in requests about file B (one API checker per project in Go and Rust).
     if len(files) >= 2:
@@ -2714,17 +3790,38 @@ def xchecker_traces(preset, battery, files, samples, apath):
         a_rel, b_rel = files[0], files[len(files) // 2]
         sa, sb = samples[a_rel], samples[b_rel]
         for (ia, pa), (ib, pb) in zip(sa.ids[:4], sb.ids[:4]):
-            ta = tb.req("getTypeAtPosition", tb.ck(file="@PROJECT_DIR@/" + a_rel, position=pa))
-            tb2 = tb.req("getTypeAtPosition", tb.ck(file="@PROJECT_DIR@/" + b_rel, position=pb))
-            tb.req("typeToString", tb.ck(location=sb.handle(ib, apath(b_rel))),
-                   {"event": ta, "pointer": "/id", "into": "/type"})
-            tb.req("isTypeAssignableTo", tb.ck(), [{"event": ta, "pointer": "/id", "into": "/source"},
-                                                   {"event": tb2, "pointer": "/id", "into": "/target"}])
-            sa_ = tb.req("getSymbolAtPosition", tb.ck(file="@PROJECT_DIR@/" + a_rel, position=pa))
-            tb.req("getTypeOfSymbolAtLocation", tb.ck(location=sb.handle(ib, apath(b_rel))),
-                   {"event": sa_, "pointer": "/id", "into": "/symbol"})
-            tb.req("getReferencesToSymbolInFile", tb.ck(file="@PROJECT_DIR@/" + b_rel),
-                   {"event": sa_, "pointer": "/id", "into": "/symbol"})
+            ta = tb.req(
+                "getTypeAtPosition", tb.ck(file="@PROJECT_DIR@/" + a_rel, position=pa)
+            )
+            tb2 = tb.req(
+                "getTypeAtPosition", tb.ck(file="@PROJECT_DIR@/" + b_rel, position=pb)
+            )
+            tb.req(
+                "typeToString",
+                tb.ck(location=sb.handle(ib, apath(b_rel))),
+                {"event": ta, "pointer": "/id", "into": "/type"},
+            )
+            tb.req(
+                "isTypeAssignableTo",
+                tb.ck(),
+                [
+                    {"event": ta, "pointer": "/id", "into": "/source"},
+                    {"event": tb2, "pointer": "/id", "into": "/target"},
+                ],
+            )
+            sa_ = tb.req(
+                "getSymbolAtPosition", tb.ck(file="@PROJECT_DIR@/" + a_rel, position=pa)
+            )
+            tb.req(
+                "getTypeOfSymbolAtLocation",
+                tb.ck(location=sb.handle(ib, apath(b_rel))),
+                {"event": sa_, "pointer": "/id", "into": "/symbol"},
+            )
+            tb.req(
+                "getReferencesToSymbolInFile",
+                tb.ck(file="@PROJECT_DIR@/" + b_rel),
+                {"event": sa_, "pointer": "/id", "into": "/symbol"},
+            )
         out.append((trace_header("x_file_a_b", battery, preset), tb.events))
     return out
 
@@ -2737,7 +3834,7 @@ def xchecker_traces(preset, battery, files, samples, apath):
 # ---------------------------------------------------------------------------
 
 REL_IMPORT = re.compile(r"""(?:from|import)\s*['"](\.{1,2}/[^'"]+)['"]""")
-TEMP_SUFFIX = "\nexport const __apiOracleTemp: number = \"x\";\n"
+TEMP_SUFFIX = '\nexport const __apiOracleTemp: number = "x";\n'
 
 
 def u16_offsets(text):
@@ -2757,8 +3854,17 @@ def line_start_u16(text, offs, pos16):
 
 
 def resolve_rel_import(rel, spec, roots):
-    base = re.sub(r"\.(m|c)?js$", "", os.path.normpath(os.path.join(os.path.dirname(rel), spec)))
-    return next((c for c in (base, base + ".ts", base + ".mts", base + "/index.ts") if c in roots), None)
+    base = re.sub(
+        r"\.(m|c)?js$", "", os.path.normpath(os.path.join(os.path.dirname(rel), spec))
+    )
+    return next(
+        (
+            c
+            for c in (base, base + ".ts", base + ".mts", base + "/index.ts")
+            if c in roots
+        ),
+        None,
+    )
 
 
 def first_statement_end(enc, decl, K):
@@ -2780,45 +3886,84 @@ def first_statement_end(enc, decl, K):
 class ExtPlan:
     """The files of the ext traces (section 4.1), chosen from the root file list of `build`."""
 
-    def __init__(self, name, preset, files, encoded, kinds, caps, project, samples=None):
+    def __init__(
+        self, name, preset, files, encoded, kinds, caps, project, samples=None
+    ):
         cfg = EXT_PRESETS[name]
         pdir = preset["dir"]
         self.preset, self.kinds, self.files = preset, kinds, files
         self.enc = {f: EncodedFile(encoded[f]) for f in files}
-        self.samples = samples or {f: FileSamples(self.enc[f], f, kinds, caps) for f in files}
+        self.samples = samples or {
+            f: FileSamples(self.enc[f], f, kinds, caps) for f in files
+        }
         self.text = {}
         for f in files:
             with open(os.path.join(pdir, f), encoding="utf-8", newline="") as fh:
                 self.text[f] = fh.read()
         roots = set(files)
-        imports = {f: sorted({r for r in (resolve_rel_import(f, sp, roots) for sp in REL_IMPORT.findall(self.text[f]))
-                              if r}) for f in files}
+        imports = {
+            f: sorted(
+                {
+                    r
+                    for r in (
+                        resolve_rel_import(f, sp, roots)
+                        for sp in REL_IMPORT.findall(self.text[f])
+                    )
+                    if r
+                }
+            )
+            for f in files
+        }
         importers = {f: sorted(g for g in files if f in imports[g]) for f in files}
         excl = [glob_regex(p) for p in cfg["sampleExclude"]]
-        ts_files = [f for f in files if not f.endswith(".d.ts") and not any(r.match(f) for r in excl)]
+        ts_files = [
+            f
+            for f in files
+            if not f.endswith(".d.ts") and not any(r.match(f) for r in excl)
+        ]
         # The bigger half by encoded node count (ties by name), in name order: enough constructs per file.
         by_nodes = sorted(ts_files, key=lambda f: (-self.enc[f].count, f))
-        big = sorted(by_nodes[:max(cfg["files"], len(by_nodes) // 2)])
+        big = sorted(by_nodes[: max(cfg["files"], len(by_nodes) // 2)])
         self.ext_files = spread(big, cfg["files"])
         # Import adder: target A, B1 = A's first imported root, B2 = the first big file that A does not import.
         self.adder = []
         for a in spread([f for f in big if imports[f]], 3):
-            b2 = next((g for g in big if g != a and g not in imports[a] and not g.endswith("index.ts")), None)
+            b2 = next(
+                (
+                    g
+                    for g in big
+                    if g != a and g not in imports[a] and not g.endswith("index.ts")
+                ),
+                None,
+            )
             if b2:
                 self.adder.append((a, imports[a][0], b2))
         # Temporary snapshots: small files that import a root and that a root imports, with their first importer.
-        small = [f for f in ts_files if len(self.text[f].encode()) <= 25000 and imports[f] and importers[f]]
+        small = [
+            f
+            for f in ts_files
+            if len(self.text[f].encode()) <= 25000 and imports[f] and importers[f]
+        ]
         self.temp = [(t, importers[t][0]) for t in spread(small, 2)]
         self.emit_files = spread(big, 8)
         self.variants = spread(big, 5)
         self.jsx = spread(glob_files(pdir, cfg["jsx"], []), 5) if cfg.get("jsx") else []
         self.fixture = cfg.get("fixture") or []
         # The project's own compilerOptions (the bundler-plugin use of transpile), project dir as @PROJECT_DIR@.
-        self.options = Normalizer([(pdir, "@PROJECT_DIR@")]).strings(project.get("compilerOptions") or {})
+        self.options = Normalizer([(pdir, "@PROJECT_DIR@")]).strings(
+            project.get("compilerOptions") or {}
+        )
 
     def summary(self):
-        return {"extFiles": self.ext_files, "adder": self.adder, "temp": self.temp, "emitFiles": self.emit_files,
-                "variants": self.variants, "jsx": self.jsx, "fixture": self.fixture}
+        return {
+            "extFiles": self.ext_files,
+            "adder": self.adder,
+            "temp": self.temp,
+            "emitFiles": self.emit_files,
+            "variants": self.variants,
+            "jsx": self.jsx,
+            "fixture": self.fixture,
+        }
 
     def handle(self, rel, i):
         return self.samples[rel].handle(i, os.path.join(self.preset["dir"], rel))
@@ -2847,7 +3992,14 @@ def ext_file_trace(ext, rel):
     tb.req("getFullyQualifiedName", ck(), at(mod, "/id", "/symbol"))
     exports = tb.req("getExportsOfSymbol", obj(), at(mod, "/id", "/objectId"))
     for k in range(3):
-        about_symbol(at(exports, "", "/symbol", pick={"sortBy": ["name"], "index": k, "then": "/id"}))
+        about_symbol(
+            at(
+                exports,
+                "",
+                "/symbol",
+                pick={"sortBy": ["name"], "index": k, "then": "/id"},
+            )
+        )
     for i, pos in s.ids[:4]:
         a = tb.req("getSymbolAtPosition", ck(file=file, position=pos))
         about_symbol(at(a, "/id", "/symbol"))
@@ -2859,39 +4011,87 @@ def ext_file_trace(ext, rel):
         i, pos = s.ids[0]
         for meaning in (SF_TYPE_PARAMETER, SF_ALIAS, SF_BLOCK_SCOPED_VARIABLE):
             tb.req("getSymbolsInScope", ck(file=file, position=pos, meaning=meaning))
-        tb.req("getSymbolsInScope", ck(location=ext.handle(rel, i), meaning=SF_BLOCK_SCOPED_VARIABLE | SF_FUNCTION))
+        tb.req(
+            "getSymbolsInScope",
+            ck(
+                location=ext.handle(rel, i),
+                meaning=SF_BLOCK_SCOPED_VARIABLE | SF_FUNCTION,
+            ),
+        )
     # Type parameter handles come from TypeParameter nodes, gated on the type flag (design decision 8).
     is_tp = [{"pointer": "/flags", "mask": TF_TYPE_PARAMETER}]
-    tp_nodes = [j for j in range(1, enc.count) if enc.node(j)[0] == K["KindTypeParameter"]]
+    tp_nodes = [
+        j for j in range(1, enc.count) if enc.node(j)[0] == K["KindTypeParameter"]
+    ]
     for j in spread(tp_nodes, 3):
         t = tb.req("getTypeAtLocation", ck(location=ext.handle(rel, j)))
-        d = tb.req("getDefaultFromTypeParameter", obj(), at(t, "/id", "/objectId", when=is_tp))
+        d = tb.req(
+            "getDefaultFromTypeParameter", obj(), at(t, "/id", "/objectId", when=is_tp)
+        )
         tb.req("typeToString", ck(), at(d, "/id", "/type"))
-        tb.req("getConstraintOfTypeParameter", obj(), at(t, "/id", "/objectId", when=is_tp))
+        tb.req(
+            "getConstraintOfTypeParameter", obj(), at(t, "/id", "/objectId", when=is_tp)
+        )
     for i in s.calls[:2]:
         g = tb.req("getResolvedSignature", ck(location=ext.handle(rel, i)))
         for index in (0, 1):
-            tp = tb.req("getTypeParameterAtPosition", ck(index=index), at(g, "/id", "/signature"))
+            tp = tb.req(
+                "getTypeParameterAtPosition",
+                ck(index=index),
+                at(g, "/id", "/signature"),
+            )
             tb.req("typeToString", ck(), at(tp, "/id", "/type"))
     offs = u16_offsets(text)
     for i in s.sig_decls[:2]:
         t = tb.req("getTypeAtLocation", ck(location=ext.handle(rel, i)))
         sg = tb.req("getSignaturesOfType", ck(kind=SIG_CALL), at(t, "/id", "/type"))
-        tps = tb.req("getTypeParametersOfSignature", obj(),
-                     at(sg, "/0/id", "/objectId", when=[{"pointer": "/0/typeParameters", "nonzero": True}]))
+        tps = tb.req(
+            "getTypeParametersOfSignature",
+            obj(),
+            at(
+                sg,
+                "/0/id",
+                "/objectId",
+                when=[{"pointer": "/0/typeParameters", "nonzero": True}],
+            ),
+        )
         tb.req("getDefaultFromTypeParameter", obj(), at(tps, "/0/id", "/objectId"))
-        p_close = line_start_u16(text, offs, enc.node(i)[2] - 1)  # the line of the closing "}"
+        p_close = line_start_u16(
+            text, offs, enc.node(i)[2] - 1
+        )  # the line of the closing "}"
         body_end = first_statement_end(enc, i, K)
-        d1 = tb.req("signatureToSignatureDeclaration", ck(kind=K["KindMethodSignature"]), at(sg, "/0/id", "/signature"))
-        tb.req("formatNodeForInsertion", ck(file=file, position=p_close), at(d1, "/data", "/data"))
-        tb.req("formatNodeForInsertion", ck(file=file, position=0), at(d1, "/data", "/data"))
-        d2 = tb.req("signatureToSignatureDeclaration", ck(kind=K["KindFunctionDeclaration"]),
-                    at(sg, "/0/id", "/signature"))
-        tb.req("formatNodeForInsertion", ck(file=file, position=offs[-1]), at(d2, "/data", "/data"))
+        d1 = tb.req(
+            "signatureToSignatureDeclaration",
+            ck(kind=K["KindMethodSignature"]),
+            at(sg, "/0/id", "/signature"),
+        )
+        tb.req(
+            "formatNodeForInsertion",
+            ck(file=file, position=p_close),
+            at(d1, "/data", "/data"),
+        )
+        tb.req(
+            "formatNodeForInsertion",
+            ck(file=file, position=0),
+            at(d1, "/data", "/data"),
+        )
+        d2 = tb.req(
+            "signatureToSignatureDeclaration",
+            ck(kind=K["KindFunctionDeclaration"]),
+            at(sg, "/0/id", "/signature"),
+        )
+        tb.req(
+            "formatNodeForInsertion",
+            ck(file=file, position=offs[-1]),
+            at(d2, "/data", "/data"),
+        )
         tn = tb.req("typeToTypeNode", ck(), at(t, "/id", "/type"))
         if body_end is not None:
-            tb.req("formatNodeForInsertion", ck(file=file, position=line_start_u16(text, offs, body_end - 1)),
-                   at(tn, "/data", "/data"))
+            tb.req(
+                "formatNodeForInsertion",
+                ck(file=file, position=line_start_u16(text, offs, body_end - 1)),
+                at(tn, "/data", "/data"),
+            )
     return tb.events
 
 
@@ -2906,16 +4106,28 @@ def ext_misc_trace(ext):
     tb.req("getWellKnownSignatures", ck())
     tb.req("getSymbolsOfSourceFiles", ck(files=[pdir_file(f) for f in ext.ext_files]))
     tb.req("getSymbolsOfSourceFiles", ck(files=[]))
-    tb.req("getSymbolsOfSourceFiles", ck(files=[pdir_file(ext.files[0]), pdir_file("does/not/exist.ts")]))
+    tb.req(
+        "getSymbolsOfSourceFiles",
+        ck(files=[pdir_file(ext.files[0]), pdir_file("does/not/exist.ts")]),
+    )
     tb.req("getSymbolOfSourceFile", ck(file="bundled:///libs/lib.es5.d.ts"))
     first = ext.ext_files[0]
     pos = ext.samples[first].ids[0][1] if ext.samples[first].ids else 0
-    for meaning in (SF_VALUE, SF_TYPE):  # all globals: 0.4 to 0.7 MB each (design decision 11)
-        tb.req("getSymbolsInScope", ck(file=pdir_file(first), position=pos, meaning=meaning))
+    for meaning in (
+        SF_VALUE,
+        SF_TYPE,
+    ):  # all globals: 0.4 to 0.7 MB each (design decision 11)
+        tb.req(
+            "getSymbolsInScope",
+            ck(file=pdir_file(first), position=pos, meaning=meaning),
+        )
     # errors
     tb.req("getSymbolsInScope", ck(meaning=SF_VALUE))
     tb.req("getSymbolsInScope", ck(location="bad-handle", meaning=SF_VALUE))
-    call = next(((f, ext.samples[f].calls[0]) for f in ext.ext_files if ext.samples[f].calls), None)
+    call = next(
+        ((f, ext.samples[f].calls[0]) for f in ext.ext_files if ext.samples[f].calls),
+        None,
+    )
     if call:
         g = tb.req("getResolvedSignature", ck(location=ext.handle(*call)))
         tb.req("getTypeParameterAtPosition", ck(index=-1), at(g, "/id", "/signature"))
@@ -2938,7 +4150,10 @@ def ext_config_trace(ext):
     tb.req("getConfigSourceFile", ck(file=pdir_file("does/not/exist.json")))
     r = tb.req("readConfigFile", {"file": conf})
     tb.req("readConfigFile", {"file": preset["tsconfig"]})
-    tb.req("readConfigFile", {"file": {"uri": "file://" + os.path.join(preset["dir"], preset["tsconfig"])}})
+    tb.req(
+        "readConfigFile",
+        {"file": {"uri": "file://" + os.path.join(preset["dir"], preset["tsconfig"])}},
+    )
     x = tb.req("readConfigFile", {}, at(names, "/1", "/file"))
     tb.req("readConfigFile", {"file": "package.json"})
     tb.req("readConfigFile", {"file": "missing.json"})
@@ -2948,11 +4163,23 @@ def ext_config_trace(ext):
     tb.req(pj, {}, [at(x, "/config", "/json"), at(names, "/1", "/configFileName")])
     tb.req(pj, {"json": {}, "configDirectory": "@PROJECT_DIR@", "configFileName": conf})
     tb.req(pj, {"json": {}})
-    tb.req(pj, {"json": {"files": [None], "include": [None], "exclude": [None]}, "configDirectory": "@PROJECT_DIR@"})
+    tb.req(
+        pj,
+        {
+            "json": {"files": [None], "include": [None], "exclude": [None]},
+            "configDirectory": "@PROJECT_DIR@",
+        },
+    )
     first = ext.files[0]
-    for argv in (["-p", conf], ["-p", conf, "--noEmit", "--declaration", "--outDir", "out"],
-                 [first, "--target", "es2022", "--module", "nodenext", "--strict"],
-                 ["--lib", "es2022,dom", "--types", "node", first], ["--notAnOption"], ["--target", "es3000"], []):
+    for argv in (
+        ["-p", conf],
+        ["-p", conf, "--noEmit", "--declaration", "--outDir", "out"],
+        [first, "--target", "es2022", "--module", "nodenext", "--strict"],
+        ["--lib", "es2022,dom", "--types", "node", first],
+        ["--notAnOption"],
+        ["--target", "es3000"],
+        [],
+    ):
         tb.req("parseCommandLine", {"commandLine": argv})
     tb.req("parseConfigFile", {}, at(names, "/1", "/file"))
     return tb.events
@@ -2971,8 +4198,14 @@ def ext_adder_trace(ext):
         return at(ev, "", f"/actions/{slot}/symbol", pick=p)
 
     def adder(a, specs, **kw):
-        tb.req("getImportAdderEdits", ck(file=pdir_file(a), actions=[{"kind": "importSymbol", **kw} for _ in specs]),
-               specs)
+        tb.req(
+            "getImportAdderEdits",
+            ck(
+                file=pdir_file(a),
+                actions=[{"kind": "importSymbol", **kw} for _ in specs],
+            ),
+            specs,
+        )
 
     for a, b1, b2 in ext.adder:
         m = tb.req("getSymbolsOfSourceFiles", ck(files=[pdir_file(b1), pdir_file(b2)]))
@@ -2984,11 +4217,19 @@ def ext_adder_trace(ext):
         adder(a, [pick(e1, 0, 0), pick(e2, 0, 1)])  # two modules
         adder(a, [pick(e2, 0, 0, SF_TYPE)], isValidTypeOnlyUseSite=False)
     a = pdir_file(ext.adder[0][0])
-    for actions in ([{"kind": "unknown"}], [{"kind": "importSymbol", "symbol": 0}],
-                    [{"kind": "importSymbol", "symbol": 987654321}]):
+    for actions in (
+        [{"kind": "unknown"}],
+        [{"kind": "importSymbol", "symbol": 0}],
+        [{"kind": "importSymbol", "symbol": 987654321}],
+    ):
         tb.req("getImportAdderEdits", ck(file=a, actions=actions))
-    tb.req("getImportAdderEdits", ck(file=pdir_file("does/not/exist.ts"),
-                                     actions=[{"kind": "importSymbol", "symbol": 987654321}]))
+    tb.req(
+        "getImportAdderEdits",
+        ck(
+            file=pdir_file("does/not/exist.ts"),
+            actions=[{"kind": "importSymbol", "symbol": 987654321}],
+        ),
+    )
     return tb.events
 
 
@@ -2996,8 +4237,8 @@ def ext_temp_trace(ext):
     """Section 4.2 ext_temp: updateTemporarySnapshot (#4642, wave 2). Overlays only; no file is written."""
     tb = TraceBuilder()
     s1 = open_session(tb, ext.preset)
-    snap = lambda ev: at(ev, "/snapshot", "/snapshot")  # noqa: E731
-    pr = lambda **kw: {"project": "@PROJECT@", **kw}  # noqa: E731
+    snap = lambda ev: at(ev, "/snapshot", "/snapshot")
+    pr = lambda **kw: {"project": "@PROJECT@", **kw}
     first_x = None
     for t, imp in ext.temp:
         text, file = ext.text[t], pdir_file(t)
@@ -3007,7 +4248,11 @@ def ext_temp_trace(ext):
         first_x = first_x if first_x is not None else x
         tb.req("getSemanticDiagnostics", pr(files=[file]), snap(x))
         tb.req("getSyntacticDiagnostics", pr(files=[file]), snap(x))
-        ty = tb.req("getTypeAtPosition", pr(file=file, position=utf16_len(text) + len("\nexport const ")), snap(x))
+        ty = tb.req(
+            "getTypeAtPosition",
+            pr(file=file, position=utf16_len(text) + len("\nexport const ")),
+            snap(x),
+        )
         tb.req("typeToString", pr(), [snap(x), at(ty, "/id", "/type")])
         tb.req("getSourceFile", pr(file=file), snap(x))
         tb.req("getSemanticDiagnostics", pr(files=[pdir_file(imp)]), snap(x))
@@ -3017,12 +4262,18 @@ def ext_temp_trace(ext):
         tb.req("release", {}, snap(x))
         tb.req("getSemanticDiagnostics", pr(files=[file]), snap(s1))
         tb.req("getSourceFile", pr(file=file), snap(s1))
-        z_file = pdir_file(os.path.join(os.path.dirname(t), "__api_oracle_temp.ts"))  # not on disk
-        z_text = f"import * as m from \"./{os.path.splitext(os.path.basename(t))[0]}\";\nexport const probe = m;\n"
+        z_file = pdir_file(
+            os.path.join(os.path.dirname(t), "__api_oracle_temp.ts")
+        )  # not on disk
+        z_text = f'import * as m from "./{os.path.splitext(os.path.basename(t))[0]}";\nexport const probe = m;\n'
         z = tb.temp({"file": z_file, "newText": z_text}, snap(s1))
         tb.req("getDefaultProjectForFile", {"file": z_file}, snap(z))
         tb.req("getSemanticDiagnostics", pr(files=[z_file]), snap(z))
-        tb.req("getTypeAtPosition", pr(file=z_file, position=z_text.index("probe")), snap(z))
+        tb.req(
+            "getTypeAtPosition",
+            pr(file=z_file, position=z_text.index("probe")),
+            snap(z),
+        )
         tb.req("release", {}, snap(z))
     t0 = pdir_file(ext.temp[0][0])
     tb.temp({"file": pdir_file("notes.txt"), "newText": "x"}, snap(s1))
@@ -3048,7 +4299,14 @@ def ext_emit_trace(ext):
     tb.req("getJavaScriptEmit", ck(files=files[:5]))
     tb.req("getDeclarationEmit", ck(files=files[:5]))
     tb.req("getJavaScriptEmit", ck(files=[]))
-    tb.req("getDeclarationEmit", ck(files=[{"uri": "file://" + os.path.join(ext.preset["dir"], ext.emit_files[0])}]))
+    tb.req(
+        "getDeclarationEmit",
+        ck(
+            files=[
+                {"uri": "file://" + os.path.join(ext.preset["dir"], ext.emit_files[0])}
+            ]
+        ),
+    )
     tb.req("getJavaScriptEmit", ck(files=[pdir_file("does/not/exist.ts")]))
     tb.req("getJavaScriptEmit", ck())
     return tb.events
@@ -3060,21 +4318,52 @@ def ext_emit_fixture_trace(ext):
     names = [os.path.basename(rel) for rel in ext.fixture]
     fx = {}
     for rel in ext.fixture:
-        with open(os.path.join(ext.preset["dir"], rel), encoding="utf-8", newline="") as f:
+        with open(
+            os.path.join(ext.preset["dir"], rel), encoding="utf-8", newline=""
+        ) as f:
             fx["emitfx/" + os.path.basename(rel)] = f.read()
-    config = {"compilerOptions": {"target": "es2020", "module": "esnext", "moduleResolution": "bundler",
-                                  "lib": ["es2022", "dom"], "strict": True, "declaration": True, "declarationMap": True,
-                                  "sourceMap": True, "outDir": "out", "types": []}, "files": names}
+    config = {
+        "compilerOptions": {
+            "target": "es2020",
+            "module": "esnext",
+            "moduleResolution": "bundler",
+            "lib": ["es2022", "dom"],
+            "strict": True,
+            "declaration": True,
+            "declarationMap": True,
+            "sourceMap": True,
+            "outDir": "out",
+            "types": [],
+        },
+        "files": names,
+    }
     fx["emitfx/tsconfig.json"] = json.dumps(config, indent=2) + "\n"
-    fx["emitfx/tsconfig.noemit.json"] = json.dumps({"extends": "./tsconfig.json", "compilerOptions": {"noEmit": True}},
-                                                   indent=2) + "\n"
-    fx["emitfx/tsconfig.errors.json"] = json.dumps({"extends": "./tsconfig.json",
-                                                    "compilerOptions": {"noEmitOnError": True},
-                                                    "files": names + ["bad.ts"]}, indent=2) + "\n"
-    fx["emitfx/bad.ts"] = "export const n: number = \"x\";\n"
-    fx["emitfx/bad.json"] = "{\n  \"compilerOptions\": {\n    \"strict\" true\n  }\n}\n"
-    cfg = lambda name: "@RUN_DIR@/emitfx/" + name  # noqa: E731
-    ck = lambda name, **kw: {"snapshot": "@SNAPSHOT@", "project": "@PROJECT:" + cfg(name) + "@", **kw}  # noqa: E731
+    fx["emitfx/tsconfig.noemit.json"] = (
+        json.dumps(
+            {"extends": "./tsconfig.json", "compilerOptions": {"noEmit": True}},
+            indent=2,
+        )
+        + "\n"
+    )
+    fx["emitfx/tsconfig.errors.json"] = (
+        json.dumps(
+            {
+                "extends": "./tsconfig.json",
+                "compilerOptions": {"noEmitOnError": True},
+                "files": names + ["bad.ts"],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    fx["emitfx/bad.ts"] = 'export const n: number = "x";\n'
+    fx["emitfx/bad.json"] = '{\n  "compilerOptions": {\n    "strict" true\n  }\n}\n'
+    cfg = lambda name: "@RUN_DIR@/emitfx/" + name
+    ck = lambda name, **kw: {
+        "snapshot": "@SNAPSHOT@",
+        "project": "@PROJECT:" + cfg(name) + "@",
+        **kw,
+    }
     tb = TraceBuilder()
     tb.req("initialize")
     tb.snap(open_params(cfg("tsconfig.json")))
@@ -3084,7 +4373,9 @@ def ext_emit_fixture_trace(ext):
     tb.req("emitToString", ck("tsconfig.json"))
     tb.snap(open_params(cfg("tsconfig.noemit.json")))
     tb.req("emit", ck("tsconfig.noemit.json"))  # skipped: noEmit
-    tb.req("getJavaScriptEmit", ck("tsconfig.noemit.json", files=[cfg(names[0])]))  # forced
+    tb.req(
+        "getJavaScriptEmit", ck("tsconfig.noemit.json", files=[cfg(names[0])])
+    )  # forced
     tb.snap(open_params(cfg("tsconfig.errors.json")))
     tb.req("emit", ck("tsconfig.errors.json"))  # skipped: noEmitOnError and TS2322
     tb.req("emitToString", ck("tsconfig.errors.json"))
@@ -3095,10 +4386,23 @@ def ext_emit_fixture_trace(ext):
 TRANSPILE_MODULE_SETS = [
     ({"module": 1, "target": 9, "sourceMap": True, "esModuleInterop": True}, True),
     ({"module": 199, "target": 99, "verbatimModuleSyntax": True}, True),
-    ({"module": 99, "target": 9, "inlineSourceMap": True, "inlineSources": True, "removeComments": True}, True),
+    (
+        {
+            "module": 99,
+            "target": 9,
+            "inlineSourceMap": True,
+            "inlineSources": True,
+            "removeComments": True,
+        },
+        True,
+    ),
     ({"module": 99, "target": 2, "experimentalDecorators": True}, True),
-    ({}, False)]
-TRANSPILE_DECLARATION_SETS = [({"declarationMap": True}, True), ({"stripInternal": True, "target": 99}, True)]
+    ({}, False),
+]
+TRANSPILE_DECLARATION_SETS = [
+    ({"declarationMap": True}, True),
+    ({"stripInternal": True, "target": 99}, True),
+]
 TRANSPILE_SYNTAX_ERROR = "const x: = 1;\nexport {}"
 
 
@@ -3107,42 +4411,85 @@ def ext_transpile_trace(ext, declaration):
     Go panics on a .d.ts input ("Output generation failed"); the event stays (design decision 10)."""
     tb = TraceBuilder()
     tb.req("initialize")
-    m_file = "transpileDeclarationFromFile" if declaration else "transpileModuleFromFile"
+    m_file = (
+        "transpileDeclarationFromFile" if declaration else "transpileModuleFromFile"
+    )
     m_text = "transpileDeclaration" if declaration else "transpileModule"
+
     def from_file(f, options, report=True):
-        tb.req(m_file, {"fileName": pdir_file(f), "options": {"compilerOptions": options, "reportDiagnostics": report}})
+        tb.req(
+            m_file,
+            {
+                "fileName": pdir_file(f),
+                "options": {"compilerOptions": options, "reportDiagnostics": report},
+            },
+        )
 
     for f in ext.files:
         from_file(f, ext.options)
     for f in ext.variants:
-        for options, report in TRANSPILE_DECLARATION_SETS if declaration else TRANSPILE_MODULE_SETS:
+        for options, report in (
+            TRANSPILE_DECLARATION_SETS if declaration else TRANSPILE_MODULE_SETS
+        ):
             from_file(f, options, report)
     inline = {"compilerOptions": {"module": 99, "target": 9}, "reportDiagnostics": True}
     for f in ext.variants[:2]:
         tb.req(m_text, {"input": ext.text[f], "options": {**inline, "fileName": f}})
     if declaration:
-        tb.req(m_text, {"input": TRANSPILE_SYNTAX_ERROR, "options": {"reportDiagnostics": True}})
-        tb.req(m_text, {"input": "export function f(a) { return a; }\n", "options": {"reportDiagnostics": True}})
+        tb.req(
+            m_text,
+            {"input": TRANSPILE_SYNTAX_ERROR, "options": {"reportDiagnostics": True}},
+        )
+        tb.req(
+            m_text,
+            {
+                "input": "export function f(a) { return a; }\n",
+                "options": {"reportDiagnostics": True},
+            },
+        )
     else:
-        tb.req(m_text, {"input": ext.text[ext.variants[0]], "options": inline})  # Go default name module.ts
-        tb.req(m_text, {"input": TRANSPILE_SYNTAX_ERROR, "options": {"reportDiagnostics": True}})
-        tb.req(m_text, {"input": TRANSPILE_SYNTAX_ERROR, "options": {"reportDiagnostics": False}})
+        tb.req(
+            m_text, {"input": ext.text[ext.variants[0]], "options": inline}
+        )  # Go default name module.ts
+        tb.req(
+            m_text,
+            {"input": TRANSPILE_SYNTAX_ERROR, "options": {"reportDiagnostics": True}},
+        )
+        tb.req(
+            m_text,
+            {"input": TRANSPILE_SYNTAX_ERROR, "options": {"reportDiagnostics": False}},
+        )
         tb.req(m_text, {"input": "", "options": {}})
-        tb.req(m_text, {"input": "import x = require(\"y\");\nexport = x;\n",
-                        "options": {"compilerOptions": {"module": 1}}})
+        tb.req(
+            m_text,
+            {
+                "input": 'import x = require("y");\nexport = x;\n',
+                "options": {"compilerOptions": {"module": 1}},
+            },
+        )
         for f in ext.jsx:
-            from_file(f, {"jsx": 4, "jsxImportSource": "hono/jsx", "module": 99, "target": 9})
+            from_file(
+                f, {"jsx": 4, "jsxImportSource": "hono/jsx", "module": 99, "target": 9}
+            )
             from_file(f, {"jsx": 1})
         if ext.jsx:
-            tb.req(m_text, {"input": "export const el = <div id=\"a\">{1}</div>;\n",
-                            "options": {"compilerOptions": {"jsx": 4}, "reportDiagnostics": True}})  # module.tsx
+            tb.req(
+                m_text,
+                {
+                    "input": 'export const el = <div id="a">{1}</div>;\n',
+                    "options": {
+                        "compilerOptions": {"jsx": 4},
+                        "reportDiagnostics": True,
+                    },
+                },
+            )  # module.tsx
     tb.req(m_file, {"fileName": pdir_file("does/not/exist.ts"), "options": {}})
     return tb.events
 
 
 def ext_traces(ext, battery):
     """(header, events) of every ext trace (section 3)."""
-    h = lambda name, **kw: trace_header(name, battery, ext.preset, **kw)  # noqa: E731
+    h = lambda name, **kw: trace_header(name, battery, ext.preset, **kw)
     for rel in ext.ext_files:
         yield h("ext_file_" + slug(rel), file=rel), ext_file_trace(ext, rel)
     yield h("ext_misc"), ext_misc_trace(ext)
@@ -3165,9 +4512,16 @@ def check_emit_guard(header, events):
         if ev.get("method") != "emit":
             continue
         project = (ev.get("params") or {}).get("project")
-        if "writeFile" not in (header.get("callbacks") or []) or not header.get("fixture") or ev.get("paramsFrom") \
-                or not isinstance(project, str) or not project.startswith("@PROJECT:@RUN_DIR@/"):
-            raise HarnessError(f"{header['name']} event {k}: emit outside a fixture project")
+        if (
+            "writeFile" not in (header.get("callbacks") or [])
+            or not header.get("fixture")
+            or ev.get("paramsFrom")
+            or not isinstance(project, str)
+            or not project.startswith("@PROJECT:@RUN_DIR@/")
+        ):
+            raise HarnessError(
+                f"{header['name']} event {k}: emit outside a fixture project"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -3188,12 +4542,18 @@ def main(argv=None):
         p.add_argument("--request-timeout", type=float)
         p.add_argument("--keep-temp", action="store_true")
 
-    p = sub.add_parser("build", help="write traces for a project (runs the oracle once to find nodes)")
+    p = sub.add_parser(
+        "build", help="write traces for a project (runs the oracle once to find nodes)"
+    )
     p.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
     p.add_argument("--oracle", default=DEFAULT_ORACLE)
     p.add_argument("--preset", required=True)
     p.add_argument("--battery", required=True)
-    p.add_argument("--kind", default="files", choices=["files", "proto", "callbacks", "lsp", "xchecker", "ext"])
+    p.add_argument(
+        "--kind",
+        default="files",
+        choices=["files", "proto", "callbacks", "lsp", "xchecker", "ext"],
+    )
     p.add_argument("--limit", type=int, help="first N files")
     p.add_argument("--sample", type=int, help="N files spread over the list")
     p.add_argument("--cap", action="append", help="override a sample cap, e.g. ids=4")
@@ -3212,8 +4572,13 @@ def main(argv=None):
     p.add_argument("--goport", required=True)
     p.add_argument("--label", required=True)
     p.add_argument("--oracle-sha", help="golden set (default: hash of --oracle)")
-    p.add_argument("--wire", type=int, choices=[3], help="send the snapshot events of protocol 4 traces in "
-                   "their protocol 3 form (a ruling 10 rebase run of base bins; needs a reviewer ruling)")
+    p.add_argument(
+        "--wire",
+        type=int,
+        choices=[3],
+        help="send the snapshot events of protocol 4 traces in "
+        "their protocol 3 form (a ruling 10 rebase run of base bins; needs a reviewer ruling)",
+    )
     p = sub.add_parser("summary")
     p.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
     p.add_argument("--label", required=True)
@@ -3226,8 +4591,14 @@ def main(argv=None):
     p.add_argument("--event", required=True)
     p.add_argument("--max-lines", type=int, default=120)
     args = ap.parse_args(argv)
-    fn = {"build": cmd_build, "record": cmd_record, "selfcheck": cmd_selfcheck, "check": cmd_check,
-          "summary": cmd_summary, "show": cmd_show}[args.cmd]
+    fn = {
+        "build": cmd_build,
+        "record": cmd_record,
+        "selfcheck": cmd_selfcheck,
+        "check": cmd_check,
+        "summary": cmd_summary,
+        "show": cmd_show,
+    }[args.cmd]
     try:
         return fn(args)
     except UsageError as e:
@@ -3243,6 +4614,16 @@ def main(argv=None):
 
 if __name__ == "__main__":
     if os.environ.get("GOPORT_PIN") and not os.environ.get("GOPORT_PIN_ACTIVE"):
-        os.execvp(sys.executable, [sys.executable, PIN_TOOL, "exec", "--", sys.executable,
-                                   os.path.abspath(__file__), *sys.argv[1:]])
+        os.execvp(
+            sys.executable,
+            [
+                sys.executable,
+                PIN_TOOL,
+                "exec",
+                "--",
+                sys.executable,
+                os.path.abspath(__file__),
+                *sys.argv[1:],
+            ],
+        )
     sys.exit(main())

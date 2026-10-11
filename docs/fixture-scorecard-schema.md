@@ -27,28 +27,28 @@ contains `fixedShard`:
 - the ordered-key `digest` and `digestAlgorithm`; and
 - `variantCount`.
 
-This is additive schema-5 provenance. `manifestDigest` remains the digest of
-the complete upstream oracle manifest, so selection identity never replaces or
+This is additive schema-5 provenance. `manifestDigest` remains the digest of the
+complete upstream oracle manifest, so selection identity never replaces or
 changes the discovery identity.
 
 ## Stable variant identity
 
-Every variant has a `variantKey` in the form `v1:<32 lowercase hex digits>`.
-The v1 identity hashes length-delimited fields for the repository-relative case
+Every variant has a `variantKey` in the form `v1:<32 lowercase hex digits>`. The
+v1 identity hashes length-delimited fields for the repository-relative case
 path, compiler-option names normalized to lowercase, canonical option values,
-the expected baseline path, and the complete expected baseline contents.
-Aliases such as `target=es6` and `target=es2015` therefore have the same
-identity, while a changed oracle produces a new identity.
+the expected baseline path, and the complete expected baseline contents. Aliases
+such as `target=es6` and `target=es2015` therefore have the same identity, while
+a changed oracle produces a new identity.
 
 Fixed shard manifests must store these complete keys. A future identity
-algorithm requires a new key prefix and an explicit manifest migration.
-The runner discovers the complete oracle manifest, requires each unique named
-case to resolve exactly once to a runnable case, and fully expands only those
-named cases before resolving fixed keys. It requires each key to resolve
-exactly once, checks redundant case/option/baseline/source metadata against
-discovery, and executes the resolved variants in manifest order. Fixed
-execution also requires a clean upstream checkout at the manifest's exact Git
-SHA and oracle-manifest digest.
+algorithm requires a new key prefix and an explicit manifest migration. The
+runner discovers the complete oracle manifest, requires each unique named case
+to resolve exactly once to a runnable case, and fully expands only those named
+cases before resolving fixed keys. It requires each key to resolve exactly once,
+checks redundant case/option/baseline/source metadata against discovery, and
+executes the resolved variants in manifest order. Fixed execution also requires
+a clean upstream checkout at the manifest's exact Git SHA and oracle-manifest
+digest.
 
 ## Outcome and frontier fields
 
@@ -56,8 +56,7 @@ SHA and oracle-manifest digest.
 
 - `exact`;
 - `harness_config` for a fixture option or artifact fidelity boundary;
-- `checker_capability` for a typed, intentionally unsupported compiler
-  boundary;
+- `checker_capability` for a typed, intentionally unsupported compiler boundary;
 - `supported_mismatch` when the checker ran but its artifact differs; or
 - `fatal_invariant` for a typed compiler invariant failure or a caught canonical
   checker unwind.
@@ -73,17 +72,18 @@ unsupported results. Version 5 additionally permits `fatal_invariant` and adds
 
 Canonical checker capability and invariant results are retained per variant;
 later variants continue to execute. Either outcome still makes the command exit
+
 1. A fixture filesystem I/O failure remains a process-level harness error and
-exits 2 because reliable scorecard persistence cannot be assumed.
+   exits 2 because reliable scorecard persistence cannot be assumed.
 
 The runner isolates only the call to the canonical checker program constructor;
 fixture parsing, filesystem setup, baseline I/O, and legacy checking remain
-outside the unwind boundary. A checker panic is retained as
-`INV.CHECKER.PANIC`, with its string payload copied verbatim into the blocker
-detail after a stable `canonical checker panicked:` prefix. Non-string payloads
-use the deterministic `<non-string panic payload>` marker. Panic outcomes are
-fatal invariants, never capabilities, and do not stop later variants or JSON
-persistence. The normal panic hook is not replaced or suppressed.
+outside the unwind boundary. A checker panic is retained as `INV.CHECKER.PANIC`,
+with its string payload copied verbatim into the blocker detail after a stable
+`canonical checker panicked:` prefix. Non-string payloads use the deterministic
+`<non-string panic payload>` marker. Panic outcomes are fatal invariants, never
+capabilities, and do not stop later variants or JSON persistence. The normal
+panic hook is not replaced or suppressed.
 
 This isolation contract requires a binary built with `panic="unwind"`. A
 `panic="abort"` build rejects canonical diagnostic execution explicitly as a

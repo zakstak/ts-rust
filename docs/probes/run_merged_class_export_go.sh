@@ -33,9 +33,9 @@ check_upstream() {
 check_upstream
 mkdir -p "$out/go-cache" "$out/go-tmp"
 sha256sum "$0" "$cases" "$probe" "$go" "$upstream/go.mod" "$upstream/go.sum" \
-  > "$out/go-inputs.sha256"
+  >"$out/go-inputs.sha256"
 jq -n --arg target "$upstream/internal/checker/zz_wave152_merged_class_exports_test.go" \
-  --arg source "$probe" '{Replace:{($target):$source}}' > "$out/go-overlay.json"
+  --arg source "$probe" '{Replace:{($target):$source}}' >"$out/go-overlay.json"
 
 export GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOWORK=off GOFLAGS=
 export GOMAXPROCS=1 GOMEMLIMIT=15032385536 GOTELEMETRY=off
@@ -46,18 +46,18 @@ export TS_MERGED_EXPORT_GO_REPORT="$out/go-observations.json"
 build_status=0
 timeout 900s "$go" -C "$upstream" test -mod=readonly -vet=off -p 1 \
   -overlay "$out/go-overlay.json" -c -o "$out/go-observer" ./internal/checker \
-  > "$out/go-build.log" 2>&1 || build_status=$?
+  >"$out/go-build.log" 2>&1 || build_status=$?
 if ((build_status != 0)); then
-  sha256sum --check "$out/go-inputs.sha256" > "$out/go-input-check.log"
+  sha256sum --check "$out/go-inputs.sha256" >"$out/go-input-check.log"
   check_upstream
   exit "$build_status"
 fi
 run_status=0
 timeout 900s "$out/go-observer" -test.run '^TestWave152MergedClassExportSemantics$' \
   -test.count=1 -test.parallel=1 -test.v -test.timeout=900s \
-  > "$out/go-run.log" 2>&1 || run_status=$?
-sha256sum --check "$out/go-inputs.sha256" > "$out/go-input-check.log"
+  >"$out/go-run.log" 2>&1 || run_status=$?
+sha256sum --check "$out/go-inputs.sha256" >"$out/go-input-check.log"
 check_upstream
-sha256sum "$out/go-observer" "$out/go-observations.json" > "$out/go-results.sha256"
+sha256sum "$out/go-observer" "$out/go-observations.json" >"$out/go-results.sha256"
 printf 'Pinned Go merged-class observations completed. Upstream remains clean.\n'
 exit "$run_status"

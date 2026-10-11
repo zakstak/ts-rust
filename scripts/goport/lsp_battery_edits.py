@@ -52,8 +52,12 @@ from pathlib import Path
 
 REPO = Path("/home/theo/Code/sandbox/ts-rust")
 INPUTS = REPO / "target/project-inputs"
-LSP_BATTERY_PY = Path(os.environ.get(
-    "LSP_BATTERY_PY", REPO / "target/worktrees/goport-int7/scripts/goport/lsp_battery.py"))
+LSP_BATTERY_PY = Path(
+    os.environ.get(
+        "LSP_BATTERY_PY",
+        REPO / "target/worktrees/goport-int7/scripts/goport/lsp_battery.py",
+    )
+)
 
 
 def load_lsp_battery(path: Path):
@@ -75,27 +79,72 @@ UTF8, UTF16 = lb.POSITION_ENCODING_KIND_UTF8, lb.POSITION_ENCODING_KIND_UTF16
 CREATED, CHANGED, DELETED = 1, 2, 3
 
 PROJECTS = [
-    {"name": "query-core", "root": INPUTS / "query/source/packages/query-core",
-     "include": ["src/*"], "exclude": ["*/__tests__/*"], "expectFiles": 23},
-    {"name": "hono", "root": INPUTS / "hono/source",
-     "include": ["src/*"], "exclude": ["*.test.ts", "*.test.tsx"], "expectFiles": 188},
-    {"name": "zod", "root": INPUTS / "zod/source/packages/zod",
-     "include": ["src/*"], "exclude": ["*/tests/*", "*.test.ts"], "expectFiles": 131},
+    {
+        "name": "query-core",
+        "root": INPUTS / "query/source/packages/query-core",
+        "include": ["src/*"],
+        "exclude": ["*/__tests__/*"],
+        "expectFiles": 23,
+    },
+    {
+        "name": "hono",
+        "root": INPUTS / "hono/source",
+        "include": ["src/*"],
+        "exclude": ["*.test.ts", "*.test.tsx"],
+        "expectFiles": 188,
+    },
+    {
+        "name": "zod",
+        "root": INPUTS / "zod/source/packages/zod",
+        "include": ["src/*"],
+        "exclude": ["*/tests/*", "*.test.ts"],
+        "expectFiles": 131,
+    },
 ]
 
 # didChangeConfiguration variants (Go: ls/lsutil/userpreferences.go and formatcodeoptions.go config paths).
 PREF_VARIANTS = [
-    {"preferences": {"quoteStyle": "single", "importModuleSpecifier": "relative",
-                     "importModuleSpecifierEnding": "js"}},
-    {"preferences": {"quoteStyle": "double", "importModuleSpecifier": "non-relative",
-                     "importModuleSpecifierEnding": "minimal", "preferTypeOnlyAutoImports": True}},
-    {"preferences": {"importModuleSpecifier": "project-relative", "importModuleSpecifierEnding": "index",
-                     "organizeImports": {"caseSensitivity": "caseInsensitive", "unicodeCollation": "unicode",
-                                         "typeOrder": "first"}},
-     "format": {"semicolons": "remove", "insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": False}},
-    {"suggest": {"autoImports": False, "includeCompletionsForImportStatements": False},
-     "format": {"semicolons": "insert", "insertSpaceBeforeFunctionParenthesis": True,
-                "placeOpenBraceOnNewLineForFunctions": True}},
+    {
+        "preferences": {
+            "quoteStyle": "single",
+            "importModuleSpecifier": "relative",
+            "importModuleSpecifierEnding": "js",
+        }
+    },
+    {
+        "preferences": {
+            "quoteStyle": "double",
+            "importModuleSpecifier": "non-relative",
+            "importModuleSpecifierEnding": "minimal",
+            "preferTypeOnlyAutoImports": True,
+        }
+    },
+    {
+        "preferences": {
+            "importModuleSpecifier": "project-relative",
+            "importModuleSpecifierEnding": "index",
+            "organizeImports": {
+                "caseSensitivity": "caseInsensitive",
+                "unicodeCollation": "unicode",
+                "typeOrder": "first",
+            },
+        },
+        "format": {
+            "semicolons": "remove",
+            "insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": False,
+        },
+    },
+    {
+        "suggest": {
+            "autoImports": False,
+            "includeCompletionsForImportStatements": False,
+        },
+        "format": {
+            "semicolons": "insert",
+            "insertSpaceBeforeFunctionParenthesis": True,
+            "placeOpenBraceOnNewLineForFunctions": True,
+        },
+    },
 ]
 
 
@@ -145,8 +194,17 @@ class Doc:
 
     def open(self, tr):
         self.version = 1
-        tr.notification("textDocument/didOpen", {"textDocument": {
-            "uri": self.uri, "languageId": self.language_id, "version": 1, "text": self.text.decode("utf-8")}})
+        tr.notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": self.uri,
+                    "languageId": self.language_id,
+                    "version": 1,
+                    "text": self.text.decode("utf-8"),
+                }
+            },
+        )
 
     def change(self, tr, edits: list[tuple[int, int, bytes]]):
         """One didChange with incremental edits, applied in order. Offsets refer to the text
@@ -155,22 +213,39 @@ class Doc:
         for start, end, new in edits:
             rng = self.rng(start, end)
             # The server applies the range with LineAndCharacterToPosition; check it lands where we splice.
-            assert self.conv.from_lsp_range(self.script, rng) == (start, end), (self.rel, start, end)
+            assert self.conv.from_lsp_range(self.script, rng) == (start, end), (
+                self.rel,
+                start,
+                end,
+            )
             changes.append({"range": rng, "text": new.decode("utf-8")})
             self.set(self.text[:start] + new + self.text[end:])
         self.version += 1
-        tr.notification("textDocument/didChange", {
-            "textDocument": {"uri": self.uri, "version": self.version}, "contentChanges": changes})
+        tr.notification(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": self.uri, "version": self.version},
+                "contentChanges": changes,
+            },
+        )
 
     def replace_all(self, tr, new: bytes):
         self.version += 1
-        tr.notification("textDocument/didChange", {
-            "textDocument": {"uri": self.uri, "version": self.version},
-            "contentChanges": [{"text": new.decode("utf-8")}]})
+        tr.notification(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": self.uri, "version": self.version},
+                "contentChanges": [{"text": new.decode("utf-8")}],
+            },
+        )
         self.set(new)
 
     def names(self, start: int = 0) -> list:
-        return [t for i, t in enumerate(self.toks) if t.start >= start and lb.is_name(self.toks, i)]
+        return [
+            t
+            for i, t in enumerate(self.toks)
+            if t.start >= start and lb.is_name(self.toks, i)
+        ]
 
     def after_first_rune(self, offset: int) -> int:
         return offset + lb.decode_rune_in_string(self.text, offset)[1]
@@ -180,12 +255,20 @@ def initialize_params(encoding: str, push: bool = False, watch: bool = False) ->
     m = manifest()
     caps = lb.get_capabilities_with_defaults(encoding)
     if watch:
-        caps["workspace"]["didChangeWatchedFiles"] = {"dynamicRegistration": True, "relativePatternSupport": True}
+        caps["workspace"]["didChangeWatchedFiles"] = {
+            "dynamicRegistration": True,
+            "relativePatternSupport": True,
+        }
     opts = dict(m["initializationOptions"])
     if push:
         opts["disablePushDiagnostics"] = False
-    return {"processId": None, "rootUri": lb.ROOT_URI_PLACEHOLDER, "locale": "en-US",
-            "capabilities": caps, "initializationOptions": opts}
+    return {
+        "processId": None,
+        "rootUri": lb.ROOT_URI_PLACEHOLDER,
+        "locale": "en-US",
+        "capabilities": caps,
+        "initializationOptions": opts,
+    }
 
 
 def ata_off() -> dict:
@@ -195,7 +278,9 @@ def ata_off() -> dict:
 def configure(tr, variant: dict | None):
     settings = json.loads(json.dumps(ata_off()))
     settings.update(variant or {})
-    tr.notification("workspace/didChangeConfiguration", {"settings": {"js/ts": settings}})
+    tr.notification(
+        "workspace/didChangeConfiguration", {"settings": {"js/ts": settings}}
+    )
 
 
 spread = lb.spread  # all items, or `cap` items spaced evenly
@@ -230,8 +315,12 @@ def import_statements(doc: Doc) -> list[dict]:
         while j < len(toks) and toks[j].kind != "str" and toks[j].kind != ";":
             if toks[j].kind == "{":
                 braces = True
-            elif (braces and toks[j].kind == "id" and toks[j].text not in ("type", "as")
-                  and not (j + 1 < len(toks) and toks[j + 1].text == "as")):
+            elif (
+                braces
+                and toks[j].kind == "id"
+                and toks[j].text not in ("type", "as")
+                and not (j + 1 < len(toks) and toks[j + 1].text == "as")
+            ):
                 names.append(toks[j].text)
             j += 1
         if j >= len(toks) or toks[j].kind != "str":
@@ -251,7 +340,8 @@ def module_strings(doc: Doc) -> list:
             continue
         p = toks[i - 1]
         if (p.kind == "id" and p.text in ("from", "import")) or (
-                p.kind == "(" and i > 1 and toks[i - 2].text in ("import", "require")):
+            p.kind == "(" and i > 1 and toks[i - 2].text in ("import", "require")
+        ):
             out.append(t)
     return out
 
@@ -260,7 +350,11 @@ def interfaces(doc: Doc) -> list[tuple[str, int]]:
     """(name, type parameter count) of interfaces declared in the file."""
     toks, out = doc.toks, []
     for i in range(len(toks) - 1):
-        if toks[i].text != "interface" or toks[i].kind != "id" or not lb.is_name(toks, i + 1):
+        if (
+            toks[i].text != "interface"
+            or toks[i].kind != "id"
+            or not lb.is_name(toks, i + 1)
+        ):
             continue
         if i > 0 and toks[i - 1].kind in (".", "?."):
             continue
@@ -279,8 +373,16 @@ def interfaces(doc: Doc) -> list[tuple[str, int]]:
     return out
 
 
-DECL_KEYWORDS = {"const": "value", "let": "value", "var": "value", "function": "value", "class": "value",
-                 "enum": "value", "interface": "type", "type": "type"}
+DECL_KEYWORDS = {
+    "const": "value",
+    "let": "value",
+    "var": "value",
+    "function": "value",
+    "class": "value",
+    "enum": "value",
+    "interface": "type",
+    "type": "type",
+}
 
 
 def exported_names(doc: Doc) -> list[tuple[str, str]]:
@@ -298,7 +400,12 @@ def exported_names(doc: Doc) -> list[tuple[str, str]]:
         j += 1
         if j < len(toks) and toks[j].kind == "*":
             j += 1
-        if j + 1 < len(toks) and toks[j].kind == "id" and toks[j + 1].kind != "<" and len(toks[j].text) >= 4:
+        if (
+            j + 1 < len(toks)
+            and toks[j].kind == "id"
+            and toks[j + 1].kind != "<"
+            and len(toks[j].text) >= 4
+        ):
             out.append((toks[j].text, kind))
     return out
 
@@ -306,8 +413,11 @@ def exported_names(doc: Doc) -> list[tuple[str, str]]:
 def calls(doc: Doc) -> list[tuple[int, int]]:
     """(open paren index, close paren index) of call-like parens after a name."""
     match = lb.match_brackets(doc.toks)
-    return [(i, match[i]) for i, t in enumerate(doc.toks)
-            if t.kind == "(" and i > 0 and lb.is_name(doc.toks, i - 1) and i in match]
+    return [
+        (i, match[i])
+        for i, t in enumerate(doc.toks)
+        if t.kind == "(" and i > 0 and lb.is_name(doc.toks, i - 1) and i in match
+    ]
 
 
 def line_of(doc: Doc, offset: int) -> int:
@@ -324,14 +434,27 @@ def line_span(doc: Doc, line: int) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 
 
-def completion(tr, doc: Doc, offset: int, trigger: str | None = None, kind: int | None = None, resolve: int = 1):
+def completion(
+    tr,
+    doc: Doc,
+    offset: int,
+    trigger: str | None = None,
+    kind: int | None = None,
+    resolve: int = 1,
+):
     ctx = {"triggerKind": kind or (2 if trigger else 1)}
     if trigger:
         ctx["triggerCharacter"] = trigger
     ev = tr.request("textDocument/completion", {**doc.tdp(offset), "context": ctx})
     for i in range(resolve):
-        tr.request("completionItem/resolve", params_from={
-            "event": ev, "pointer": "/items", "pick": {"sortBy": ["sortText", "label"], "index": i}})
+        tr.request(
+            "completionItem/resolve",
+            params_from={
+                "event": ev,
+                "pointer": "/items",
+                "pick": {"sortBy": ["sortText", "label"], "index": i},
+            },
+        )
     return ev
 
 
@@ -343,40 +466,79 @@ def flow_triggers(tr, doc: Doc):
     slashes = [(t.start + t.text.rfind("/") + 1) for t in specs if "/" in t.text[1:-1]]
     for at in spread(slashes, 2):
         completion(tr, doc, at, "/")
-    args = [t for i, t in enumerate(toks) if t.kind == "str" and t not in specs and i > 0
-            and toks[i - 1].kind in ("(", ",")]
+    args = [
+        t
+        for i, t in enumerate(toks)
+        if t.kind == "str"
+        and t not in specs
+        and i > 0
+        and toks[i - 1].kind in ("(", ",")
+    ]
     for t in spread(args, 2):
         completion(tr, doc, t.start + 1, t.text[:1])
-    ats = [block.start() + m.start() + 1 for block in re.finditer(rb"/\*\*.*?\*/", text, re.DOTALL)
-           for m in re.finditer(rb"@[a-zA-Z]", block.group(0))]
+    ats = [
+        block.start() + m.start() + 1
+        for block in re.finditer(rb"/\*\*.*?\*/", text, re.DOTALL)
+        for m in re.finditer(rb"@[a-zA-Z]", block.group(0))
+    ]
     for at in spread(ats, 2):
         completion(tr, doc, at, "@")
-    lts = [t.end for i, t in enumerate(toks) if t.kind == "<" and i > 0 and lb.is_name(toks, i - 1)]
+    lts = [
+        t.end
+        for i, t in enumerate(toks)
+        if t.kind == "<" and i > 0 and lb.is_name(toks, i - 1)
+    ]
     for at in spread(lts, 2):
         completion(tr, doc, at, "<")
     for t in spread([t for t in toks if t.kind == "priv"], 1):
         completion(tr, doc, t.start + 1, "#")
-    spaces = [t.end + 1 for i, t in enumerate(toks) if t.kind == "id" and t.text in ("import", "new", "extends")
-              and text[t.end:t.end + 1] == b" " and not (i > 0 and toks[i - 1].kind in (".", "?."))]
+    spaces = [
+        t.end + 1
+        for i, t in enumerate(toks)
+        if t.kind == "id"
+        and t.text in ("import", "new", "extends")
+        and text[t.end : t.end + 1] == b" "
+        and not (i > 0 and toks[i - 1].kind in (".", "?."))
+    ]
     for at in spread(spaces, 2):
         completion(tr, doc, at, " ")
-    for t in spread([t for t in toks if t.kind == "tmpl" and t.text.startswith("`")], 1):
+    for t in spread(
+        [t for t in toks if t.kind == "tmpl" and t.text.startswith("`")], 1
+    ):
         completion(tr, doc, t.start + 1, "`")
 
 
-def signature_help(tr, doc: Doc, offset: int, trigger: str | None, kind: int, retrigger=False, from_event=None):
+def signature_help(
+    tr,
+    doc: Doc,
+    offset: int,
+    trigger: str | None,
+    kind: int,
+    retrigger=False,
+    from_event=None,
+):
     ctx = {"triggerKind": kind, "isRetrigger": retrigger}
     if trigger:
         ctx["triggerCharacter"] = trigger
     pf = None
     if from_event is not None:
-        pf = {"event": from_event, "pointer": "", "into": "/context/activeSignatureHelp"}
-    return tr.request("textDocument/signatureHelp", {**doc.tdp(offset), "context": ctx}, pf)
+        pf = {
+            "event": from_event,
+            "pointer": "",
+            "into": "/context/activeSignatureHelp",
+        }
+    return tr.request(
+        "textDocument/signatureHelp", {**doc.tdp(offset), "context": ctx}, pf
+    )
 
 
 def flow_signature(tr, doc: Doc):
     toks = doc.toks
-    lts = [t.end for i, t in enumerate(toks) if t.kind == "<" and i > 0 and lb.is_name(toks, i - 1)]
+    lts = [
+        t.end
+        for i, t in enumerate(toks)
+        if t.kind == "<" and i > 0 and lb.is_name(toks, i - 1)
+    ]
     for at in spread(lts, 2):
         signature_help(tr, doc, at, "<", 2)
     # A call with a nested call: open the outer help, then ")" after the inner call and a
@@ -390,7 +552,9 @@ def flow_signature(tr, doc: Doc):
     for open_i, close_i, (_, inner_close) in spread(nested, 3):
         first = signature_help(tr, doc, toks[open_i].end, "(", 2)
         signature_help(tr, doc, toks[inner_close].end, ")", 2, True, first)
-        comma = next((j for j in range(inner_close, close_i) if toks[j].kind == ","), None)
+        comma = next(
+            (j for j in range(inner_close, close_i) if toks[j].kind == ","), None
+        )
         if comma is not None:
             signature_help(tr, doc, toks[comma].end, None, 3, True, first)
 
@@ -400,44 +564,105 @@ def flow_methods(tr, doc: Doc):
     names = doc.names()
     picks = spread(names, 3)
     # linkedEditingRange: JSX tag names in .tsx files, else plain identifiers (null answers).
-    tags = [toks[i + 1] for i in range(len(toks) - 1) if toks[i].kind == "<" and toks[i + 1].kind == "id"
-            and (i == 0 or not lb.is_name(toks, i - 1))]
+    tags = [
+        toks[i + 1]
+        for i in range(len(toks) - 1)
+        if toks[i].kind == "<"
+        and toks[i + 1].kind == "id"
+        and (i == 0 or not lb.is_name(toks, i - 1))
+    ]
     for t in spread(tags, 3) if doc.rel.endswith((".tsx", ".jsx")) else picks[:1]:
-        tr.request("textDocument/linkedEditingRange", doc.tdp(doc.after_first_rune(t.start)))
+        tr.request(
+            "textDocument/linkedEditingRange", doc.tdp(doc.after_first_rune(t.start))
+        )
     for kind, ch in ((";", ";"), ("}", "}")):
         for t in spread([t for t in toks if t.kind == kind], 2):
-            tr.request("textDocument/onTypeFormatting", {**doc.tdp(t.end), "ch": ch, "options": FORMAT_OPTIONS})
-    brace_lines = [n + 1 for n in range(len(doc.line_starts) - 1)
-                   if text[slice(*line_span(doc, n))].rstrip().endswith(b"{")]
+            tr.request(
+                "textDocument/onTypeFormatting",
+                {**doc.tdp(t.end), "ch": ch, "options": FORMAT_OPTIONS},
+            )
+    brace_lines = [
+        n + 1
+        for n in range(len(doc.line_starts) - 1)
+        if text[slice(*line_span(doc, n))].rstrip().endswith(b"{")
+    ]
     for n in spread(brace_lines, 2):
-        tr.request("textDocument/onTypeFormatting", {
-            "textDocument": {"uri": doc.uri}, "position": {"line": n, "character": 0}, "ch": "\n",
-            "options": FORMAT_OPTIONS})
+        tr.request(
+            "textDocument/onTypeFormatting",
+            {
+                "textDocument": {"uri": doc.uri},
+                "position": {"line": n, "character": 0},
+                "ch": "\n",
+                "options": FORMAT_OPTIONS,
+            },
+        )
     last = min(20, len(doc.line_starts) - 1)
-    tr.request("textDocument/rangeFormatting", {**doc.td(), "range": {
-        "start": {"line": 0, "character": 0}, "end": {"line": last, "character": 0}}, "options": FORMAT_OPTIONS})
+    tr.request(
+        "textDocument/rangeFormatting",
+        {
+            **doc.td(),
+            "range": {
+                "start": {"line": 0, "character": 0},
+                "end": {"line": last, "character": 0},
+            },
+            "options": FORMAT_OPTIONS,
+        },
+    )
     match = lb.match_brackets(toks)
-    blocks = [(toks[i].start, toks[match[i]].end) for i in range(len(toks))
-              if toks[i].kind == "{" and i in match and line_of(doc, toks[match[i]].start) - line_of(doc, toks[i].start) >= 3]
+    blocks = [
+        (toks[i].start, toks[match[i]].end)
+        for i in range(len(toks))
+        if toks[i].kind == "{"
+        and i in match
+        and line_of(doc, toks[match[i]].start) - line_of(doc, toks[i].start) >= 3
+    ]
     for start, end in spread(blocks, 1):
-        tr.request("textDocument/rangeFormatting", {**doc.td(), "range": doc.rng(start, end), "options": FORMAT_OPTIONS})
+        tr.request(
+            "textDocument/rangeFormatting",
+            {**doc.td(), "range": doc.rng(start, end), "options": FORMAT_OPTIONS},
+        )
     for t in picks[:2]:
-        tr.request("custom/textDocument/multiDocumentHighlight", {
-            **doc.tdp(doc.after_first_rune(t.start)), "filesToSearch": [doc.uri]})
-    imported = [t for st in import_statements(doc) for t in names
-                if st["start"] <= t.start and t.end <= st["end"] and t.text in st["names"]]
+        tr.request(
+            "custom/textDocument/multiDocumentHighlight",
+            {**doc.tdp(doc.after_first_rune(t.start)), "filesToSearch": [doc.uri]},
+        )
+    imported = [
+        t
+        for st in import_statements(doc)
+        for t in names
+        if st["start"] <= t.start and t.end <= st["end"] and t.text in st["names"]
+    ]
     for t in spread(imported, 2) + picks[1:2]:
-        tr.request("custom/textDocument/sourceDefinition", doc.tdp(doc.after_first_rune(t.start)))
+        tr.request(
+            "custom/textDocument/sourceDefinition",
+            doc.tdp(doc.after_first_rune(t.start)),
+        )
     for t in picks[:2]:
-        tr.request("textDocument/_vs_references", {**doc.tdp(doc.after_first_rune(t.start)),
-                                                   "context": {"includeDeclaration": True}})
+        tr.request(
+            "textDocument/_vs_references",
+            {
+                **doc.tdp(doc.after_first_rune(t.start)),
+                "context": {"includeDeclaration": True},
+            },
+        )
     base, ext = os.path.splitext(os.path.basename(doc.rel))
     parent = os.path.dirname(doc.rel)
     renamed = lb.document_uri(os.path.join(parent, f"{base}__goport_renamed{ext}"))
-    tr.request("workspace/willRenameFiles", {"files": [{"oldUri": doc.uri, "newUri": renamed}]})
+    tr.request(
+        "workspace/willRenameFiles", {"files": [{"oldUri": doc.uri, "newUri": renamed}]}
+    )
     if parent:
-        tr.request("workspace/willRenameFiles", {"files": [{
-            "oldUri": lb.document_uri(parent), "newUri": lb.document_uri(parent + "__goport_renamed")}]})
+        tr.request(
+            "workspace/willRenameFiles",
+            {
+                "files": [
+                    {
+                        "oldUri": lb.document_uri(parent),
+                        "newUri": lb.document_uri(parent + "__goport_renamed"),
+                    }
+                ]
+            },
+        )
     tr.request("custom/projectInfo", doc.td())
 
 
@@ -467,8 +692,12 @@ def flow_edits(tr, doc: Doc):
     doc.change(tr, [(at, at + len(new), b"")])
 
     # 2. Delete a non-empty line near 60% of the file, then put it back.
-    lines = [n for n in range(len(doc.line_starts)) if doc.text[slice(*line_span(doc, n))].strip()
-             and not doc.text[slice(*line_span(doc, n))].lstrip().startswith(b"import")]
+    lines = [
+        n
+        for n in range(len(doc.line_starts))
+        if doc.text[slice(*line_span(doc, n))].strip()
+        and not doc.text[slice(*line_span(doc, n))].lstrip().startswith(b"import")
+    ]
     if lines:
         n = lines[len(lines) * 3 // 5]
         start, end = line_span(doc, n)
@@ -480,7 +709,9 @@ def flow_edits(tr, doc: Doc):
         tr.request("textDocument/semanticTokens/full", doc.td())
         after = doc.names(start)
         if after:
-            tr.request("textDocument/hover", doc.tdp(doc.after_first_rune(after[0].start)))
+            tr.request(
+                "textDocument/hover", doc.tdp(doc.after_first_rune(after[0].start))
+            )
         doc.change(tr, [(start, start, removed)])
 
     # 3. Break the syntax at a block start near 40% of the file, then fix it.
@@ -495,15 +726,27 @@ def flow_edits(tr, doc: Doc):
         tr.request("textDocument/semanticTokens/full", doc.td())
         after = doc.names(t.end + len(junk))
         if after:
-            tr.request("textDocument/selectionRange", {**doc.td(), "positions": [doc.pos(after[0].start)]})
-            tr.request("textDocument/hover", doc.tdp(doc.after_first_rune(after[0].start)))
+            tr.request(
+                "textDocument/selectionRange",
+                {**doc.td(), "positions": [doc.pos(after[0].start)]},
+            )
+            tr.request(
+                "textDocument/hover", doc.tdp(doc.after_first_rune(after[0].start))
+            )
             completion(tr, doc, after[0].start, resolve=0)
         doc.change(tr, [(t.end, t.end + len(junk), b"")])
         tr.request("textDocument/diagnostic", doc.td())
 
     # 4. Type after "." at the end of the file, one character at a time.
-    dots = [i for i, t in enumerate(doc.toks) if t.kind == "." and i > 0 and doc.toks[i - 1].kind == "id"
-            and i + 1 < len(doc.toks) and doc.toks[i + 1].kind == "id"]
+    dots = [
+        i
+        for i, t in enumerate(doc.toks)
+        if t.kind == "."
+        and i > 0
+        and doc.toks[i - 1].kind == "id"
+        and i + 1 < len(doc.toks)
+        and doc.toks[i + 1].kind == "id"
+    ]
     if dots:
         i = dots[len(dots) // 2]
         receiver, member = doc.toks[i - 1].text.encode(), doc.toks[i + 1].text.encode()
@@ -513,13 +756,20 @@ def flow_edits(tr, doc: Doc):
         completion(tr, doc, len(doc.text), ".")
         doc.change(tr, [(len(doc.text), len(doc.text), member[:1])])
         completion(tr, doc, len(doc.text), kind=3)
-        tr.request("textDocument/signatureHelp", {**doc.tdp(len(doc.text)),
-                                                  "context": {"triggerKind": 1, "isRetrigger": False}})
+        tr.request(
+            "textDocument/signatureHelp",
+            {
+                **doc.tdp(len(doc.text)),
+                "context": {"triggerKind": 1, "isRetrigger": False},
+            },
+        )
         doc.replace_all(tr, original)
 
     # 5. Two changes in one notification, then a whole-document replace back.
     head, tail = b"/* goport a */\n", b"\n// goport b\n"
-    end = len(original) + len(head)  # the second range is on the text after the first change
+    end = len(original) + len(
+        head
+    )  # the second range is on the text after the first change
     doc.change(tr, [(0, 0, head), (end, end, tail)])
     tr.request("textDocument/foldingRange", doc.td())
     tr.request("textDocument/semanticTokens/full", doc.td())
@@ -530,11 +780,27 @@ def flow_edits(tr, doc: Doc):
 
 def quickfixes(tr, doc: Doc, diagnostic: int, cap: int):
     for i in range(cap):
-        tr.request("textDocument/codeAction",
-                   {**doc.td(), "range": None,
-                    "context": {"diagnostics": [None], "only": ["quickfix"], "triggerKind": 1}},
-                   {"event": diagnostic, "pointer": "/items", "pick": {"index": i},
-                    "into": [{"to": "/range", "from": "/range"}, {"to": "/context/diagnostics/0", "from": ""}]})
+        tr.request(
+            "textDocument/codeAction",
+            {
+                **doc.td(),
+                "range": None,
+                "context": {
+                    "diagnostics": [None],
+                    "only": ["quickfix"],
+                    "triggerKind": 1,
+                },
+            },
+            {
+                "event": diagnostic,
+                "pointer": "/items",
+                "pick": {"index": i},
+                "into": [
+                    {"to": "/range", "from": "/range"},
+                    {"to": "/context/diagnostics/0", "from": ""},
+                ],
+            },
+        )
 
 
 def source_action(tr, doc: Doc, only: list[str] | None, rng: dict | None = None):
@@ -542,20 +808,35 @@ def source_action(tr, doc: Doc, only: list[str] | None, rng: dict | None = None)
     if only is not None:
         ctx["only"] = only
     zero = {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}}
-    return tr.request("textDocument/codeAction", {**doc.td(), "range": rng or zero, "context": ctx})
+    return tr.request(
+        "textDocument/codeAction", {**doc.td(), "range": rng or zero, "context": ctx}
+    )
 
 
 def all_diagnostics_action(tr, doc: Doc, diagnostic: int):
-    tr.request("textDocument/codeAction",
-               {**doc.td(), "range": doc.full(), "context": {"diagnostics": [], "triggerKind": 1}},
-               {"event": diagnostic, "pointer": "/items", "into": "/context/diagnostics"})
+    tr.request(
+        "textDocument/codeAction",
+        {
+            **doc.td(),
+            "range": doc.full(),
+            "context": {"diagnostics": [], "triggerKind": 1},
+        },
+        {"event": diagnostic, "pointer": "/items", "into": "/context/diagnostics"},
+    )
 
 
 def pick_missing_export(doc: Doc, exports: dict) -> tuple[str, str] | None:
     """A name that another project file exports and this file never mentions."""
     present = {t.text for t in doc.toks if t.kind == "id"}
-    cands = sorted({(n, k) for rel, names in exports.items() if rel != doc.rel for n, k in names
-                    if n not in present})
+    cands = sorted(
+        {
+            (n, k)
+            for rel, names in exports.items()
+            if rel != doc.rel
+            for n, k in names
+            if n not in present
+        }
+    )
     if not cands:
         return None
     return cands[int(hashlib.sha256(doc.rel.encode()).hexdigest(), 16) % len(cands)]
@@ -571,7 +852,7 @@ def flow_fixes(tr, doc: Doc, exports: dict):
     if named:
         # 1. Remove an import: "Cannot find name" diagnostics and auto-import fixes.
         s = named[0]
-        removed = doc.text[s["start"]:s["end"]]
+        removed = doc.text[s["start"] : s["end"]]
         doc.change(tr, [(s["start"], s["end"], b"")])
         d = tr.request("textDocument/diagnostic", doc.td())
         quickfixes(tr, doc, d, 6)
@@ -582,10 +863,20 @@ def flow_fixes(tr, doc: Doc, exports: dict):
 
         # 2. An unused duplicate import at the top.
         spec = s["spec"].text.encode()
-        dup = b"import { " + s["names"][0].encode() + b" as __goport_unused } from " + spec + b";\n"
+        dup = (
+            b"import { "
+            + s["names"][0].encode()
+            + b" as __goport_unused } from "
+            + spec
+            + b";\n"
+        )
         doc.change(tr, [(0, 0, dup)])
         tr.request("textDocument/diagnostic", doc.td())
-        for kind in ("source.removeUnusedImports", "source.sortImports", "source.organizeImports"):
+        for kind in (
+            "source.removeUnusedImports",
+            "source.sortImports",
+            "source.organizeImports",
+        ):
             source_action(tr, doc, [kind])
         doc.change(tr, [(0, len(dup), b"")])
 
@@ -603,8 +894,14 @@ def flow_fixes(tr, doc: Doc, exports: dict):
         doc.change(tr, [(end, end + len(cls), b"")])
 
     # 4. A misspelled member: "Did you mean" diagnostics (Go has no spelling fix).
-    dots = [i for i, t in enumerate(doc.toks) if t.kind == "." and i + 1 < len(doc.toks)
-            and doc.toks[i + 1].kind == "id" and len(doc.toks[i + 1].text) >= 3]
+    dots = [
+        i
+        for i, t in enumerate(doc.toks)
+        if t.kind == "."
+        and i + 1 < len(doc.toks)
+        and doc.toks[i + 1].kind == "id"
+        and len(doc.toks[i + 1].text) >= 3
+    ]
     if dots:
         t = doc.toks[dots[len(dots) // 2] + 1]
         doc.change(tr, [(t.end, t.end, t.text[-1:].encode())])
@@ -616,8 +913,11 @@ def flow_fixes(tr, doc: Doc, exports: dict):
     missing = pick_missing_export(doc, exports)
     if missing:
         name, kind = missing
-        line = (b"\nvoid " + name.encode() + b";\n") if kind == "value" \
+        line = (
+            (b"\nvoid " + name.encode() + b";\n")
+            if kind == "value"
             else (b"\ntype __GoportFix = " + name.encode() + b";\n")
+        )
         end = len(doc.text)
         doc.change(tr, [(end, end, line)])
         name_at = end + line.index(name.encode())
@@ -626,14 +926,32 @@ def flow_fixes(tr, doc: Doc, exports: dict):
         source_action(tr, doc, ["source.fixAll"])
         for variant in PREF_VARIANTS:
             configure(tr, variant)
-            tr.request("textDocument/codeAction",
-                       {**doc.td(), "range": None,
-                        "context": {"diagnostics": [None], "only": ["quickfix"], "triggerKind": 1}},
-                       {"event": d, "pointer": "/items", "pick": {"match": {"code": 2304}},
-                        "into": [{"to": "/range", "from": "/range"}, {"to": "/context/diagnostics/0", "from": ""}]})
+            tr.request(
+                "textDocument/codeAction",
+                {
+                    **doc.td(),
+                    "range": None,
+                    "context": {
+                        "diagnostics": [None],
+                        "only": ["quickfix"],
+                        "triggerKind": 1,
+                    },
+                },
+                {
+                    "event": d,
+                    "pointer": "/items",
+                    "pick": {"match": {"code": 2304}},
+                    "into": [
+                        {"to": "/range", "from": "/range"},
+                        {"to": "/context/diagnostics/0", "from": ""},
+                    ],
+                },
+            )
             completion(tr, doc, name_at + 1, resolve=2)
             source_action(tr, doc, ["source.organizeImports"])
-            tr.request("textDocument/formatting", {**doc.td(), "options": FORMAT_OPTIONS})
+            tr.request(
+                "textDocument/formatting", {**doc.td(), "options": FORMAT_OPTIONS}
+            )
         configure(tr, None)
         doc.change(tr, [(end, end + len(line), b"")])
     assert doc.text == original
@@ -650,7 +968,9 @@ def flow_lifecycle(tr, doc: Doc):
     probe = names[len(names) // 3] if names else None
     if probe is not None:
         tr.request("textDocument/hover", doc.tdp(doc.after_first_rune(probe.start)))
-        tr.request("textDocument/definition", doc.tdp(doc.after_first_rune(probe.start)))
+        tr.request(
+            "textDocument/definition", doc.tdp(doc.after_first_rune(probe.start))
+        )
     tr.request("textDocument/documentSymbol", doc.td())
     tr.request("custom/projectInfo", doc.td())
     doc.open(tr)
@@ -661,21 +981,37 @@ def flow_lifecycle(tr, doc: Doc):
 
 def flow_utf8(tr, doc: Doc):
     """Requests at identifiers on lines with non-ASCII text, then a non-ASCII edit."""
-    wide = {n for n in range(len(doc.line_starts)) if any(b >= 0x80 for b in doc.text[slice(*line_span(doc, n))])}
+    wide = {
+        n
+        for n in range(len(doc.line_starts))
+        if any(b >= 0x80 for b in doc.text[slice(*line_span(doc, n))])
+    }
     names = [t for t in doc.names() if line_of(doc, t.start) in wide]
     for t in spread(names or doc.names(), 12):
         tdp = doc.tdp(doc.after_first_rune(t.start))
         tr.request("textDocument/hover", tdp)
         tr.request("textDocument/definition", tdp)
-        tr.request("textDocument/references", {**tdp, "context": {"includeDeclaration": True}})
+        tr.request(
+            "textDocument/references", {**tdp, "context": {"includeDeclaration": True}}
+        )
         tr.request("textDocument/documentHighlight", tdp)
         tr.request("textDocument/rename", {**tdp, "newName": RENAME_TO})
-        tr.request("textDocument/selectionRange", {**doc.td(), "positions": [tdp["position"]]})
-    strs = [t for t in doc.toks if t.kind in ("str", "tmpl") and line_of(doc, t.start) in wide]
+        tr.request(
+            "textDocument/selectionRange", {**doc.td(), "positions": [tdp["position"]]}
+        )
+    strs = [
+        t
+        for t in doc.toks
+        if t.kind in ("str", "tmpl") and line_of(doc, t.start) in wide
+    ]
     for t in spread(strs, 3):
         completion(tr, doc, t.end - 1, resolve=0)
-    for method in ("textDocument/diagnostic", "textDocument/documentSymbol", "textDocument/foldingRange",
-                   "textDocument/semanticTokens/full"):
+    for method in (
+        "textDocument/diagnostic",
+        "textDocument/documentSymbol",
+        "textDocument/foldingRange",
+        "textDocument/semanticTokens/full",
+    ):
         tr.request(method, doc.td())
     tr.request("textDocument/inlayHint", {**doc.td(), "range": doc.full()})
     tr.request("textDocument/formatting", {**doc.td(), "options": FORMAT_OPTIONS})
@@ -699,14 +1035,28 @@ def flow_utf8(tr, doc: Doc):
 
 
 def header(name: str, source: dict, root: dict, encoding: str) -> dict:
-    return {"format": lb.TRACE_FORMAT, "name": name, "source": source, "root": root, "cwd": "",
-            "config": manifest()["config"], "positionEncoding": encoding}
+    return {
+        "format": lb.TRACE_FORMAT,
+        "name": name,
+        "source": source,
+        "root": root,
+        "cwd": "",
+        "config": manifest()["config"],
+        "positionEncoding": encoding,
+    }
 
 
 def project_sources(project: dict) -> list[str]:
-    rels = lb.list_sources(project["root"], project["include"], project["exclude"], manifest()["sweep"]["extensions"])
+    rels = lb.list_sources(
+        project["root"],
+        project["include"],
+        project["exclude"],
+        manifest()["sweep"]["extensions"],
+    )
     if len(rels) != project["expectFiles"]:
-        raise SystemExit(f"{project['name']}: found {len(rels)} files, expected {project['expectFiles']}")
+        raise SystemExit(
+            f"{project['name']}: found {len(rels)} files, expected {project['expectFiles']}"
+        )
     return rels
 
 
@@ -714,7 +1064,9 @@ def project_part(project: dict, out_dir: Path) -> list[dict]:
     root = project["root"]
     rels = project_sources(project)
     texts = {rel: lb.read_source(root / rel) for rel in rels}
-    exports = {rel: exported_names(Doc(rel, text, UTF16)) for rel, text in texts.items()}
+    exports = {
+        rel: exported_names(Doc(rel, text, UTF16)) for rel, text in texts.items()
+    }
     entries = []
     for rel in rels:
         text = texts[rel]
@@ -727,10 +1079,22 @@ def project_part(project: dict, out_dir: Path) -> list[dict]:
         flow_fixes(tr, doc, exports)
         flow_lifecycle(tr, doc)
         name = f"{BATTERY}-{project['name']}/{rel}"
-        src = {"kind": "edits", "part": f"{BATTERY}-{project['name']}", "file": rel, "complete": True,
-               "sha256": hashlib.sha256(text).hexdigest()}
-        entries.append(lb.write_trace(out_dir, header(name, src, {"kind": "project", "dir": str(root.resolve())},
-                                                      UTF16), tr))
+        src = {
+            "kind": "edits",
+            "part": f"{BATTERY}-{project['name']}",
+            "file": rel,
+            "complete": True,
+            "sha256": hashlib.sha256(text).hexdigest(),
+        }
+        entries.append(
+            lb.write_trace(
+                out_dir,
+                header(
+                    name, src, {"kind": "project", "dir": str(root.resolve())}, UTF16
+                ),
+                tr,
+            )
+        )
     return entries
 
 
@@ -748,10 +1112,23 @@ def utf8_part(out_dir: Path) -> list[dict]:
             doc.open(tr)
             flow_utf8(tr, doc)
             name = f"{BATTERY}-utf8/{project['name']}/{rel}"
-            src = {"kind": "utf8", "part": f"{BATTERY}-utf8", "project": project["name"], "file": rel,
-                   "complete": True, "sha256": hashlib.sha256(text).hexdigest()}
-            entries.append(lb.write_trace(out_dir, header(name, src, {"kind": "project", "dir": str(root.resolve())},
-                                                          UTF8), tr))
+            src = {
+                "kind": "utf8",
+                "part": f"{BATTERY}-utf8",
+                "project": project["name"],
+                "file": rel,
+                "complete": True,
+                "sha256": hashlib.sha256(text).hexdigest(),
+            }
+            entries.append(
+                lb.write_trace(
+                    out_dir,
+                    header(
+                        name, src, {"kind": "project", "dir": str(root.resolve())}, UTF8
+                    ),
+                    tr,
+                )
+            )
     return entries
 
 
@@ -763,7 +1140,14 @@ def utf8_part(out_dir: Path) -> list[dict]:
 class Case:
     """One materialized project and its session."""
 
-    def __init__(self, name: str, description: str, files: dict[str, str], push=False, watch=False):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        files: dict[str, str],
+        push=False,
+        watch=False,
+    ):
         self.name, self.description, self.files = name, description, dict(files)
         self.disk = dict(files)
         self.tr = lb.Trace()
@@ -777,13 +1161,17 @@ class Case:
         return doc
 
     def close(self, rel: str):
-        self.tr.notification("textDocument/didClose", {"textDocument": {"uri": lb.document_uri(rel)}})
+        self.tr.notification(
+            "textDocument/didClose", {"textDocument": {"uri": lb.document_uri(rel)}}
+        )
         self.docs.pop(rel, None)
 
     def write(self, rel: str, content: str, notify=True):
         kind = CHANGED if rel in self.disk else CREATED
         self.disk[rel] = content
-        self.tr.events.append({"kind": "fs", "op": "write", "path": rel, "content": content})
+        self.tr.events.append(
+            {"kind": "fs", "op": "write", "path": rel, "content": content}
+        )
         if notify:
             self.watched([(rel, kind)])
 
@@ -794,8 +1182,14 @@ class Case:
             self.watched([(rel, DELETED)])
 
     def watched(self, changes: list[tuple[str, int]]):
-        self.tr.notification("workspace/didChangeWatchedFiles", {
-            "changes": [{"uri": lb.document_uri(rel), "type": kind} for rel, kind in changes]})
+        self.tr.notification(
+            "workspace/didChangeWatchedFiles",
+            {
+                "changes": [
+                    {"uri": lb.document_uri(rel), "type": kind} for rel, kind in changes
+                ]
+            },
+        )
 
     def diag(self, doc: Doc) -> int:
         return self.tr.request("textDocument/diagnostic", doc.td())
@@ -808,21 +1202,38 @@ class Case:
 
     def entry(self, out_dir: Path) -> dict:
         name = f"{BATTERY}-inline/{self.name}"
-        src = {"kind": "inline", "part": f"{BATTERY}-inline", "case": self.name, "complete": True,
-               "description": self.description}
-        return lb.write_trace(out_dir, header(name, src, {"kind": "materialize", "files": self.files}, UTF16),
-                              self.tr)
+        src = {
+            "kind": "inline",
+            "part": f"{BATTERY}-inline",
+            "case": self.name,
+            "complete": True,
+            "description": self.description,
+        }
+        return lb.write_trace(
+            out_dir,
+            header(name, src, {"kind": "materialize", "files": self.files}, UTF16),
+            self.tr,
+        )
 
 
-TSCONFIG = json.dumps({"compilerOptions": {"strict": True, "module": "nodenext", "target": "es2022"}}, indent=2)
+TSCONFIG = json.dumps(
+    {"compilerOptions": {"strict": True, "module": "nodenext", "target": "es2022"}},
+    indent=2,
+)
 
 
 def case_fs_add_delete_rename(watch: bool) -> Case:
-    c = Case("fs-watch-register" if watch else "fs-add-delete-rename",
-             "create, delete and rename an imported file with didChangeWatchedFiles"
-             + (" (client supports watcher registration)" if watch else ""),
-             {"tsconfig.json": TSCONFIG, "package.json": '{ "type": "module" }\n',
-              "src/a.ts": 'import { b } from "./b.js";\nexport const a: number = b + 1;\n'}, watch=watch)
+    c = Case(
+        "fs-watch-register" if watch else "fs-add-delete-rename",
+        "create, delete and rename an imported file with didChangeWatchedFiles"
+        + (" (client supports watcher registration)" if watch else ""),
+        {
+            "tsconfig.json": TSCONFIG,
+            "package.json": '{ "type": "module" }\n',
+            "src/a.ts": 'import { b } from "./b.js";\nexport const a: number = b + 1;\n',
+        },
+        watch=watch,
+    )
     a = c.open("src/a.ts")
     c.diag(a)
     c.write("src/b.ts", "export const b = 1;\n")
@@ -837,37 +1248,79 @@ def case_fs_add_delete_rename(watch: bool) -> Case:
     c.watched([("src/c.ts", CREATED), ("src/b.ts", CREATED)])
     c.diag(a)
     c.tr.request("textDocument/definition", a.tdp(b_at))
-    c.tr.request("workspace/willRenameFiles", {"files": [{
-        "oldUri": lb.document_uri("src/c.ts"), "newUri": lb.document_uri("src/lib/c2.ts")}]})
+    c.tr.request(
+        "workspace/willRenameFiles",
+        {
+            "files": [
+                {
+                    "oldUri": lb.document_uri("src/c.ts"),
+                    "newUri": lb.document_uri("src/lib/c2.ts"),
+                }
+            ]
+        },
+    )
     c.remove("src/c.ts", notify=False)
     c.write("src/lib/c2.ts", 'export const b = "now a string";\n', notify=False)
     c.watched([("src/c.ts", DELETED), ("src/lib/c2.ts", CREATED)])
     c.diag(a)
-    c.tr.request("textDocument/completion", {**a.tdp(len(a.text)), "context": {"triggerKind": 1}})
+    c.tr.request(
+        "textDocument/completion", {**a.tdp(len(a.text)), "context": {"triggerKind": 1}}
+    )
     return c
 
 
 def case_fs_tsconfig() -> Case:
-    loose = json.dumps({"compilerOptions": {"strict": False, "module": "esnext", "target": "es2022"}}, indent=2)
-    c = Case("fs-tsconfig", "tsconfig.json changes: strict on, then a file leaves the include list",
-             {"tsconfig.json": loose, "src/a.ts": "export function f(x) {\n  return x;\n}\nf(1);\n",
-              "src/b.ts": "import { f } from './a';\nexport const y: string = f(2);\n"})
+    loose = json.dumps(
+        {"compilerOptions": {"strict": False, "module": "esnext", "target": "es2022"}},
+        indent=2,
+    )
+    c = Case(
+        "fs-tsconfig",
+        "tsconfig.json changes: strict on, then a file leaves the include list",
+        {
+            "tsconfig.json": loose,
+            "src/a.ts": "export function f(x) {\n  return x;\n}\nf(1);\n",
+            "src/b.ts": "import { f } from './a';\nexport const y: string = f(2);\n",
+        },
+    )
     a, b = c.open("src/a.ts"), c.open("src/b.ts")
     c.diag(a)
     c.diag(b)
     c.tr.request("custom/projectInfo", a.td())
-    c.write("tsconfig.json", json.dumps({"compilerOptions": {"strict": True, "module": "esnext", "target": "es2022"}},
-                                        indent=2))
+    c.write(
+        "tsconfig.json",
+        json.dumps(
+            {
+                "compilerOptions": {
+                    "strict": True,
+                    "module": "esnext",
+                    "target": "es2022",
+                }
+            },
+            indent=2,
+        ),
+    )
     c.diag(a)
     c.diag(b)
     c.tr.request("textDocument/hover", b.tdp(c.at(b, "f(2)")))
-    c.write("tsconfig.json", json.dumps({"compilerOptions": {"strict": True, "module": "esnext"},
-                                         "include": ["src/b.ts"]}, indent=2))
+    c.write(
+        "tsconfig.json",
+        json.dumps(
+            {
+                "compilerOptions": {"strict": True, "module": "esnext"},
+                "include": ["src/b.ts"],
+            },
+            indent=2,
+        ),
+    )
     c.diag(a)
     c.diag(b)
     c.tr.request("custom/projectInfo", a.td())
     c.tr.request("custom/projectInfo", b.td())
-    c.tr.request("textDocument/references", {**a.tdp(c.at(a, "f(x)")), "context": {"includeDeclaration": True}})
+    c.tr.request(
+        "textDocument/references",
+        {**a.tdp(c.at(a, "f(x)")), "context": {"includeDeclaration": True}},
+    )
     c.remove("tsconfig.json")
     c.diag(a)
     c.tr.request("custom/projectInfo", a.td())
@@ -875,59 +1328,120 @@ def case_fs_tsconfig() -> Case:
 
 
 def case_fs_package_json() -> Case:
-    c = Case("fs-package-json", "package.json type and imports change the module format and resolution",
-             {"tsconfig.json": TSCONFIG, "package.json": '{ "name": "p" }\n',
-              "src/a.ts": 'import { u } from "#util";\nexport const here = import.meta.url + u;\n',
-              "src/util.ts": 'export const u = "u";\n'})
+    c = Case(
+        "fs-package-json",
+        "package.json type and imports change the module format and resolution",
+        {
+            "tsconfig.json": TSCONFIG,
+            "package.json": '{ "name": "p" }\n',
+            "src/a.ts": 'import { u } from "#util";\nexport const here = import.meta.url + u;\n',
+            "src/util.ts": 'export const u = "u";\n',
+        },
+    )
     a = c.open("src/a.ts")
     c.diag(a)
     c.write("package.json", '{ "name": "p", "type": "module" }\n')
     c.diag(a)
-    c.write("package.json", '{ "name": "p", "type": "module", "imports": { "#util": "./src/util.js" } }\n')
+    c.write(
+        "package.json",
+        '{ "name": "p", "type": "module", "imports": { "#util": "./src/util.js" } }\n',
+    )
     c.diag(a)
     c.tr.request("textDocument/definition", a.tdp(c.at(a, "u }")))
-    c.tr.request("textDocument/completion", {**a.tdp(c.at(a, "#util") + 1),
-                                             "context": {"triggerKind": 2, "triggerCharacter": "#"}})
-    c.write("package.json", '{ "name": "p", "type": "commonjs", "imports": { "#util": "./src/util.js" } }\n')
+    c.tr.request(
+        "textDocument/completion",
+        {
+            **a.tdp(c.at(a, "#util") + 1),
+            "context": {"triggerKind": 2, "triggerCharacter": "#"},
+        },
+    )
+    c.write(
+        "package.json",
+        '{ "name": "p", "type": "commonjs", "imports": { "#util": "./src/util.js" } }\n',
+    )
     c.diag(a)
     return c
 
 
 def case_fs_node_modules() -> Case:
-    c = Case("fs-node-modules", "a package appears in node_modules, then its types change",
-             {"tsconfig.json": TSCONFIG, "package.json": '{ "type": "module" }\n',
-              "src/a.ts": 'import { greet } from "greeter";\nexport const s: string = greet("x");\n'})
+    c = Case(
+        "fs-node-modules",
+        "a package appears in node_modules, then its types change",
+        {
+            "tsconfig.json": TSCONFIG,
+            "package.json": '{ "type": "module" }\n',
+            "src/a.ts": 'import { greet } from "greeter";\nexport const s: string = greet("x");\n',
+        },
+    )
     a = c.open("src/a.ts")
     c.diag(a)
-    c.write("node_modules/greeter/package.json",
-            '{ "name": "greeter", "type": "module", "exports": { ".": { "types": "./index.d.ts" } } }\n', notify=False)
-    c.write("node_modules/greeter/index.d.ts", "export declare function greet(n: string): string;\n", notify=False)
-    c.watched([("node_modules/greeter/package.json", CREATED), ("node_modules/greeter/index.d.ts", CREATED)])
+    c.write(
+        "node_modules/greeter/package.json",
+        '{ "name": "greeter", "type": "module", "exports": { ".": { "types": "./index.d.ts" } } }\n',
+        notify=False,
+    )
+    c.write(
+        "node_modules/greeter/index.d.ts",
+        "export declare function greet(n: string): string;\n",
+        notify=False,
+    )
+    c.watched(
+        [
+            ("node_modules/greeter/package.json", CREATED),
+            ("node_modules/greeter/index.d.ts", CREATED),
+        ]
+    )
     c.diag(a)
     c.tr.request("textDocument/hover", a.tdp(c.at(a, "greet(")))
     c.tr.request("custom/textDocument/sourceDefinition", a.tdp(c.at(a, "greet(")))
-    c.write("node_modules/greeter/index.d.ts", "export declare function greet(n: number): number;\n")
+    c.write(
+        "node_modules/greeter/index.d.ts",
+        "export declare function greet(n: number): number;\n",
+    )
     c.diag(a)
-    c.tr.request("textDocument/signatureHelp", {**a.tdp(c.at(a, '"x"')),
-                                                "context": {"triggerKind": 1, "isRetrigger": False}})
+    c.tr.request(
+        "textDocument/signatureHelp",
+        {**a.tdp(c.at(a, '"x"')), "context": {"triggerKind": 1, "isRetrigger": False}},
+    )
     return c
 
 
 def case_fs_closed_and_open() -> Case:
-    c = Case("fs-closed-and-open", "disk changes to a closed dependency and to an open file (the overlay wins)",
-             {"tsconfig.json": TSCONFIG, "package.json": '{ "type": "module" }\n',
-              "src/a.ts": 'import { dep } from "./dep.js";\nexport const v: number = dep;\n',
-              "src/dep.ts": "export const dep = 1;\n"})
+    c = Case(
+        "fs-closed-and-open",
+        "disk changes to a closed dependency and to an open file (the overlay wins)",
+        {
+            "tsconfig.json": TSCONFIG,
+            "package.json": '{ "type": "module" }\n',
+            "src/a.ts": 'import { dep } from "./dep.js";\nexport const v: number = dep;\n',
+            "src/dep.ts": "export const dep = 1;\n",
+        },
+    )
     a = c.open("src/a.ts")
     c.diag(a)
     c.write("src/dep.ts", "export const dep2 = 1;\n")
     c.diag(a)
-    c.tr.request("textDocument/codeAction", {**a.td(), "range": a.full(),
-                                             "context": {"diagnostics": [], "only": ["source.organizeImports"]}})
+    c.tr.request(
+        "textDocument/codeAction",
+        {
+            **a.td(),
+            "range": a.full(),
+            "context": {"diagnostics": [], "only": ["source.organizeImports"]},
+        },
+    )
     c.write("src/a.ts", "export const broken: = ;\n")
     c.diag(a)
     c.tr.request("textDocument/hover", a.tdp(c.at(a, "v:")))
-    a.change(c.tr, [(0, len(a.text), b'import { dep2 } from "./dep.js";\nexport const v: number = dep2;\n')])
+    a.change(
+        c.tr,
+        [
+            (
+                0,
+                len(a.text),
+                b'import { dep2 } from "./dep.js";\nexport const v: number = dep2;\n',
+            )
+        ],
+    )
     c.diag(a)
     c.close("src/a.ts")
     d = Doc("src/a.ts", c.disk["src/a.ts"].encode(), UTF16)
@@ -937,19 +1451,35 @@ def case_fs_closed_and_open() -> Case:
 
 
 def case_isolated_declarations() -> Case:
-    text = ("import { helper } from './helper.js';\n"
-            "export function add(a: number, b: number) {\n  return a + b;\n}\n"
-            "export const total = add(1, 2);\n"
-            "export const pair = { left: helper(), right: [1, 2] as const };\n"
-            "export class Box {\n  value = helper();\n  get size() { return 1; }\n  method(x: string) { return x.length; }\n}\n"
-            "export default { add };\n"
-            "export const arrow = (n: number) => n * 2;\n")
-    c = Case("isolated-declarations", "isolatedDeclarations errors and their type annotation fixes",
-             {"tsconfig.json": json.dumps({"compilerOptions": {
-                 "strict": True, "module": "nodenext", "declaration": True, "isolatedDeclarations": True}}, indent=2),
-              "package.json": '{ "type": "module" }\n',
-              "src/helper.ts": "export function helper(): { id: number } { return { id: 1 }; }\n",
-              "src/a.ts": text})
+    text = (
+        "import { helper } from './helper.js';\n"
+        "export function add(a: number, b: number) {\n  return a + b;\n}\n"
+        "export const total = add(1, 2);\n"
+        "export const pair = { left: helper(), right: [1, 2] as const };\n"
+        "export class Box {\n  value = helper();\n  get size() { return 1; }\n  method(x: string) { return x.length; }\n}\n"
+        "export default { add };\n"
+        "export const arrow = (n: number) => n * 2;\n"
+    )
+    c = Case(
+        "isolated-declarations",
+        "isolatedDeclarations errors and their type annotation fixes",
+        {
+            "tsconfig.json": json.dumps(
+                {
+                    "compilerOptions": {
+                        "strict": True,
+                        "module": "nodenext",
+                        "declaration": True,
+                        "isolatedDeclarations": True,
+                    }
+                },
+                indent=2,
+            ),
+            "package.json": '{ "type": "module" }\n',
+            "src/helper.ts": "export function helper(): { id: number } { return { id: 1 }; }\n",
+            "src/a.ts": text,
+        },
+    )
     a = c.open("src/a.ts")
     d = c.diag(a)
     quickfixes(c.tr, a, d, 10)
@@ -960,16 +1490,22 @@ def case_isolated_declarations() -> Case:
 
 
 def case_implement_interface() -> Case:
-    c = Case("implement-interface", "implement an interface whose member types come from other modules",
-             {"tsconfig.json": TSCONFIG, "package.json": '{ "type": "module" }\n',
-              "src/types.ts": "export interface Opts { depth: number; tags?: readonly string[] }\n"
-                              "export type Result<T> = { ok: true; value: T } | { ok: false; error: Error };\n",
-              "src/shape.ts": 'import type { Opts, Result } from "./types.js";\n'
-                              "export interface Shape<T = number> {\n  readonly id: string;\n"
-                              "  area(opts?: Opts): Result<T>;\n  scale?(by: number): this;\n"
-                              "  [key: `x-${string}`]: unknown;\n  get name(): string;\n}\n",
-              "src/impl.ts": 'import { Shape } from "./shape.js";\n\nexport class Square implements Shape<bigint> {}\n'
-                             "export class Circle implements Shape {\n  readonly id = 'c';\n}\n"})
+    c = Case(
+        "implement-interface",
+        "implement an interface whose member types come from other modules",
+        {
+            "tsconfig.json": TSCONFIG,
+            "package.json": '{ "type": "module" }\n',
+            "src/types.ts": "export interface Opts { depth: number; tags?: readonly string[] }\n"
+            "export type Result<T> = { ok: true; value: T } | { ok: false; error: Error };\n",
+            "src/shape.ts": 'import type { Opts, Result } from "./types.js";\n'
+            "export interface Shape<T = number> {\n  readonly id: string;\n"
+            "  area(opts?: Opts): Result<T>;\n  scale?(by: number): this;\n"
+            "  [key: `x-${string}`]: unknown;\n  get name(): string;\n}\n",
+            "src/impl.ts": 'import { Shape } from "./shape.js";\n\nexport class Square implements Shape<bigint> {}\n'
+            "export class Circle implements Shape {\n  readonly id = 'c';\n}\n",
+        },
+    )
     a = c.open("src/impl.ts")
     d = c.diag(a)
     quickfixes(c.tr, a, d, 4)
@@ -981,9 +1517,16 @@ def case_implement_interface() -> Case:
 
 
 def case_push_diagnostics() -> Case:
-    bad = json.dumps({"compilerOptions": {"strict": True, "notAnOption": 1, "module": "nodenext"}}, indent=2)
-    c = Case("push-diagnostics", "push diagnostics for tsconfig.json, before and after a fix",
-             {"tsconfig.json": bad, "src/a.ts": "export const a: number = 'x';\n"}, push=True)
+    bad = json.dumps(
+        {"compilerOptions": {"strict": True, "notAnOption": 1, "module": "nodenext"}},
+        indent=2,
+    )
+    c = Case(
+        "push-diagnostics",
+        "push diagnostics for tsconfig.json, before and after a fix",
+        {"tsconfig.json": bad, "src/a.ts": "export const a: number = 'x';\n"},
+        push=True,
+    )
     a = c.open("src/a.ts")
     c.diag(a)
     c.tr.request("textDocument/hover", a.tdp(c.at(a, "a:")))
@@ -994,9 +1537,15 @@ def case_push_diagnostics() -> Case:
 
 
 INLINE_CASES = [
-    lambda: case_fs_add_delete_rename(False), lambda: case_fs_add_delete_rename(True), case_fs_tsconfig,
-    case_fs_package_json, case_fs_node_modules, case_fs_closed_and_open, case_isolated_declarations,
-    case_implement_interface, case_push_diagnostics,
+    lambda: case_fs_add_delete_rename(False),
+    lambda: case_fs_add_delete_rename(True),
+    case_fs_tsconfig,
+    case_fs_package_json,
+    case_fs_node_modules,
+    case_fs_closed_and_open,
+    case_isolated_declarations,
+    case_implement_interface,
+    case_push_diagnostics,
 ]
 
 
@@ -1009,7 +1558,10 @@ def inline_part(out_dir: Path) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 PARTS = {
-    **{f"{BATTERY}-{p['name']}": (lambda out, p=p: project_part(p, out)) for p in PROJECTS},
+    **{
+        f"{BATTERY}-{p['name']}": (lambda out, p=p: project_part(p, out))
+        for p in PROJECTS
+    },
     f"{BATTERY}-utf8": utf8_part,
     f"{BATTERY}-inline": inline_part,
 }
@@ -1019,16 +1571,26 @@ def cmd_build(args) -> int:
     out_dir = Path(args.out)
     lb.guard_out(out_dir, [p["root"] for p in PROJECTS] + [INPUTS, lb.BATTERY_DIR])
     names = args.parts.split(",") if args.parts else list(PARTS)
-    index = {"format": "goport-lsp-battery-index/1", "battery": BATTERY,
-             "generatorSha256": lb.file_sha(Path(__file__)), "lspBatterySha256": lb.file_sha(LSP_BATTERY_PY),
-             "lspBattery": str(LSP_BATTERY_PY), "parts": []}
+    index = {
+        "format": "goport-lsp-battery-index/1",
+        "battery": BATTERY,
+        "generatorSha256": lb.file_sha(Path(__file__)),
+        "lspBatterySha256": lb.file_sha(LSP_BATTERY_PY),
+        "lspBattery": str(LSP_BATTERY_PY),
+        "parts": [],
+    }
     for name in names:
         if name not in PARTS:
             raise SystemExit(f"unknown part {name}; parts: {', '.join(PARTS)}")
         traces = PARTS[name](out_dir)
-        index["parts"].append({"name": name, "kind": "edits", "schedule": "manual", "traces": traces})
-    index["traceSetSha256"] = hashlib.sha256("".join(
-        f"{t['name']} {t['sha256']}\n" for p in index["parts"] for t in p["traces"]).encode()).hexdigest()
+        index["parts"].append(
+            {"name": name, "kind": "edits", "schedule": "manual", "traces": traces}
+        )
+    index["traceSetSha256"] = hashlib.sha256(
+        "".join(
+            f"{t['name']} {t['sha256']}\n" for p in index["parts"] for t in p["traces"]
+        ).encode()
+    ).hexdigest()
     (out_dir / f"{BATTERY}.index.json").write_text(json.dumps(index, indent=1) + "\n")
     lb.print_summary(index["parts"])
     return 0

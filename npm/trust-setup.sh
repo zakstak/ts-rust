@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016 # Embedded child programs intentionally expand in the child interpreter.
 # One-time setup of npm trusted publishing for the tsc-rs packages. Run it by hand, logged in to
 # npm as an owner of tsc-rs and the @tsc-rs org, with 2FA on (npm asks for a code once).
 #
@@ -17,7 +18,10 @@
 #
 # usage: npm/trust-setup.sh [--relink]    needs npm 11.15.0 or later (npm trust)
 set -euo pipefail
-[[ ${1:-} != help ]] || { sed -n '2,18p' "$0" >&2; exit 2; }
+[[ ${1:-} != help ]] || {
+  sed -n '2,18p' "$0" >&2
+  exit 2
+}
 relink=0
 [[ ${1:-} != --relink ]] || relink=1
 repo=pingdotgg/ts-rust
@@ -26,15 +30,18 @@ packages=(tsc-rs @tsc-rs/linux-x64 @tsc-rs/linux-arm64 @tsc-rs/darwin-arm64 @tsc
 
 npm_version=$(npm --version)
 [[ $(printf '%s\n' 11.15.0 "$npm_version" | sort -V | head -1) == 11.15.0 ]] ||
-  { echo "npm $npm_version: npm trust needs 11.15.0 or later (npm install -g npm@11)" >&2; exit 1; }
+  {
+    echo "npm $npm_version: npm trust needs 11.15.0 or later (npm install -g npm@11)" >&2
+    exit 1
+  }
 echo "npm user: $(npm whoami)"
 
 for name in "${packages[@]}"; do
-  if npm view "$name" version > /dev/null 2>&1; then
+  if npm view "$name" version >/dev/null 2>&1; then
     echo "$name is on npm"
   else
     dir=$(mktemp -d)
-    cat > "$dir/package.json" << EOF
+    cat >"$dir/package.json" <<EOF
 {
   "name": "$name",
   "version": "0.0.0-placeholder",
@@ -75,12 +82,14 @@ for name in "${packages[@]}"; do
   case $state in
     none)
       npm trust github "$name" --file release.yml --repo "$repo" --env npm --allow-publish --yes
-      sleep 2 ;;
+      sleep 2
+      ;;
     other)
       echo "$name trusts another repo, workflow, environment or permission:" >&2
       npm trust list "$name" >&2
       echo "revoke it with: npm trust revoke $name --id <id>, then run this again" >&2
-      exit 1 ;;
+      exit 1
+      ;;
   esac
   npm trust list "$name"
 done

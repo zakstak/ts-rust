@@ -20,22 +20,28 @@ let modulePromise;
  * tries again.
  */
 export function loadModule(source) {
-    modulePromise ??= compile(source ?? new URL("./ts_rust.wasm", import.meta.url)).catch(error => {
-        modulePromise = undefined;
-        throw error;
-    });
-    return modulePromise;
+  modulePromise ??= compile(
+    source ?? new URL("./ts_rust.wasm", import.meta.url),
+  ).catch((error) => {
+    modulePromise = undefined;
+    throw error;
+  });
+  return modulePromise;
 }
 
 async function compile(source) {
-    if (source instanceof WebAssembly.Module) return source;
-    if (source instanceof ArrayBuffer || ArrayBuffer.isView(source)) return WebAssembly.compile(source);
-    const response = source instanceof Response ? source : await fetch(source);
-    if (!response.ok) throw new Error(`ts-rust: cannot load the wasm module: ${response.status} ${response.url}`);
-    if (response.headers.get("content-type")?.startsWith("application/wasm")) {
-        return WebAssembly.compileStreaming(response);
-    }
-    return WebAssembly.compile(await response.arrayBuffer());
+  if (source instanceof WebAssembly.Module) return source;
+  if (source instanceof ArrayBuffer || ArrayBuffer.isView(source))
+    return WebAssembly.compile(source);
+  const response = source instanceof Response ? source : await fetch(source);
+  if (!response.ok)
+    throw new Error(
+      `ts-rust: cannot load the wasm module: ${response.status} ${response.url}`,
+    );
+  if (response.headers.get("content-type")?.startsWith("application/wasm")) {
+    return WebAssembly.compileStreaming(response);
+  }
+  return WebAssembly.compile(await response.arrayBuffer());
 }
 
 /**
@@ -46,23 +52,32 @@ async function compile(source) {
  * not print them. `options.wasm` is the `loadModule` source.
  */
 export async function tsc(args, options = {}) {
-    const module = await loadModule(options.wasm);
-    const fs = memoryFileSystem(options.files ?? {});
-    const stdout = [];
-    const stderr = [];
-    const { exitCode, diagnostics } = await runTscAsync(module, {
-        args,
-        cwd: options.cwd ?? "/",
-        fs,
-        env: options.env ?? {},
-        diagnosticsJson: options.diagnostics === "json",
-        stdout: chunk => stdout.push(chunk),
-        stderr: chunk => stderr.push(chunk),
-    });
-    return { exitCode, stdout: decode(stdout), stderr: decode(stderr), diagnostics, files: fs.files };
+  const module = await loadModule(options.wasm);
+  const fs = memoryFileSystem(options.files ?? {});
+  const stdout = [];
+  const stderr = [];
+  const { exitCode, diagnostics } = await runTscAsync(module, {
+    args,
+    cwd: options.cwd ?? "/",
+    fs,
+    env: options.env ?? {},
+    diagnosticsJson: options.diagnostics === "json",
+    stdout: (chunk) => stdout.push(chunk),
+    stderr: (chunk) => stderr.push(chunk),
+  });
+  return {
+    exitCode,
+    stdout: decode(stdout),
+    stderr: decode(stderr),
+    diagnostics,
+    files: fs.files,
+  };
 }
 
 function decode(chunks) {
-    const decoder = new TextDecoder();
-    return chunks.map(chunk => decoder.decode(chunk, { stream: true })).join("") + decoder.decode();
+  const decoder = new TextDecoder();
+  return (
+    chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join("") +
+    decoder.decode()
+  );
 }

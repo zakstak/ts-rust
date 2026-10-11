@@ -10,7 +10,10 @@
 # Usage: copy-libs.sh <dir>
 set -euo pipefail
 
-[[ $# == 1 ]] || { echo "usage: $0 <dir>" >&2; exit 2; }
+[[ $# == 1 ]] || {
+  echo "usage: $0 <dir>" >&2
+  exit 2
+}
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 crates="$(cd -- "$script_dir/../.." && pwd)"
 mkdir -p "$1"

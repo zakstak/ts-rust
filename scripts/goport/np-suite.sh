@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2016 # Embedded child programs intentionally expand in the child interpreter.
 # usage: np-suite.sh run <label> <tsgo-bin>     run the suite with one binary
 #        np-suite.sh diff <labelA> <labelB>     per-test status changes from A to B
 # Runs the typescript-go native-preview API client suite (_packages/native-preview:
@@ -20,27 +21,44 @@
 #   summary.txt    counts by status
 #   meta.txt       binary and sha256, Go commit, node, host, node exit code
 set -uo pipefail
-cd /home/theo/Code/sandbox/ts-rust
+cd /home/theo/Code/sandbox/ts-rust || exit
 OUT=target/continuation-r97-goport/compat-backlog/np-suite
-if [[ -n ${NP_GO_DIR:-} ]]; then GO=$NP_GO_DIR
-elif [[ -n ${GOPORT_PIN:-} ]]; then GO=$(python3 scripts/upstream/pin.py path goCheckout "$GOPORT_PIN") || exit 2
+if [[ -n ${NP_GO_DIR:-} ]]; then
+  GO=$NP_GO_DIR
+elif [[ -n ${GOPORT_PIN:-} ]]; then
+  GO=$(python3 scripts/upstream/pin.py path goCheckout "$GOPORT_PIN") || exit 2
 else GO=$HOME/.explore/repos/microsoft__typescript-go@52168999f; fi
-usage() { sed -n '2,21p' "$0"; exit 2; }
+usage() {
+  sed -n '2,21p' "$0"
+  exit 2
+}
 
 run() {
   local label=$1 bin
   bin=$(realpath "$2") || exit 2
-  [[ -x $bin ]] || { echo "not executable: $bin" >&2; exit 2; }
+  [[ -x $bin ]] || {
+    echo "not executable: $bin" >&2
+    exit 2
+  }
   local o=$OUT/$label
-  rm -rf "$o"; mkdir -p "$o"; o=$(realpath "$o")
+  rm -rf "$o"
+  mkdir -p "$o"
+  o=$(realpath "$o")
   t=$(mktemp -d "${TMPDIR:-/tmp}/np-suite.XXXXXX")
-  [[ ${NP_KEEP:-0} == 1 ]] && echo "tree $t (kept)" || trap 'rm -rf "$t"' EXIT
+  if [[ ${NP_KEEP:-0} == 1 ]] && echo "tree $t (kept)"; then
+    :
+  else
+    trap 'rm -rf "$t"' EXIT
+  fi
   local pkg
   if grep -qx 'module github.com/microsoft/TypeScript/tsc' "$GO/go.mod" 2>/dev/null; then
     # microsoft/TypeScript layout (see the header).
     local repo
     repo=$(realpath "$GO/..")
-    [[ -d $repo/node_modules ]] || { echo "no $repo/node_modules: run npm ci --ignore-scripts in $repo" >&2; exit 2; }
+    [[ -d $repo/node_modules ]] || {
+      echo "no $repo/node_modules: run npm ci --ignore-scripts in $repo" >&2
+      exit 2
+    }
     mkdir -p "$t/packages" "$t/built/local" "$t/tsc/testdata/baselines/reference"
     cp -a --reflink=auto "$repo/packages/typescript" "$t/packages/"
     cp -a --reflink=auto "$GO/testdata/fixtures" "$t/tsc/testdata/"
@@ -63,12 +81,19 @@ run() {
     ln -s "$bin" "$t/built/local/tsgo"
     pkg=$t/_packages/native-preview
   fi
-  { echo "bin $bin"; echo "sha256 $(sha256sum "$bin" | cut -d' ' -f1)"; echo "go $GO $(git -C "$GO" rev-parse HEAD)"; echo "node $(node --version)"; echo "host $(hostname)"; date -Is; } > "$o/meta.txt"
+  {
+    echo "bin $bin"
+    echo "sha256 $(sha256sum "$bin" | cut -d' ' -f1)"
+    echo "go $GO $(git -C "$GO" rev-parse HEAD)"
+    echo "node $(node --version)"
+    echo "host $(hostname)"
+    date -Is
+  } >"$o/meta.txt"
 
   # Reporter: one JSON line per finished test or suite, with its full name path.
   # test:start and test:pass/fail come in definition order per file, so a stack
   # per file gives the parent names.
-  cat > "$t/reporter.mjs" <<'EOF'
+  cat >"$t/reporter.mjs" <<'EOF'
 import path from "node:path";
 export default async function* (source) {
   const stacks = new Map();
@@ -100,13 +125,13 @@ export default async function* (source) {
 }
 EOF
   echo "np-suite $label: running with $bin"
-  ( cd "$pkg" && timeout "${NP_TIMEOUT:-1800}" node --experimental-strip-types --no-warnings \
-      --conditions @typescript/source --test --test-timeout="${NP_TEST_TIMEOUT:-300000}" \
-      --test-reporter=spec --test-reporter-destination="$o/spec.log" \
-      --test-reporter="$t/reporter.mjs" --test-reporter-destination="$o/results.jsonl" \
-      './test/**/*.test.ts' )
+  (cd "$pkg" && timeout "${NP_TIMEOUT:-1800}" node --experimental-strip-types --no-warnings \
+    --conditions @typescript/source --test --test-timeout="${NP_TEST_TIMEOUT:-300000}" \
+    --test-reporter=spec --test-reporter-destination="$o/spec.log" \
+    --test-reporter="$t/reporter.mjs" --test-reporter-destination="$o/results.jsonl" \
+    './test/**/*.test.ts')
   local rc=$?
-  echo "rc $rc" >> "$o/meta.txt"
+  echo "rc $rc" >>"$o/meta.txt"
   node -e '
     const rows = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
     const tests = rows.filter(r => r.kind === "test"), n = {};
@@ -120,7 +145,10 @@ EOF
 # with the B side message for a new failure.
 diff_runs() {
   local a=$OUT/$1/results.jsonl b=$OUT/$2/results.jsonl
-  [[ -f $a && -f $b ]] || { echo "missing results: $a or $b" >&2; exit 2; }
+  [[ -f $a && -f $b ]] || {
+    echo "missing results: $a or $b" >&2
+    exit 2
+  }
   node -e '
     const fs = require("fs");
     const load = f => {
@@ -151,7 +179,13 @@ diff_runs() {
 }
 
 case ${1:-} in
-  run) [[ $# -eq 3 ]] || usage; run "$2" "$3" ;;
-  diff) [[ $# -eq 3 ]] || usage; diff_runs "$2" "$3" ;;
+  run)
+    [[ $# -eq 3 ]] || usage
+    run "$2" "$3"
+    ;;
+  diff)
+    [[ $# -eq 3 ]] || usage
+    diff_runs "$2" "$3"
+    ;;
   *) usage ;;
 esac

@@ -3,7 +3,10 @@
 # all its worktrees, and sets this repo's commit email to the GitHub noreply address.
 # usage: scripts/git-hooks/install.sh
 set -euo pipefail
-[[ ${1:-} != help ]] || { sed -n '2,4p' "$0" >&2; exit 2; }
+[[ ${1:-} != help ]] || {
+  sed -n '2,4p' "$0" >&2
+  exit 2
+}
 dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 hooks=$(git rev-parse --git-common-dir)/hooks
 mkdir -p "$hooks"

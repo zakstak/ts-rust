@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016 # Embedded child programs intentionally expand in the child interpreter.
 # Times the T3 Code projects without and with the Effect diagnostics (hyperfine, 1 warmup, RUNS
 # runs, default 5). Before the timing, one run per tool writes its exit code and diagnostic count.
 # usage: scripts/bench-apps/t3code.sh <work-dir> [sha]   (after setup.sh; default sha: the README's)
@@ -15,7 +16,10 @@
 #   tsc-rs    Effect diagnostics built in
 #   bun       bun check, then effect-tsgo diagnostics for the Effect diagnostics
 set -uo pipefail
-[[ $# -ge 1 ]] || { sed -n '4p' "$0" >&2; exit 2; }
+[[ $# -ge 1 ]] || {
+  sed -n '4p' "$0" >&2
+  exit 2
+}
 work=$(cd "$1" && pwd)
 sha=${2:-cd41c4ada0c70cc2eec95ecd7266f3dab010c58c}
 t3=$work/repos/t3code
@@ -47,7 +51,10 @@ fi
 RS=$work/node_modules/@tsc-rs/darwin-arm64/lib/tsc
 GO=$work/node_modules/@typescript/typescript-darwin-arm64/lib/tsc
 GOE=$(cd "$t3" && node_modules/.bin/effect-tsgo get-exe-path | tail -1)
-[[ -x $GOE ]] || { echo "no Effect-patched tsc: $GOE" >&2; exit 1; }
+[[ -x $GOE ]] || {
+  echo "no Effect-patched tsc: $GOE" >&2
+  exit 1
+}
 TS6="node --max-old-space-size=16384 $work/node_modules/ts6/lib/tsc.js"
 TS6E="node --max-old-space-size=16384 $work/ts6effect/node_modules/typescript/lib/tsc.js"
 BUN=$work/bun-darwin-aarch64/bun
@@ -61,22 +68,23 @@ tag=${TOOLS:+.${TOOLS// /+}}
 mkdir -p "$work/results"
 
 for p in $PROJECTS; do
-  cd "$t3/$p"
+  cd "$t3/$p" || exit
   slug=${p//\//-}
   for mode in $MODES; do
     if [[ $mode == noeffect ]]; then
       c=tsconfig.noeffect.json
       cmds=("$TS6 -p $c $F --pretty false" "$GO -p $c $F --pretty false" "$RS -p $c $F --pretty false"
-            "$BUN check -p $c $F --no-pretty --all")
+        "$BUN check -p $c $F --no-pretty --all")
     else
       c=tsconfig.json
       cmds=("$TS6E -p $c $F --pretty false" "$GOE -p $c $F --pretty false" "$RS -p $c $F --pretty false"
-            "sh -c '$BUN check -p $c $F --no-pretty --all; $ETSGO diagnostics --project $PWD/$c --format text'")
+        "sh -c '$BUN check -p $c $F --no-pretty --all; $ETSGO diagnostics --project $PWD/$c --format text'")
     fi
     out=$work/results/t3-$slug-$mode$tag
     : >"$out.diags"
     for i in "${sel[@]}"; do
-      o=$(eval "${cmds[$i]}" 2>&1); rc=$?
+      o=$(eval "${cmds[$i]}" 2>&1)
+      rc=$?
       n=$(grep -cE '(error|warning|message|suggestion) (TS[0-9]+|effect\()' <<<"$o")
       echo "${names[$i]} rc=$rc diags=$n" >>"$out.diags"
     done

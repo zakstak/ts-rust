@@ -10,31 +10,40 @@ try 1: goport_util built from goport-legacy1). A fingerprint dir whose dep-info 
 repository (the main checkout or any worktree) but outside <checkout> is removed, so cargo builds that unit
 again. Registry and git sources do not count. Prints one line per removed dir and a count.
 """
-import os, re, shutil, sys
 
-ROOT = '/home/theo/Code/sandbox/ts-rust/'
-PATH = re.compile(rb'/[\x21-\x7e]+')
+import os
+import re
+import shutil
+import sys
+
+ROOT = "/home/theo/Code/sandbox/ts-rust/"
+PATH = re.compile(rb"/[\x21-\x7e]+")
 
 
 def main():
     if len(sys.argv) != 3:
         sys.exit(__doc__)
-    target, checkout = sys.argv[1], os.path.realpath(sys.argv[2]) + '/'
+    target, checkout = sys.argv[1], os.path.realpath(sys.argv[2]) + "/"
     removed = 0
-    for profile in ('release', 'debug'):
-        fp = os.path.join(target, profile, '.fingerprint')
+    for profile in ("release", "debug"):
+        fp = os.path.join(target, profile, ".fingerprint")
         if not os.path.isdir(fp):
             continue
         for name in sorted(os.listdir(fp)):
             d = os.path.join(fp, name)
             foreign = None
             for f in os.listdir(d) if os.path.isdir(d) else []:
-                if not f.startswith('dep-'):
+                if not f.startswith("dep-"):
                     continue
-                with open(os.path.join(d, f), 'rb') as h:
+                with open(os.path.join(d, f), "rb") as h:
                     for m in PATH.finditer(h.read()):
-                        p = m.group().decode('ascii', 'replace')
-                        if p.startswith(ROOT) and not p.startswith(checkout) and '/registry/' not in p and '/git/checkouts/' not in p:
+                        p = m.group().decode("ascii", "replace")
+                        if (
+                            p.startswith(ROOT)
+                            and not p.startswith(checkout)
+                            and "/registry/" not in p
+                            and "/git/checkouts/" not in p
+                        ):
                             foreign = p
                             break
                 if foreign:
@@ -42,9 +51,9 @@ def main():
             if foreign:
                 shutil.rmtree(d)
                 removed += 1
-                print(f'removed {profile}/.fingerprint/{name} (built from {foreign})')
-    print(f'{removed} foreign fingerprint dir(s) removed')
+                print(f"removed {profile}/.fingerprint/{name} (built from {foreign})")
+    print(f"{removed} foreign fingerprint dir(s) removed")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

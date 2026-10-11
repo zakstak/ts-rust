@@ -39,65 +39,76 @@ import { fileURLToPath } from "node:url";
 import getExePath from "#getExePath";
 
 const pkgDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"));
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"),
+);
 const binPath = path.join(pkgDir, Object.values(pkg.bin)[0]);
 
 function keepLauncherReason() {
-    if (process.platform === "win32") return "Windows";
-    if (/\byarn\//.test(process.env.npm_config_user_agent ?? "")) return "Yarn";
-    if (!pkgDir.split(path.sep).includes("node_modules")) return "not installed in node_modules";
-    return undefined;
+  if (process.platform === "win32") return "Windows";
+  if (/\byarn\//.test(process.env.npm_config_user_agent ?? "")) return "Yarn";
+  if (!pkgDir.split(path.sep).includes("node_modules"))
+    return "not installed in node_modules";
+  return undefined;
 }
 
 function useNativeBin() {
-    if (keepLauncherReason()) return;
-    const exe = getExePath();
-    const out = execFileSync(exe, ["--version"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-    // tsc-rs records the version its tsc reports as tscVersion (npm/pack.mjs).
-    const want = `Version ${pkg.tscVersion ?? pkg.version}`;
-    if (out !== want) {
-        throw new Error(`${exe} reports "${out}", not "${want}"`);
+  if (keepLauncherReason()) return;
+  const exe = getExePath();
+  const out = execFileSync(exe, ["--version"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+  // tsc-rs records the version its tsc reports as tscVersion (npm/pack.mjs).
+  const want = `Version ${pkg.tscVersion ?? pkg.version}`;
+  if (out !== want) {
+    throw new Error(`${exe} reports "${out}", not "${want}"`);
+  }
+  const target = path.relative(
+    fs.realpathSync(path.dirname(binPath)),
+    fs.realpathSync(exe),
+  );
+  // npm links node_modules/.bin/<bin> to this path.
+  const npmLink = path.relative(
+    path.join(path.dirname(pkgDir), ".bin"),
+    binPath,
+  );
+  // The paths go in sh "..." strings on a JS line comment.
+  for (const p of [target, npmLink]) {
+    if (/["$`\\\n\r\u2028\u2029]/.test(p)) {
+      throw new Error(`cannot quote the path ${JSON.stringify(p)}`);
     }
-    const target = path.relative(fs.realpathSync(path.dirname(binPath)), fs.realpathSync(exe));
-    // npm links node_modules/.bin/<bin> to this path.
-    const npmLink = path.relative(path.join(path.dirname(pkgDir), ".bin"), binPath);
-    // The paths go in sh "..." strings on a JS line comment.
-    for (const p of [target, npmLink]) {
-        if (/["$`\\\n\r\u2028\u2029]/.test(p)) {
-            throw new Error(`cannot quote the path ${JSON.stringify(p)}`);
-        }
-    }
-    // p becomes a path of the bin that is not a symlink. A relative link target is relative to the
-    // link's dir.
-    const resolve = [
-        `p=$0; g="\${p%/*}/${npmLink}"`,
-        'if [ -L "$p" ] && [ ! -L "$g" ] && [ "$p" -ef "$g" ]; then p=$g',
-        "else case $p in */*) ;; *) p=./$p ;; esac",
-        'while [ -L "$p" ]; do t=$(readlink "$p"); case $t in /*) p=$t ;; *) p=${p%/*}/$t ;; esac; done; fi',
-    ].join("; ");
-    // When the native tsc is not at the path, the bin runs Go's launcher with Node (see above).
-    const run = `t="\${p%/*}/${target}"; [ -x "$t" ] || exec node "$p" "$@"; exec "$t" "$@"`;
-    const polyglot = `#!/bin/sh\n":" //; ${resolve}; ${run}\nimport "../lib/tsc.js";\n`;
-    const tmp = `${binPath}.${process.pid}.tmp`;
-    fs.rmSync(tmp, { force: true });
+  }
+  // p becomes a path of the bin that is not a symlink. A relative link target is relative to the
+  // link's dir.
+  const resolve = [
+    `p=$0; g="\${p%/*}/${npmLink}"`,
+    'if [ -L "$p" ] && [ ! -L "$g" ] && [ "$p" -ef "$g" ]; then p=$g',
+    "else case $p in */*) ;; *) p=./$p ;; esac",
+    'while [ -L "$p" ]; do t=$(readlink "$p"); case $t in /*) p=$t ;; *) p=${p%/*}/$t ;; esac; done; fi',
+  ].join("; ");
+  // When the native tsc is not at the path, the bin runs Go's launcher with Node (see above).
+  const run = `t="\${p%/*}/${target}"; [ -x "$t" ] || exec node "$p" "$@"; exec "$t" "$@"`;
+  const polyglot = `#!/bin/sh\n":" //; ${resolve}; ${run}\nimport "../lib/tsc.js";\n`;
+  const tmp = `${binPath}.${process.pid}.tmp`;
+  fs.rmSync(tmp, { force: true });
+  try {
+    fs.writeFileSync(tmp, polyglot);
+    fs.chmodSync(tmp, 0o755);
+    fs.renameSync(tmp, binPath);
+  } catch (e) {
+    // A failed write, chmod or rename leaves no temp file; the bin is not changed.
     try {
-        fs.writeFileSync(tmp, polyglot);
-        fs.chmodSync(tmp, 0o755);
-        fs.renameSync(tmp, binPath);
-    }
-    catch (e) {
-        // A failed write, chmod or rename leaves no temp file; the bin is not changed.
-        try {
-            fs.rmSync(tmp, { force: true });
-        }
-        catch {}
-        throw e;
-    }
+      fs.rmSync(tmp, { force: true });
+    } catch {}
+    throw e;
+  }
 }
 
 try {
-    useNativeBin();
-}
-catch (e) {
-    console.warn(`${pkg.name}: ${path.relative(pkgDir, binPath)} keeps the Node launcher: ${e instanceof Error ? e.message : e}`);
+  useNativeBin();
+} catch (e) {
+  console.warn(
+    `${pkg.name}: ${path.relative(pkgDir, binPath)} keeps the Node launcher: ${e instanceof Error ? e.message : e}`,
+  );
 }

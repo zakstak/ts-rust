@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016 # Embedded child programs intentionally expand in the child interpreter.
 # Builds the release goport binaries: PGO, then BOLT. Only build options
 # change, not the source.
 #
@@ -245,7 +246,10 @@ static="${RELEASE_STATIC:-0}"
 case $libc in
   gnu) jemalloc="${RELEASE_JEMALLOC:-$((static == 1 ? 0 : 1))}" ;;
   musl) static=1 jemalloc="${RELEASE_JEMALLOC:-1}" ;;
-  *) echo "error: RELEASE_LIBC is gnu or musl, not $libc" >&2; exit 1 ;;
+  *)
+    echo "error: RELEASE_LIBC is gnu or musl, not $libc" >&2
+    exit 1
+    ;;
 esac
 features="${RELEASE_FEATURES:-}"
 # A shipped release is the noembed build (see the header).
@@ -278,9 +282,15 @@ target="$host"
 if [[ $libc == musl ]]; then
   target="${host%-gnu}-musl"
   # -Cprofile-generate needs the profiler runtime of the target's std.
-  compgen -G "$sysroot/lib/rustlib/$target/lib/libprofiler_builtins-*.rlib" > /dev/null \
-    || { echo "error: no std for $target in $sysroot (rustup target add $target)" >&2; exit 1; }
-  command -v musl-gcc > /dev/null || { echo "error: musl-gcc not found (package musl); jemalloc needs it" >&2; exit 1; }
+  compgen -G "$sysroot/lib/rustlib/$target/lib/libprofiler_builtins-*.rlib" >/dev/null ||
+    {
+      echo "error: no std for $target in $sysroot (rustup target add $target)" >&2
+      exit 1
+    }
+  command -v musl-gcc >/dev/null || {
+    echo "error: musl-gcc not found (package musl); jemalloc needs it" >&2
+    exit 1
+  }
 fi
 rustc_llvm="$(rustc -vV | sed -n 's/^LLVM version: \([0-9]*\).*/\1/p')"
 profdata="${LLVM_PROFDATA:-}"
@@ -305,14 +315,26 @@ if ((profdata_llvm > rustc_llvm)); then
 fi
 if [[ $bolt == 1 ]]; then
   for tool in llvm-bolt perf2bolt merge-fdata llvm-objcopy perf; do
-    command -v "$tool" > /dev/null || { echo "error: $tool not found (or set RELEASE_BOLT=0)" >&2; exit 1; }
+    command -v "$tool" >/dev/null || {
+      echo "error: $tool not found (or set RELEASE_BOLT=0)" >&2
+      exit 1
+    }
   done
-  perf record -q -e cycles:u -j any,u -o /dev/null -- true 2> /dev/null \
-    || { echo "error: perf branch sampling (-j any,u) does not work here (or set RELEASE_BOLT=0)" >&2; exit 1; }
+  perf record -q -e cycles:u -j any,u -o /dev/null -- true 2>/dev/null ||
+    {
+      echo "error: perf branch sampling (-j any,u) does not work here (or set RELEASE_BOLT=0)" >&2
+      exit 1
+    }
 fi
 
-command -v qemu-x86_64 > /dev/null || { echo "error: qemu-x86_64 not found (package qemu-user); step 6 needs it" >&2; exit 1; }
-command -v python3 > /dev/null || { echo "error: python3 not found; check_np_config and the editor sessions need it" >&2; exit 1; }
+command -v qemu-x86_64 >/dev/null || {
+  echo "error: qemu-x86_64 not found (package qemu-user); step 6 needs it" >&2
+  exit 1
+}
+command -v python3 >/dev/null || {
+  echo "error: python3 not found; check_np_config and the editor sessions need it" >&2
+  exit 1
+}
 
 # floor_sysroot <dir>: makes the glibc 2.28 sysroot of the dynamic build in
 # <dir>, from Arch Linux packages of April 2019 (built for plain x86-64):
@@ -327,10 +349,16 @@ floor_sysroot() {
   rm -rf "$dir"
   mkdir -p "$dir/pkgs"
   while read -r sum pkg; do
-    curl -sfL -o "$dir/pkgs/${pkg##*/}" "https://archive.archlinux.org/packages/$pkg" \
-      || { echo "error: cannot download $pkg" >&2; exit 1; }
-    echo "$sum  $dir/pkgs/${pkg##*/}" | sha256sum -c --quiet - || { echo "error: $pkg does not match its sha256" >&2; exit 1; }
-  done << 'PKGS'
+    curl -sfL -o "$dir/pkgs/${pkg##*/}" "https://archive.archlinux.org/packages/$pkg" ||
+      {
+        echo "error: cannot download $pkg" >&2
+        exit 1
+      }
+    echo "$sum  $dir/pkgs/${pkg##*/}" | sha256sum -c --quiet - || {
+      echo "error: $pkg does not match its sha256" >&2
+      exit 1
+    }
+  done <<'PKGS'
 34fa06bac690f62f7167ef68c04978cad90d0fcf505abbac2bd563f20ee0803b g/glibc/glibc-2.28-6-x86_64.pkg.tar.xz
 5c891731216b2752ddd15cd5851216d85e9a17dd5807ba02b88ff6597909e805 l/linux-api-headers/linux-api-headers-5.0.7-1-any.pkg.tar.xz
 400e2ecb1b2dfb40e09cdb6805f0075cbc88e6fcef9b73f23c64a6e709dcd61b g/gcc-libs/gcc-libs-8.3.0-1-x86_64.pkg.tar.xz
@@ -360,8 +388,11 @@ elif [[ $static == 1 ]]; then
     # in linker scripts (libm.a is one) point into it too.
     # The same libgcc dir as the host cc uses (not a multilib dir like 32/).
     libgcc_dir="$RELEASE_SYSROOT$(dirname "$(cc -print-libgcc-file-name)")"
-    [[ -f $RELEASE_SYSROOT/usr/lib/libc.a && -f $libgcc_dir/libgcc_eh.a ]] \
-      || { echo "error: RELEASE_SYSROOT needs usr/lib/libc.a and $libgcc_dir/libgcc_eh.a" >&2; exit 1; }
+    [[ -f $RELEASE_SYSROOT/usr/lib/libc.a && -f $libgcc_dir/libgcc_eh.a ]] ||
+      {
+        echo "error: RELEASE_SYSROOT needs usr/lib/libc.a and $libgcc_dir/libgcc_eh.a" >&2
+        exit 1
+      }
     link_flags+=" -C link-arg=--sysroot=$RELEASE_SYSROOT"
     for d in "$RELEASE_SYSROOT/usr/lib" "$libgcc_dir"; do
       link_flags+=" -C link-arg=-B$d -C link-arg=-L$d"
@@ -371,8 +402,11 @@ else
   glibc_root="${RELEASE_SYSROOT:-$data_root/target/goport-release-sysroot/glibc-2.28}"
   [[ -n ${RELEASE_SYSROOT:-} ]] || floor_sysroot "$glibc_root"
   glibc_root="$(cd -- "$glibc_root" && pwd)"
-  [[ -f $glibc_root/usr/lib/libc.so.6 && -f $glibc_root/usr/include/stdio.h && -e $glibc_root/lib64/ld-linux-x86-64.so.2 ]] \
-    || { echo "error: $glibc_root needs usr/lib/libc.so.6, usr/include/stdio.h and lib64/ld-linux-x86-64.so.2" >&2; exit 1; }
+  [[ -f $glibc_root/usr/lib/libc.so.6 && -f $glibc_root/usr/include/stdio.h && -e $glibc_root/lib64/ld-linux-x86-64.so.2 ]] ||
+    {
+      echo "error: $glibc_root needs usr/lib/libc.so.6, usr/include/stdio.h and lib64/ld-linux-x86-64.so.2" >&2
+      exit 1
+    }
   # -B and -L come before gcc's own paths (gcc otherwise also searches the
   # host /usr/lib), so crt files, libc.so, libgcc_s.so come from here.
   # --sysroot sends the absolute paths in libc.so (a linker script) and the
@@ -398,7 +432,7 @@ feature_args=()
 malloc_env() {
   local src="$repo/crates/ts_goport/src/bin/$1.rs"
   if [[ $jemalloc == 1 ]]; then
-    sed -n 's/^const JEMALLOC_CONF: &str = "\([^"]*\)";$/_RJEM_MALLOC_CONF=\1/p' "$src" 2> /dev/null | head -1 || true
+    sed -n 's/^const JEMALLOC_CONF: &str = "\([^"]*\)";$/_RJEM_MALLOC_CONF=\1/p' "$src" 2>/dev/null | head -1 || true
   fi
 }
 
@@ -408,7 +442,10 @@ malloc_env() {
 if [[ $jemalloc == 1 ]]; then
   JEMALLOC_SYS_WITH_MALLOC_CONF="$(malloc_env tsgo)"
   export JEMALLOC_SYS_WITH_MALLOC_CONF="${JEMALLOC_SYS_WITH_MALLOC_CONF#_RJEM_MALLOC_CONF=}"
-  [[ -n $JEMALLOC_SYS_WITH_MALLOC_CONF ]] || { echo "error: no JEMALLOC_CONF line in bin/tsgo.rs" >&2; exit 1; }
+  [[ -n $JEMALLOC_SYS_WITH_MALLOC_CONF ]] || {
+    echo "error: no JEMALLOC_CONF line in bin/tsgo.rs" >&2
+    exit 1
+  }
 fi
 
 # libs_to <dir>: a noembed bin reads the lib files next to it, so each dir
@@ -426,7 +463,10 @@ build() {
   echo "== build $name ($flags) ${feature_args[*]}"
   env "${c_env[@]}" CARGO_TARGET_DIR="$out/$name" TS_CARGO_SEPARATE_TARGET=1 TS_CARGO_SCCACHE=0 RUSTFLAGS="$flags" \
     "${cargo_cmd[@]}" build --profile goport --offline --locked -p ts_goport --target "$target" "${feature_args[@]}" "${bin_args[@]}" \
-    > "$out/build-$name.log" 2>&1 || { tail -20 "$out/build-$name.log" >&2; exit 1; }
+    >"$out/build-$name.log" 2>&1 || {
+    tail -20 "$out/build-$name.log" >&2
+    exit 1
+  }
 }
 
 P="$data_root/target/project-inputs"
@@ -467,7 +507,7 @@ effect_np() {
     ln -s "$e" "$np/packages/effect/"
   done
   awk '/"plugins": \[/ { skip = 1 } !skip { print } skip && /^    \}\]/ { skip = 0 }' \
-    "$src/tsconfig.base.json" > "$np/tsconfig.base.json"
+    "$src/tsconfig.base.json" >"$np/tsconfig.base.json"
   check_np_config "$src/tsconfig.base.json" "$np/tsconfig.base.json" || exit 1
 }
 
@@ -477,7 +517,7 @@ effect_np() {
 # compilerOptions.plugins. Else effectnp would train on a broken config (tsgo
 # reports it and checks less), or on the config of effect, with no error.
 check_np_config() {
-  python3 - "$1" "$2" << 'PY'
+  python3 - "$1" "$2" <<'PY'
 import json, re, sys
 
 STRING = r'"(?:\\.|[^"\\])*"'
@@ -522,7 +562,7 @@ libs_to "$gen"
 killed=0
 train() {
   local rc=0
-  "$@" > /dev/null 2>&1 || rc=$?
+  "$@" >/dev/null 2>&1 || rc=$?
   if ((rc > 128 && rc != 124)); then
     killed=$((killed + 1))
     echo "training run killed (exit $rc): $*" >&2
@@ -596,7 +636,10 @@ fi
 if [[ $static != 1 ]]; then
   for b in "${shipped[@]}"; do
     need="$(objdump -T "$use/$b" | grep -o 'GLIBC_[0-9][0-9.]*' | sort -uV | tail -1)"
-    [[ -n $need ]] || { echo "error: objdump -T shows no GLIBC_ version in $use/$b" >&2; exit 1; }
+    [[ -n $need ]] || {
+      echo "error: objdump -T shows no GLIBC_ version in $use/$b" >&2
+      exit 1
+    }
     if [[ $(printf '%s\n' "$need" "GLIBC_$glibc_floor" | sort -V | tail -1) != "GLIBC_$glibc_floor" ]]; then
       echo "error: $b needs $need, above the glibc floor $glibc_floor: $(objdump -T "$use/$b" | grep "($need)" | awk '{print $NF}' | head -5 | xargs)" >&2
       exit 1
@@ -621,9 +664,9 @@ if [[ $static == 1 || $jemalloc == 1 ]]; then
       /^[0-9a-f]+ <.*>:$/ { fn = substr($2, 2, length($2) - 3); next }
       fn !~ /^_(ZN|R)/ && fn !~ /avx|evex|fma|xsave/ &&
         /\t(v[a-z0-9]+|andn|bextr|blsi|blsmsk|blsr|bzhi|pdep|pext|mulx|rorx|sarx|shlx|shrx|k[a-z]+[bwdq]) / { bad[fn]++ }
-      END { for (f in bad) print f }' > "$out/cpu-check-$b.txt"
+      END { for (f in bad) print f }' >"$out/cpu-check-$b.txt"
     if [[ -s $out/cpu-check-$b.txt ]]; then
-      echo "error: $b has AVX or BMI code in $(wc -l < "$out/cpu-check-$b.txt") non-Rust functions, for example $(sort "$out/cpu-check-$b.txt" | head -3 | xargs)." >&2
+      echo "error: $b has AVX or BMI code in $(wc -l <"$out/cpu-check-$b.txt") non-Rust functions, for example $(sort "$out/cpu-check-$b.txt" | head -3 | xargs)." >&2
       echo "The static libc or libgcc (see RELEASE_SYSROOT) or jemalloc (see CFLAGS) is not built for plain x86-64." >&2
       exit 1
     fi
@@ -658,8 +701,11 @@ rec() {
   shift 2
   perf record -q -e cycles:u -j any,u -F "${freq:-${BOLT_PERF_FREQ:-20000}}" -o "$bolt_dir/data/$name.data" -- bash -c \
     'n=$1; t=$2; shift 2; for ((i = 0; i < n; i++)); do rm -rf "$t"/*.tsbuildinfo "$t"/out-*; "$@"; done; true' \
-    _ "$count" "$tmp" "$@" > "$bolt_dir/data/$name.out" 2>&1 || true
-  [[ -s "$bolt_dir/data/$name.data" ]] || { echo "error: no perf data for $name" >&2; exit 1; }
+    _ "$count" "$tmp" "$@" >"$bolt_dir/data/$name.out" 2>&1 || true
+  [[ -s "$bolt_dir/data/$name.data" ]] || {
+    echo "error: no perf data for $name" >&2
+    exit 1
+  }
 }
 
 # lsp_rec <name> <bin> <inputs-dir> <session>...: one recording of editor
@@ -668,8 +714,12 @@ lsp_rec() {
   local name=$1 b=$2
   shift 2
   freq=${BOLT_LSP_PERF_FREQ:-2500} rec "$name" 1 python3 "$script_dir/lsp-train.py" "$b" "$@"
-  grep -qx 'lsp-train: ok' "$bolt_dir/data/$name.out" \
-    || { tail -5 "$bolt_dir/data/$name.out" >&2; echo "error: the editor sessions of the BOLT training failed" >&2; exit 1; }
+  grep -qx 'lsp-train: ok' "$bolt_dir/data/$name.out" ||
+    {
+      tail -5 "$bolt_dir/data/$name.out" >&2
+      echo "error: the editor sessions of the BOLT training failed" >&2
+      exit 1
+    }
 }
 
 # bolt_train <bin> <path>: the training runs of one bin.
@@ -691,13 +741,17 @@ bolt_train() {
         # shellcheck disable=SC2086 # one argument per session
         lsp_rec tsgo-lsp "$b" "$P" $lsp_sessions
         if ((${#lsp_np[@]})); then lsp_rec tsgo-lsp-np "$b" "$tmp/np" "${lsp_np[@]}"; fi
-      fi ;;
+      fi
+      ;;
     goport)
-      for name in query hono zod effect effectnp; do rec "goport-$name" "${reps[$name]}" "$b" -p "${projects[$name]}"; done ;;
+      for name in query hono zod effect effectnp; do rec "goport-$name" "${reps[$name]}" "$b" -p "${projects[$name]}"; done
+      ;;
     goport_emit)
-      for name in query hono; do rec "goport_emit-$name" "${reps[$name]}" "$b" -p "${projects[$name]}" --outDir "$tmp/out-$name"; done ;;
+      for name in query hono; do rec "goport_emit-$name" "${reps[$name]}" "$b" -p "${projects[$name]}" --outDir "$tmp/out-$name"; done
+      ;;
     goport_typesyms)
-      for name in query hono; do rec "goport_typesyms-$name" "${reps[$name]}" "$b" -p "${projects[$name]}" -o "$tmp/out-$name"; done ;;
+      for name in query hono; do rec "goport_typesyms-$name" "${reps[$name]}" "$b" -p "${projects[$name]}" -o "$tmp/out-$name"; done
+      ;;
     goport_build)
       # Writable copy of the query monorepo; the top-level node_modules is a link.
       src="$P/query/source" dst="$tmp/query-build"
@@ -709,7 +763,8 @@ bolt_train() {
       chmod -R u+w "$dst"
       find "$dst" -path '*/node_modules' -prune -o -name '*.tsbuildinfo' -print0 | xargs -0 -r rm -f
       (cd "$dst" && rec goport_build-query-chain 1 "$b" -b packages/query-sync-storage-persister/tsconfig.json)
-      rm -rf "$dst" ;;
+      rm -rf "$dst"
+      ;;
   esac
 }
 
@@ -722,7 +777,7 @@ if [[ $bolt == 1 ]]; then
     # stops ("parent function not found"). Rust paths make such names
     # ("Session..warm_auto_import_cache"). Rename them in a copy: "..warm" to
     # "..Warm" (same length, only .symtab changes).
-    nm "$use/$b" | awk '$2 ~ /^[tT]$/ && $3 ~ /\.\.(cold|warm)/ {r = $3; gsub(/\.\.cold/, "..Cold", r); gsub(/\.\.warm/, "..Warm", r); print $3, r}' > "$bolt_dir/$b.rename.txt"
+    nm "$use/$b" | awk '$2 ~ /^[tT]$/ && $3 ~ /\.\.(cold|warm)/ {r = $3; gsub(/\.\.cold/, "..Cold", r); gsub(/\.\.warm/, "..Warm", r); print $3, r}' >"$bolt_dir/$b.rename.txt"
     llvm-objcopy --redefine-syms="$bolt_dir/$b.rename.txt" "$use/$b" "$bolt_dir/input/$b"
     # The bin sets its malloc variable and execs itself unless the caller set it.
     unset GLIBC_TUNABLES _RJEM_MALLOC_CONF
@@ -730,16 +785,25 @@ if [[ $bolt == 1 ]]; then
     [[ -n $tunables ]] && export "${tunables?}"
     bolt_train "$b" "$bolt_dir/input/$b"
     for d in "$bolt_dir/data/$b"-*.data; do
-      perf2bolt "${p2b_opts[@]}" -p "$d" -o "${d%.data}.fdata" "$bolt_dir/input/$b" > "${d%.data}.p2b.log" 2>&1 \
-        || { tail -5 "${d%.data}.p2b.log" >&2; exit 1; }
+      perf2bolt "${p2b_opts[@]}" -p "$d" -o "${d%.data}.fdata" "$bolt_dir/input/$b" >"${d%.data}.p2b.log" 2>&1 ||
+        {
+          tail -5 "${d%.data}.p2b.log" >&2
+          exit 1
+        }
       # Samples in the kernel (and, when dynamic, in libc) count as unknown:
       # 10 to 25%. Most of them unknown means the samples did not map to the bin.
       pct="$(sed -n 's/.*involving unknown regions: [0-9]* (\([0-9]*\)\..*/\1/p' "${d%.data}.p2b.log")"
-      [[ -n $pct ]] && ((pct < 50)) || { echo "error: the samples in $d do not map to $b" >&2; exit 1; }
+      if ! { [[ -n $pct ]] && ((pct < 50)); }; then
+        echo "error: the samples in $d do not map to $b" >&2
+        exit 1
+      fi
     done
-    merge-fdata "$bolt_dir/data/$b"-*.fdata > "$bolt_dir/$b.fdata" 2> "$bolt_dir/$b.merge.log"
-    llvm-bolt "$bolt_dir/input/$b" -o "$out/bin/$b" -data="$bolt_dir/$b.fdata" "${bolt_opts[@]}" > "$bolt_dir/$b.bolt.log" 2>&1 \
-      || { tail -20 "$bolt_dir/$b.bolt.log" >&2; exit 1; }
+    merge-fdata "$bolt_dir/data/$b"-*.fdata >"$bolt_dir/$b.fdata" 2>"$bolt_dir/$b.merge.log"
+    llvm-bolt "$bolt_dir/input/$b" -o "$out/bin/$b" -data="$bolt_dir/$b.fdata" "${bolt_opts[@]}" >"$bolt_dir/$b.bolt.log" 2>&1 ||
+      {
+        tail -20 "$bolt_dir/$b.bolt.log" >&2
+        exit 1
+      }
     echo "bolt $b: $(grep -m1 -o '[0-9]* out of [0-9]* functions in the binary ([0-9.]*%) have non-empty execution profile' "$bolt_dir/$b.bolt.log" || true)"
   done
   unset GLIBC_TUNABLES _RJEM_MALLOC_CONF
@@ -752,15 +816,15 @@ fi
 check_headers() {
   local f=$1 hdrs stack phoff phdr load
   hdrs="$(readelf -lW "$f")"
-  stack="$(awk '$1 == "GNU_STACK" { s = ""; for (i = 7; i < NF; i++) s = s $i; print s }' <<< "$hdrs")"
+  stack="$(awk '$1 == "GNU_STACK" { s = ""; for (i = 7; i < NF; i++) s = s $i; print s }' <<<"$hdrs")"
   if [[ $stack != RW ]]; then
     [[ -n $stack ]] && stack="PT_GNU_STACK flags ${stack//$'\n'/ and }" || stack="no PT_GNU_STACK"
     echo "error: $f has $stack, not one RW PT_GNU_STACK. glibc then maps thread stacks executable." >&2
     exit 1
   fi
-  phoff="$(sed -n 's/.*starting at offset \([0-9]*\)$/\1/p' <<< "$hdrs")"
-  read -r -a phdr <<< "$(awk '$1 == "PHDR" { print $2, $3; exit }' <<< "$hdrs")"
-  read -r -a load <<< "$(awk '$1 == "LOAD" { print $2, $3; exit }' <<< "$hdrs")"
+  phoff="$(sed -n 's/.*starting at offset \([0-9]*\)$/\1/p' <<<"$hdrs")"
+  read -r -a phdr <<<"$(awk '$1 == "PHDR" { print $2, $3; exit }' <<<"$hdrs")"
+  read -r -a load <<<"$(awk '$1 == "LOAD" { print $2, $3; exit }' <<<"$hdrs")"
   if ((${#phdr[@]} == 2 && phoff + load[1] - load[0] != phdr[1])); then
     echo "error: $f has its program header table at file offset $(printf '%#x' "$phoff"), but PT_PHDR says address $(printf '%#x' "${phdr[1]}"). Kernels before 5.18 would read the wrong table (was the bin stripped?)." >&2
     exit 1
@@ -789,7 +853,7 @@ check_run() {
   rm -f "$tmp/cpu-check.tsbuildinfo"
   # No core file: qemu would write it to the current dir on a crash.
   (ulimit -c 0 && exec env ${tunables:+"$tunables"} "$@" -p "${projects[$name]}" \
-    --noEmit --pretty false --tsBuildInfoFile "$tmp/cpu-check.tsbuildinfo") > "$log" 2>&1 || code=$?
+    --noEmit --pretty false --tsBuildInfoFile "$tmp/cpu-check.tsbuildinfo") >"$log" 2>&1 || code=$?
   echo "$code"
 }
 for name in query hono; do
@@ -831,12 +895,18 @@ done
   echo "lib files: $([[ $noembed == 1 ]] && echo "next to the bins (noembed)" || echo "embedded")"
   if [[ $bolt == 1 ]]; then
     echo "bolt: $(llvm-bolt --version | grep -m1 'LLVM version' | xargs), ${bolt_opts[*]}"
-    echo "bolt perf: -F ${BOLT_PERF_FREQ:-20000}, kernel.perf_event_max_sample_rate $(cat /proc/sys/kernel/perf_event_max_sample_rate 2> /dev/null || echo unknown) at the end"
+    echo "bolt perf: -F ${BOLT_PERF_FREQ:-20000}, kernel.perf_event_max_sample_rate $(cat /proc/sys/kernel/perf_event_max_sample_rate 2>/dev/null || echo unknown) at the end"
     if [[ -n $lsp_sessions ]]; then
-      echo "bolt editor sessions (tsgo, ${BOLT_LSP_PERF_FREQ:-2500} Hz): $({ sed -n 's/^lsp-train: \(.*\): [0-9]* of .*/\1/p' "$bolt_dir/data/tsgo-lsp.out"; sed -n 's/^lsp-train: \(.*\): [0-9]* of .*/\1 (no plugin)/p' "$bolt_dir/data/tsgo-lsp-np.out"; } 2> /dev/null | paste -sd';' | sed 's/;/; /g'); ls_edit_bench.py sha256 $(sha256sum "$repo/scripts/goport/ls_edit_bench.py" | cut -c1-12)"
+      echo "bolt editor sessions (tsgo, ${BOLT_LSP_PERF_FREQ:-2500} Hz): $({
+        sed -n 's/^lsp-train: \(.*\): [0-9]* of .*/\1/p' "$bolt_dir/data/tsgo-lsp.out"
+        sed -n 's/^lsp-train: \(.*\): [0-9]* of .*/\1 (no plugin)/p' "$bolt_dir/data/tsgo-lsp-np.out"
+      } 2>/dev/null | paste -sd';' | sed 's/;/; /g'); ls_edit_bench.py sha256 $(sha256sum "$repo/scripts/goport/ls_edit_bench.py" | cut -c1-12)"
     fi
   else
     echo "bolt: off"
   fi
-} > "$out/bin/BUILD.txt"
-echo "release binaries: $out/bin/{$(IFS=,; echo "${shipped[*]}")}"
+} >"$out/bin/BUILD.txt"
+echo "release binaries: $out/bin/{$(
+  IFS=,
+  echo "${shipped[*]}"
+)}"

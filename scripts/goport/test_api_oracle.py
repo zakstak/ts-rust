@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Unit tests for api_oracle.py protocol 3 (pin B) and protocol 4 (pin N). No server runs.
 
-  python3 scripts/goport/test_api_oracle.py
+python3 scripts/goport/test_api_oracle.py
 """
+
 import importlib.util
 import os
 import unittest
@@ -15,7 +16,9 @@ def load(pin):
     old = os.environ.get("GOPORT_PIN_ACTIVE")
     os.environ["GOPORT_PIN_ACTIVE"] = pin
     try:
-        spec = importlib.util.spec_from_file_location(f"api_oracle_{pin}", os.path.join(HERE, "api_oracle.py"))
+        spec = importlib.util.spec_from_file_location(
+            f"api_oracle_{pin}", os.path.join(HERE, "api_oracle.py")
+        )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
@@ -46,8 +49,14 @@ def events(mod):
 
 
 def run(mod, wire=None):
-    r = mod.SessionRun({"project": {"dir": "/p", "tsconfig": "tsconfig.json"}}, [], "tsgo", "oracle", "/tmp",
-                       wire=wire)
+    r = mod.SessionRun(
+        {"project": {"dir": "/p", "tsconfig": "tsconfig.json"}},
+        [],
+        "tsgo",
+        "oracle",
+        "/tmp",
+        wire=wire,
+    )
     r.ctx = {"snapshot": None, "projects": []}
     return r
 
@@ -62,52 +71,116 @@ class Protocol(unittest.TestCase):
 
     def test_b_events_unchanged(self):
         ev = events(B)
-        self.assertEqual([e["method"] for e in ev], ["updateSnapshot"] * 4 + ["updateTemporarySnapshot"] * 2
-                         + ["updateSnapshot"] * 3)
-        self.assertEqual([e["params"] for e in ev], [OPEN, {}, CHANGE, OPEN, TEMP, {"snapshot": 999, **TEMP},
-                                                     {}, OPEN, {}])
+        self.assertEqual(
+            [e["method"] for e in ev],
+            ["updateSnapshot"] * 4
+            + ["updateTemporarySnapshot"] * 2
+            + ["updateSnapshot"] * 3,
+        )
+        self.assertEqual(
+            [e["params"] for e in ev],
+            [OPEN, {}, CHANGE, OPEN, TEMP, {"snapshot": 999, **TEMP}, {}, OPEN, {}],
+        )
         self.assertEqual(ev[4]["paramsFrom"], PF)
         self.assertFalse(any("track" in e for e in ev))
 
     def test_n_events(self):
         ev = events(N)
-        s, fn = "@SNAPSHOT@", {"fileNotifications": CHANGE["fileChanges"], "ensurePrograms": True}
-        layer = {"fileSystem": {"kind": "layer", "files": {TEMP["file"]: "x"}}, "ensurePrograms": True}
-        self.assertEqual([(e["method"], e["params"]) for e in ev], [
-            ("createSnapshot", OPEN), ("updateSnapshot", {"snapshot": s}),
-            ("updateSnapshot", {"snapshot": s, "changes": fn}), ("updateSnapshot", {"snapshot": s, "changes": OPEN}),
-            ("updateSnapshot", {"changes": layer}), ("updateSnapshot", {"snapshot": 999, "changes": layer}),
-            ("getCurrentLanguageServerSnapshot", {}),
-            ("getCurrentLanguageServerSnapshot", {"baseSnapshot": s, "changes": OPEN}),
-            ("getCurrentLanguageServerSnapshot", {"baseSnapshot": s})])
+        s, fn = (
+            "@SNAPSHOT@",
+            {"fileNotifications": CHANGE["fileChanges"], "ensurePrograms": True},
+        )
+        layer = {
+            "fileSystem": {"kind": "layer", "files": {TEMP["file"]: "x"}},
+            "ensurePrograms": True,
+        }
+        self.assertEqual(
+            [(e["method"], e["params"]) for e in ev],
+            [
+                ("createSnapshot", OPEN),
+                ("updateSnapshot", {"snapshot": s}),
+                ("updateSnapshot", {"snapshot": s, "changes": fn}),
+                ("updateSnapshot", {"snapshot": s, "changes": OPEN}),
+                ("updateSnapshot", {"changes": layer}),
+                ("updateSnapshot", {"snapshot": 999, "changes": layer}),
+                ("getCurrentLanguageServerSnapshot", {}),
+                (
+                    "getCurrentLanguageServerSnapshot",
+                    {"baseSnapshot": s, "changes": OPEN},
+                ),
+                ("getCurrentLanguageServerSnapshot", {"baseSnapshot": s}),
+            ],
+        )
         self.assertEqual([e.get("track") for e in ev][4:6], [False, False])
         self.assertEqual(ev[4]["paramsFrom"], PF)
 
     def test_wire3_inverts(self):
         self.assertEqual([N.wire3_event(e) for e in events(N)], events(B))
-        self.assertEqual(N.wire3("getSemanticDiagnostics", {"x": 1}), ("getSemanticDiagnostics", {"x": 1}))
+        self.assertEqual(
+            N.wire3("getSemanticDiagnostics", {"x": 1}),
+            ("getSemanticDiagnostics", {"x": 1}),
+        )
 
     def test_expand_keys(self):
-        ctx = {"snapshot": 7, "project_dir": "/p", "run_dir": "/r", "tsconfig": "tsconfig.json", "projects": []}
-        got = N.expand({"snapshot": "@SNAPSHOT@", "files": {"@PROJECT_DIR@/a.ts": "@RUN_DIR@"}}, ctx)
+        ctx = {
+            "snapshot": 7,
+            "project_dir": "/p",
+            "run_dir": "/r",
+            "tsconfig": "tsconfig.json",
+            "projects": [],
+        }
+        got = N.expand(
+            {"snapshot": "@SNAPSHOT@", "files": {"@PROJECT_DIR@/a.ts": "@RUN_DIR@"}},
+            ctx,
+        )
         self.assertEqual(got, {"snapshot": 7, "files": {"/p/a.ts": "/r"}})
 
     def test_track(self):
         a, b, c = proj("a"), proj("b"), proj("c")
         r = run(N)
-        r._track({"method": "createSnapshot"}, OPEN, {"snapshot": 1, "projects": [a, b]})
-        r._track({"method": "updateSnapshot"}, {}, {"snapshot": 2, "projects": [proj("a", 1), c],
-                                                    "changes": {"removedProjects": ["b"]}})
+        r._track(
+            {"method": "createSnapshot"}, OPEN, {"snapshot": 1, "projects": [a, b]}
+        )
+        r._track(
+            {"method": "updateSnapshot"},
+            {},
+            {
+                "snapshot": 2,
+                "projects": [proj("a", 1), c],
+                "changes": {"removedProjects": ["b"]},
+            },
+        )
         self.assertEqual(r.ctx, {"snapshot": 2, "projects": [proj("a", 1), c]})
-        r._track({"method": "updateSnapshot", "track": False}, {}, {"snapshot": 3, "projects": []})
-        r._track({"method": "getCurrentLanguageServerSnapshot"}, {}, {"snapshot": 4, "projects": [b]})
+        r._track(
+            {"method": "updateSnapshot", "track": False},
+            {},
+            {"snapshot": 3, "projects": []},
+        )
+        r._track(
+            {"method": "getCurrentLanguageServerSnapshot"},
+            {},
+            {"snapshot": 4, "projects": [b]},
+        )
         self.assertEqual(r.ctx, {"snapshot": 4, "projects": [b]})
-        r._track({"method": "getCurrentLanguageServerSnapshot"}, {"baseSnapshot": 4}, {"snapshot": 5, "projects": []})
+        r._track(
+            {"method": "getCurrentLanguageServerSnapshot"},
+            {"baseSnapshot": 4},
+            {"snapshot": 5, "projects": []},
+        )
         self.assertEqual(r.ctx, {"snapshot": 5, "projects": [b]})
-        for mod, wire in ((B, None), (N, 3)):  # protocol 3: each updateSnapshot answer replaces, nothing else
+        for mod, wire in (
+            (B, None),
+            (N, 3),
+        ):  # protocol 3: each updateSnapshot answer replaces, nothing else
             r = run(mod, wire)
-            r._track({"method": "updateSnapshot"}, {}, {"snapshot": 1, "projects": [a, b]})
-            r._track({"method": "updateTemporarySnapshot"}, {}, {"snapshot": 2, "projects": [c]})
+            r._track(
+                {"method": "updateSnapshot"}, {}, {"snapshot": 1, "projects": [a, b]}
+            )
+            r._track(
+                {"method": "updateTemporarySnapshot"},
+                {},
+                {"snapshot": 2, "projects": [c]},
+            )
             r._track({"method": "updateSnapshot"}, {}, {"snapshot": 3, "projects": [c]})
             self.assertEqual(r.ctx, {"snapshot": 3, "projects": [c]})
 
@@ -117,9 +190,20 @@ class Protocol(unittest.TestCase):
         self.assertEqual(r.events, events(B))
 
     def test_prepare_sorts_create(self):
-        ans = {"changes": {"changedProjects": {"p": {"changedFiles": ["b", "a"]}}, "removedProjects": ["y", "x"]}}
+        ans = {
+            "changes": {
+                "changedProjects": {"p": {"changedFiles": ["b", "a"]}},
+                "removedProjects": ["y", "x"],
+            }
+        }
         got = N.Normalizer([]).prepare("createSnapshot", ans)["changes"]
-        self.assertEqual(got, {"changedProjects": {"p": {"changedFiles": ["a", "b"]}}, "removedProjects": ["x", "y"]})
+        self.assertEqual(
+            got,
+            {
+                "changedProjects": {"p": {"changedFiles": ["a", "b"]}},
+                "removedProjects": ["x", "y"],
+            },
+        )
 
 
 if __name__ == "__main__":

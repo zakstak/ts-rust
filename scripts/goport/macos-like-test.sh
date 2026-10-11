@@ -17,12 +17,15 @@
 #   test args    passed to the binary, for example a name filter
 # One test thread (RUST_TEST_THREADS=1), as goport-tests.sh runs them.
 set -euo pipefail
-[[ $# -ge 1 && $1 != help ]] || { sed -n '2,18p' "$0" >&2; exit 2; }
+[[ $# -ge 1 && $1 != help ]] || {
+  sed -n '2,18p' "$0" >&2
+  exit 2
+}
 bin=$(realpath "$1")
 shift
 mnt=$(mktemp -d "${TMPDIR:-/tmp}/macos-like.XXXXXX")
 trap 'rmdir "$mnt"' EXIT
-unshare -rm bash -s -- "$mnt" "$bin" "$@" << 'EOF'
+unshare -rm bash -s -- "$mnt" "$bin" "$@" <<'EOF'
 set -euo pipefail
 mnt=$1 bin=$2
 shift 2

@@ -37,16 +37,16 @@ used parameters before resolving its return.
 
 ## Upstream anchors
 
-| Concern | Pinned typescript-go anchor |
-|---|---|
-| Counter ownership and reset | `checker.go` checker fields, `checkSourceElement`, `checkDeferredNode`, `checkExpressionEx` |
-| Call resolution and overload choice | `checkCallExpression`, `getResolvedSignature`, `resolveCallExpression`, `resolveCall`, `chooseOverload` |
-| Arity, constraints, applicability | `hasCorrectTypeArgumentArity`, `checkTypeArguments`, `isSignatureApplicable` |
-| Failure recovery | `getCandidateForOverloadFailure`, `pickLongestCandidateSignature`, `inferSignatureInstantiationForOverloadFailure` |
-| Lazy checked signature | `getSignatureInstantiationWithoutFillingInTypeArguments`, `instantiateSignatureEx` |
-| Lazy parameter type | `instantiateSymbol`, `getTypeOfInstantiatedSymbol`, `relater.go::getTypeAtPosition` |
-| Lazy return | `getReturnTypeOfSignature` |
-| Core accounting | `instantiateTypeWithAlias`, `pushActiveMapper`, `clearActiveMapperCaches` |
+| Concern                             | Pinned typescript-go anchor                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Counter ownership and reset         | `checker.go` checker fields, `checkSourceElement`, `checkDeferredNode`, `checkExpressionEx`                        |
+| Call resolution and overload choice | `checkCallExpression`, `getResolvedSignature`, `resolveCallExpression`, `resolveCall`, `chooseOverload`            |
+| Arity, constraints, applicability   | `hasCorrectTypeArgumentArity`, `checkTypeArguments`, `isSignatureApplicable`                                       |
+| Failure recovery                    | `getCandidateForOverloadFailure`, `pickLongestCandidateSignature`, `inferSignatureInstantiationForOverloadFailure` |
+| Lazy checked signature              | `getSignatureInstantiationWithoutFillingInTypeArguments`, `instantiateSignatureEx`                                 |
+| Lazy parameter type                 | `instantiateSymbol`, `getTypeOfInstantiatedSymbol`, `relater.go::getTypeAtPosition`                                |
+| Lazy return                         | `getReturnTypeOfSignature`                                                                                         |
+| Core accounting                     | `instantiateTypeWithAlias`, `pushActiveMapper`, `clearActiveMapperCaches`                                          |
 
 ## Counter and reset contract
 
@@ -92,8 +92,8 @@ instantiation routine, not by catching a top-level error.
 - active-mapper cache clearing after each inferred type; and
 - session-aware single and vector instantiation entry points.
 
-The recovering constructor validates that the error type belongs to the store.
-A limit hit does not increment query or total counts.
+The recovering constructor validates that the error type belongs to the store. A
+limit hit does not increment query or total counts.
 
 ### Generic-call leaf
 
@@ -115,8 +115,8 @@ fails atomically.
 
 ### Concrete generic-call replacement map
 
-The current eager implementation is concentrated enough to remain one leaf.
-Its two implementation commits should make these replacements:
+The current eager implementation is concentrated enough to remain one leaf. Its
+two implementation commits should make these replacements:
 
 1. Add one checked-signature shell get/create path and allocation-free warm
    validator. `prepare_generic_call_vector_signature` and
@@ -126,8 +126,8 @@ Its two implementation commits should make these replacements:
    publisher instead of building duplicate eager graphs.
 2. Reorder `project_validated_generic_call_vector` to perform arity, explicit
    constraints, checked-shell publication, left-to-right applicability, and
-   uncached recovery in that order. Replace `instantiate_generic_call_shape`
-   and `generic_call_projection` with individual parameter/return demand and
+   uncached recovery in that order. Replace `instantiate_generic_call_shape` and
+   `generic_call_projection` with individual parameter/return demand and
    recovery-shell helpers. Thread the same `InstantiationSession` through
    defaults, inference, constraints, and demand, clearing active mapper caches
    immediately after each inferred type is finalized.
@@ -145,8 +145,8 @@ ordinary `set_value_symbol_links` and `set_signature_resolved_return_type`
 writes also invalidate relations that observed a lazy `None` slot. No new
 semantic record or mandatory `store.rs` adapter is expected.
 
-Warm validation of an already resolved union return must remain allocation
-free. Prefer a local exact mapper-result verifier over the currently installed
+Warm validation of an already resolved union return must remain allocation free.
+Prefer a local exact mapper-result verifier over the currently installed
 intrinsic, literal, type-parameter, Array, and anonymous-union domain. If that
 becomes unreasonably duplicative, the only acceptable extra substrate is a
 read-only union-cache identity lookup; warm validation must never intern a type
@@ -225,12 +225,12 @@ writes remain clean.
 
 After S2 integrates:
 
-| Slot | Ownership |
-|---|---|
-| Root | `production.rs`, `source.rs`, `source_calls.rs`, `type_nodes.rs`, serial Cargo/integration |
-| Leaf A | `instantiate.rs` only |
-| Leaf B | `generic_calls.rs` only |
-| Reviewer/tests | adversarial review first; then the new public test target without production-file edits |
+| Slot           | Ownership                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| Root           | `production.rs`, `source.rs`, `source_calls.rs`, `type_nodes.rs`, serial Cargo/integration |
+| Leaf A         | `instantiate.rs` only                                                                      |
+| Leaf B         | `generic_calls.rs` only                                                                    |
+| Reviewer/tests | adversarial review first; then the new public test target without production-file edits    |
 
 The leaves agree on the session API before either implementation begins. There
 is no file conflict between them. S2 is a semantic prerequisite and conflicts

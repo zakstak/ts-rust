@@ -24,7 +24,9 @@ ryu-js = "=1.0.2"
 # Its LZMA decoder is about twice as fast as lzma-rs's on wasm (lib.dom and
 # lib.es5: about 20 ms, not 45 ms) and 7 KB larger.
 [target.'cfg(target_family = "wasm")'.dependencies]
-lzma-rust2 = { version = "=0.21.0", default-features = false, features = ["std"] }
+lzma-rust2 = { version = "=0.21.0", default-features = false, features = [
+  "std",
+] }
 # wasm only: ryu-js's smaller tables for number to string (jsnum.rs). It
 # gives the same digits, a little slower, and the module is 10 KB smaller
 # with gzip.
@@ -33,11 +35,21 @@ ryu-js = { version = "=1.0.2", features = ["small"] }
 # build.rs packs the libs of the wasm build. Native builds run build.rs too,
 # but it does nothing for them.
 [build-dependencies]
-lzma-rust2 = { version = "=0.21.0", default-features = false, features = ["std", "encoder", "optimization"] }
+lzma-rust2 = { version = "=0.21.0", default-features = false, features = [
+  "std",
+  "encoder",
+  "optimization",
+] }
 
 # Native only (see ts_goport's Cargo.toml).
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-rustix = { version = "=1.1.5", features = ["event", "fs", "pipe", "process", "termios"] }
+rustix = { version = "=1.1.5", features = [
+  "event",
+  "fs",
+  "pipe",
+  "process",
+  "termios",
+] }
 
 # fswatch/canonicalize_darwin.rs: NFC for macOS watch paths (Go calls
 # CoreFoundation). The dev-dependency builds it into this crate's own tests
@@ -63,7 +75,9 @@ nix = { version = "=0.31.3", default-features = false, features = ["event"] }
 # fswatch/fsevents_darwin.rs: the FSEvents stream through notify's safe
 # `FsEventWatcher` (see the module comment).
 [target.'cfg(target_os = "macos")'.dependencies]
-notify = { version = "=8.2.0", default-features = false, features = ["macos_fsevent"] }
+notify = { version = "=8.2.0", default-features = false, features = [
+  "macos_fsevent",
+] }
 
 # fswatch/windows.rs: ReadDirectoryChangesW through notify's safe
 # `ReadDirectoryChangesWatcher` (see the module comment).

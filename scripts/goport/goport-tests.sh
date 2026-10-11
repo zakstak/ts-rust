@@ -67,134 +67,150 @@ set -uo pipefail
 # One brace group: bash reads the whole script before it runs it, so an edit of this file does not
 # change a running check.
 {
-fail() { echo "goport-tests.sh: $2" >&2; echo "FAIL rc=$1"; exit "$1"; }
-usage() { sed -n '2,/^set -uo/p' "$0" | sed '$d'; echo "FAIL rc=2"; exit 2; }
+  fail() {
+    echo "goport-tests.sh: $2" >&2
+    echo "FAIL rc=$1"
+    exit "$1"
+  }
+  usage() {
+    sed -n '2,/^set -uo/p' "$0" | sed '$d'
+    echo "FAIL rc=2"
+    exit 2
+  }
 
-# The clean environment (see the header). GOPORT_PIN of the caller becomes --pin, before the
-# arguments, so an explicit --pin wins.
-allow='PATH|HOME|LANG|USER|XDG_RUNTIME_DIR|DBUS_SESSION_BUS_ADDRESS|GOPORT_TESTS_CLEAN|PWD|OLDPWD|SHLVL|_'
-if compgen -e | grep -qvxE "$allow"; then
-  [[ -z ${GOPORT_TESTS_CLEAN:-} ]] || fail 2 "GOPORT_TESTS_CLEAN is set, but the environment has $(compgen -e | grep -vxE "$allow" | tr '\n' ' ')"
-  keep=(GOPORT_TESTS_CLEAN=1 PATH="$PATH" HOME="$HOME")
-  for v in USER XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS; do [[ -z ${!v:-} ]] || keep+=("$v=${!v}"); done
-  exec env -i "${keep[@]}" "$BASH" "${BASH_SOURCE[0]}" ${GOPORT_PIN:+--pin "$GOPORT_PIN"} "$@"
-fi
-export LANG=C.UTF-8
-
-here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(dirname "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)")
-
-pin=
-args=()
-while (($#)); do
-  case $1 in
-  --pin) (($# >= 2)) || usage; pin=$2; shift 2 ;;
-  -h | --help) usage ;;
-  *) args+=("$1"); shift ;;
-  esac
-done
-((${#args[@]} == 2)) || usage
-[[ -n $pin ]] || pin=$(jq -r '.batch.upstreamPin.to // empty' "$ROOT/docs/typechecker-state/current.json" 2> /dev/null)
-[[ -n $pin ]] || pin=$(jq -r .current "$ROOT/UPSTREAM.json")
-TB=$(realpath -- "${args[0]}") || fail 2 "no test bin dir ${args[0]}"
-O=$(realpath -m -- "${args[1]}")
-[[ ! -e $O/results.json && ! -e $O/logs ]] || fail 2 "$O has results.json or logs/ (results are never replaced)"
-
-for f in COMMIT BUILD_ROOT BUILD_TARGET SUITES bins.sha256; do [[ -s $TB/$f ]] || fail 3 "$TB has no $f"; done
-(cd "$TB" && sha256sum -c --quiet bins.sha256) || fail 3 "$TB/bins.sha256 does not match"
-grep -q '  SUITES$' "$TB/bins.sha256" || fail 3 "$TB/bins.sha256 does not cover SUITES"
-COMMIT=$(cat "$TB/COMMIT") BUILD_ROOT=$(cat "$TB/BUILD_ROOT") BUILD_TARGET=$(cat "$TB/BUILD_TARGET")
-tree=$(git -C "$ROOT" rev-parse --verify --quiet "$COMMIT:crates") || fail 3 "no commit $COMMIT"
-[[ -d $BUILD_ROOT/crates && -d $BUILD_TARGET/release && -d $TB/relbin ]] ||
-  fail 3 "missing bind path: $BUILD_ROOT/crates, $BUILD_TARGET/release or $TB/relbin"
-GO=$(python3 "$ROOT/scripts/upstream/pin.py" path goCheckout "$pin") || fail 3 "unknown pin $pin"
-[[ -d $GO/testdata/baselines/reference ]] || fail 3 "no Go checkout at $GO"
-layout=$(python3 "$ROOT/scripts/upstream/pin.py" show "$pin" | jq -r .layout) || fail 3 "no record for pin $pin"
-# The sharded test (see the header): <suite prefix> <libtest name>.
-case $layout in
-typescript-go) shard_suite=go_baselines_submodule shard_test=compiler_runner::test_submodule ;;
-typescript) shard_suite=go_baselines_local shard_test=compiler_runner::test_local ;;
-*) fail 3 "pin $pin has layout '$layout', not typescript-go or typescript" ;;
-esac
-
-# SUITES: "<suite>\t<crate dir>". Each crate dir is under crates/ (the archived tree), each suite is
-# a test binary of the dir, and each test binary of the dir is a suite.
-declare -A crate_dir
-suites=()
-while IFS=$'\t' read -r s d; do
-  case $s in
-  lib_snapshot | go_baselines_local | go_baselines_transpile | go_baselines_submodule | \
-    go_baselines_submodule_shards | go_baselines_submodule-* | go_baselines_local_shards | \
-    go_baselines_local-* | go_baselines_reference)
-    fail 3 "SUITES: $s is the name of a derived suite" ;;
-  esac
-  [[ -f $TB/$s && -x $TB/$s ]] || fail 3 "SUITES: no test binary $TB/$s"
-  [[ $d == crates/* ]] || fail 3 "SUITES: $s runs in $d, which is not under crates/"
-  crate_dir[$s]=$d
-  suites+=("$s")
-done < "$TB/SUITES"
-for f in "$TB"/*; do
-  [[ ! -f $f || ! -x $f || -n ${crate_dir[${f##*/}]+x} ]] || fail 3 "test binary ${f##*/} is not in SUITES"
-done
-
-mkdir -p "$O/logs" "$O/tmp" || fail 4 "cannot make $O"
-rm -rf "$O/src" && mkdir -p "$O/src" || fail 4 "cannot make $O/src"
-git -C "$ROOT" archive "$COMMIT" crates | tar -x -C "$O/src" || fail 4 "git archive of $COMMIT failed"
-
-export GOPORT_PIN=$pin TS_GO_REPO=$GO RUST_TEST_THREADS=1
-# Each suite runs in its own scope with a 24 GB cap. OOMPolicy=continue: when the kernel OOM killer kills
-# one compiler runner child at the cap (a case whose memory grows without bound in a port that lacks
-# an upstream fix, as new cases at 673a5f17d713 do), that child is a crash row and the suite goes on.
-# With the default policy (stop) systemd stops the whole scope and the suite ends (exit 143).
-cap=(systemd-run --user --scope --quiet --collect -p MemoryMax=24000000K -p MemorySwapMax=0 -p OOMPolicy=continue
-  nice -n 10)
-pinwrap=(python3 "$ROOT/scripts/upstream/pin.py" exec --)
-state() { echo "$1 $(date -u +%FT%TZ) Go $(git -C "$GO" rev-parse --short=12 HEAD) Go-dirty $(git -C "$GO" status --porcelain | wc -l) load $(cut -d' ' -f1-3 /proc/loadavg)"; }
-
-# suite <name> <binary> <timeout s> [test args...]: lists, then runs one test binary in its crate dir.
-# The caller sets extra environment on the call.
-suite() {
-  local name=$1 bin=$TB/$2 dir=$BUILD_ROOT/${crate_dir[$2]} secs=$3 rc
-  shift 3
-  local box=(bwrap --dev-bind / / --bind "$O/src/crates" "$BUILD_ROOT/crates"
-    --ro-bind "$TB/relbin" "$BUILD_TARGET/release" --chdir "$dir" --)
-  rm -f "$O/logs/$name.results"
-  CARGO_MANIFEST_DIR=$dir "${cap[@]}" "${pinwrap[@]}" "${box[@]}" "$bin" "$@" --list > "$O/logs/$name.list" 2>&1
-  CARGO_MANIFEST_DIR=$dir timeout "$secs" "${cap[@]}" "${pinwrap[@]}" "${box[@]}" "$bin" "$@" \
-    --logfile "$O/logs/$name.results" > "$O/logs/$name.log" 2>&1
-  rc=$?
-  echo "exit=$rc" >> "$O/logs/$name.log"
-  echo "$name exit=$rc $(grep -m1 '^test result:' "$O/logs/$name.log") $(date -u +%FT%TZ)"
-}
-
-echo "== goport tests: $TB (${COMMIT:0:9}, crates tree ${tree:0:12}), pin $pin, Go $GO, out $O"
-[[ $layout == typescript-go ]] || echo "layout $layout: $shard_test runs in 4 shards"
-state before
-[[ -z ${crate_dir[ts_goport_lib]+x} ]] || suite lib_snapshot ts_goport_lib 1200 snapshot_matches_live
-for s in "${suites[@]}"; do
-  if [[ $s != go_baselines ]]; then
-    suite "$s" "$s" 1800
-    continue
+  # The clean environment (see the header). GOPORT_PIN of the caller becomes --pin, before the
+  # arguments, so an explicit --pin wins.
+  allow='PATH|HOME|LANG|USER|XDG_RUNTIME_DIR|DBUS_SESSION_BUS_ADDRESS|GOPORT_TESTS_CLEAN|PWD|OLDPWD|SHLVL|_'
+  if compgen -e | grep -qvxE "$allow"; then
+    [[ -z ${GOPORT_TESTS_CLEAN:-} ]] || fail 2 "GOPORT_TESTS_CLEAN is set, but the environment has $(compgen -e | grep -vxE "$allow" | tr '\n' ' ')"
+    keep=(GOPORT_TESTS_CLEAN=1 PATH="$PATH" HOME="$HOME")
+    for v in USER XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS; do [[ -z ${!v:-} ]] || keep+=("$v=${!v}"); done
+    exec env -i "${keep[@]}" "$BASH" "${BASH_SOURCE[0]}" ${GOPORT_PIN:+--pin "$GOPORT_PIN"} "$@"
   fi
-  mkdir -p "$O/tmp/local"
-  # At a typescript pin the shards run TestLocal, so the default run skips it (--exact: only that name).
-  skip=()
-  [[ $layout == typescript-go ]] || skip=(--exact --skip "$shard_test")
-  COMPILER_RUNNER_TMP=$O/tmp/local COMPILER_RUNNER_RESULTS=$O/go_baselines_local.tsv \
-    TRANSPILE_RUNNER_RESULTS=$O/go_baselines_transpile.tsv TS_GOPORT_BASELINE_TRACK=$O/go_baselines.track \
-    suite go_baselines go_baselines 3600 "${skip[@]}"
-  for i in 0 1 2 3; do
-    mkdir -p "$O/tmp/sub$i"
-    COMPILER_RUNNER_TMP=$O/tmp/sub$i COMPILER_RUNNER_SHARD=$i/4 COMPILER_RUNNER_JOBS=8 \
-      COMPILER_RUNNER_RESULTS=$O/$shard_suite-$i.tsv \
-      suite "$shard_suite-$i" go_baselines 3600 --exact "$shard_test" --include-ignored
-  done
-done
-state after
+  export LANG=C.UTF-8
 
-# results.json from the --list, --logfile, compiler runner and track files.
-python3 - "$O" "$TB" "$COMMIT" "$tree" "$pin" "$GO/testdata/baselines/reference" "$shard_suite" "$shard_test" \
-  "${suites[@]}" << 'PY' || fail 5 "results.json not written"
+  here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+  ROOT=$(dirname "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)")
+
+  pin=
+  args=()
+  while (($#)); do
+    case $1 in
+      --pin)
+        (($# >= 2)) || usage
+        pin=$2
+        shift 2
+        ;;
+      -h | --help) usage ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+  ((${#args[@]} == 2)) || usage
+  [[ -n $pin ]] || pin=$(jq -r '.batch.upstreamPin.to // empty' "$ROOT/docs/typechecker-state/current.json" 2>/dev/null)
+  [[ -n $pin ]] || pin=$(jq -r .current "$ROOT/UPSTREAM.json")
+  TB=$(realpath -- "${args[0]}") || fail 2 "no test bin dir ${args[0]}"
+  O=$(realpath -m -- "${args[1]}")
+  [[ ! -e $O/results.json && ! -e $O/logs ]] || fail 2 "$O has results.json or logs/ (results are never replaced)"
+
+  for f in COMMIT BUILD_ROOT BUILD_TARGET SUITES bins.sha256; do [[ -s $TB/$f ]] || fail 3 "$TB has no $f"; done
+  (cd "$TB" && sha256sum -c --quiet bins.sha256) || fail 3 "$TB/bins.sha256 does not match"
+  grep -q '  SUITES$' "$TB/bins.sha256" || fail 3 "$TB/bins.sha256 does not cover SUITES"
+  COMMIT=$(cat "$TB/COMMIT") BUILD_ROOT=$(cat "$TB/BUILD_ROOT") BUILD_TARGET=$(cat "$TB/BUILD_TARGET")
+  tree=$(git -C "$ROOT" rev-parse --verify --quiet "$COMMIT:crates") || fail 3 "no commit $COMMIT"
+  [[ -d $BUILD_ROOT/crates && -d $BUILD_TARGET/release && -d $TB/relbin ]] ||
+    fail 3 "missing bind path: $BUILD_ROOT/crates, $BUILD_TARGET/release or $TB/relbin"
+  GO=$(python3 "$ROOT/scripts/upstream/pin.py" path goCheckout "$pin") || fail 3 "unknown pin $pin"
+  [[ -d $GO/testdata/baselines/reference ]] || fail 3 "no Go checkout at $GO"
+  layout=$(python3 "$ROOT/scripts/upstream/pin.py" show "$pin" | jq -r .layout) || fail 3 "no record for pin $pin"
+  # The sharded test (see the header): <suite prefix> <libtest name>.
+  case $layout in
+    typescript-go) shard_suite=go_baselines_submodule shard_test=compiler_runner::test_submodule ;;
+    typescript) shard_suite=go_baselines_local shard_test=compiler_runner::test_local ;;
+    *) fail 3 "pin $pin has layout '$layout', not typescript-go or typescript" ;;
+  esac
+
+  # SUITES: "<suite>\t<crate dir>". Each crate dir is under crates/ (the archived tree), each suite is
+  # a test binary of the dir, and each test binary of the dir is a suite.
+  declare -A crate_dir
+  suites=()
+  while IFS=$'\t' read -r s d; do
+    case $s in
+      lib_snapshot | go_baselines_local | go_baselines_transpile | go_baselines_submodule | \
+        go_baselines_submodule_shards | go_baselines_submodule-* | go_baselines_local_shards | \
+        go_baselines_local-* | go_baselines_reference)
+        fail 3 "SUITES: $s is the name of a derived suite"
+        ;;
+    esac
+    [[ -f $TB/$s && -x $TB/$s ]] || fail 3 "SUITES: no test binary $TB/$s"
+    [[ $d == crates/* ]] || fail 3 "SUITES: $s runs in $d, which is not under crates/"
+    crate_dir[$s]=$d
+    suites+=("$s")
+  done <"$TB/SUITES"
+  for f in "$TB"/*; do
+    [[ ! -f $f || ! -x $f || -n ${crate_dir[${f##*/}]+x} ]] || fail 3 "test binary ${f##*/} is not in SUITES"
+  done
+
+  mkdir -p "$O/logs" "$O/tmp" || fail 4 "cannot make $O"
+  if ! rm -rf "$O/src" || ! mkdir -p "$O/src"; then fail 4 "cannot make $O/src"; fi
+  git -C "$ROOT" archive "$COMMIT" crates | tar -x -C "$O/src" || fail 4 "git archive of $COMMIT failed"
+
+  export GOPORT_PIN=$pin TS_GO_REPO=$GO RUST_TEST_THREADS=1
+  # Each suite runs in its own scope with a 24 GB cap. OOMPolicy=continue: when the kernel OOM killer kills
+  # one compiler runner child at the cap (a case whose memory grows without bound in a port that lacks
+  # an upstream fix, as new cases at 673a5f17d713 do), that child is a crash row and the suite goes on.
+  # With the default policy (stop) systemd stops the whole scope and the suite ends (exit 143).
+  cap=(systemd-run --user --scope --quiet --collect -p MemoryMax=24000000K -p MemorySwapMax=0 -p OOMPolicy=continue
+    nice -n 10)
+  pinwrap=(python3 "$ROOT/scripts/upstream/pin.py" exec --)
+  state() { echo "$1 $(date -u +%FT%TZ) Go $(git -C "$GO" rev-parse --short=12 HEAD) Go-dirty $(git -C "$GO" status --porcelain | wc -l) load $(cut -d' ' -f1-3 /proc/loadavg)"; }
+
+  # suite <name> <binary> <timeout s> [test args...]: lists, then runs one test binary in its crate dir.
+  # The caller sets extra environment on the call.
+  suite() {
+    local name=$1 bin=$TB/$2 dir=$BUILD_ROOT/${crate_dir[$2]} secs=$3 rc
+    shift 3
+    local box=(bwrap --dev-bind / / --bind "$O/src/crates" "$BUILD_ROOT/crates"
+      --ro-bind "$TB/relbin" "$BUILD_TARGET/release" --chdir "$dir" --)
+    rm -f "$O/logs/$name.results"
+    CARGO_MANIFEST_DIR=$dir "${cap[@]}" "${pinwrap[@]}" "${box[@]}" "$bin" "$@" --list >"$O/logs/$name.list" 2>&1
+    CARGO_MANIFEST_DIR=$dir timeout "$secs" "${cap[@]}" "${pinwrap[@]}" "${box[@]}" "$bin" "$@" \
+      --logfile "$O/logs/$name.results" >"$O/logs/$name.log" 2>&1
+    rc=$?
+    echo "exit=$rc" >>"$O/logs/$name.log"
+    echo "$name exit=$rc $(grep -m1 '^test result:' "$O/logs/$name.log") $(date -u +%FT%TZ)"
+  }
+
+  echo "== goport tests: $TB (${COMMIT:0:9}, crates tree ${tree:0:12}), pin $pin, Go $GO, out $O"
+  [[ $layout == typescript-go ]] || echo "layout $layout: $shard_test runs in 4 shards"
+  state before
+  [[ -z ${crate_dir[ts_goport_lib]+x} ]] || suite lib_snapshot ts_goport_lib 1200 snapshot_matches_live
+  for s in "${suites[@]}"; do
+    if [[ $s != go_baselines ]]; then
+      suite "$s" "$s" 1800
+      continue
+    fi
+    mkdir -p "$O/tmp/local"
+    # At a typescript pin the shards run TestLocal, so the default run skips it (--exact: only that name).
+    skip=()
+    [[ $layout == typescript-go ]] || skip=(--exact --skip "$shard_test")
+    COMPILER_RUNNER_TMP=$O/tmp/local COMPILER_RUNNER_RESULTS=$O/go_baselines_local.tsv \
+      TRANSPILE_RUNNER_RESULTS=$O/go_baselines_transpile.tsv TS_GOPORT_BASELINE_TRACK=$O/go_baselines.track \
+      suite go_baselines go_baselines 3600 "${skip[@]}"
+    for i in 0 1 2 3; do
+      mkdir -p "$O/tmp/sub$i"
+      COMPILER_RUNNER_TMP=$O/tmp/sub$i COMPILER_RUNNER_SHARD=$i/4 COMPILER_RUNNER_JOBS=8 \
+        COMPILER_RUNNER_RESULTS=$O/$shard_suite-$i.tsv \
+        suite "$shard_suite-$i" go_baselines 3600 --exact "$shard_test" --include-ignored
+    done
+  done
+  state after
+
+  # results.json from the --list, --logfile, compiler runner and track files.
+  python3 - "$O" "$TB" "$COMMIT" "$tree" "$pin" "$GO/testdata/baselines/reference" "$shard_suite" "$shard_test" \
+    "${suites[@]}" <<'PY' || fail 5 "results.json not written"
 import hashlib, json, os, sys
 out, tb, commit, tree, pin, ref_root, shard_base, shard_test = sys.argv[1:9]
 binaries = sys.argv[9:]
@@ -354,8 +370,8 @@ for s, n in doc['suites'].items():
     print(f'{s}: {len(n)} names, ' + ', '.join(f'{k} {v}' for k, v in c.items() if v or k == 'ok'))
 print(f'incomplete: {", ".join(doc["incomplete"]) or "none"}')
 PY
-rm -rf "$O/src" "$O/tmp"
-echo "results $O/results.json sha256 $(sha256sum < "$O/results.json" | cut -c1-64)"
-echo DONE
-exit 0
+  rm -rf "$O/src" "$O/tmp"
+  echo "results $O/results.json sha256 $(sha256sum <"$O/results.json" | cut -c1-64)"
+  echo DONE
+  exit 0
 }

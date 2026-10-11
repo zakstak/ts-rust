@@ -4,7 +4,10 @@
 # usage: scripts/bench-apps/setup.sh <work-dir>
 # Use a work dir whose name ends in .noindex, so Spotlight does not index the repos.
 set -euo pipefail
-[[ $# == 1 ]] || { sed -n '4p' "$0" >&2; exit 2; }
+[[ $# == 1 ]] || {
+  sed -n '4p' "$0" >&2
+  exit 2
+}
 mkdir -p "$1" && cd "$1"
 mkdir -p repos logs
 
@@ -22,14 +25,20 @@ checkout() { # name url sha
 }
 install() { # name
   cd "repos/$1"
-  if [[ -f pnpm-lock.yaml ]]; then pnpm install --frozen-lockfile --ignore-scripts
-  elif [[ -f yarn.lock ]]; then corepack yarn install --frozen-lockfile --ignore-scripts
-  else npm ci --ignore-scripts --no-audit --no-fund
+  if [[ -f pnpm-lock.yaml ]]; then
+    pnpm install --frozen-lockfile --ignore-scripts
+  elif [[ -f yarn.lock ]]; then
+    corepack yarn install --frozen-lockfile --ignore-scripts
+  else
+    npm ci --ignore-scripts --no-audit --no-fund
   fi
 }
 while read -r name url sha; do
   checkout "$name" "$url" "$sha"
-  (install "$name") >"logs/install-$name.log" 2>&1 || { echo "install failed: $name (logs/install-$name.log)" >&2; exit 1; }
+  (install "$name") >"logs/install-$name.log" 2>&1 || {
+    echo "install failed: $name (logs/install-$name.log)" >&2
+    exit 1
+  }
 done <<'EOF'
 vscode https://github.com/microsoft/vscode 3f07e1aba32acacb8b08ae91bfdc954b580ad1fd
 sentry https://github.com/getsentry/sentry 8294650589dbd26f230c73f4ab26b62a68aede8f

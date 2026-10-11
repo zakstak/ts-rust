@@ -32,9 +32,10 @@ project inputs remain unchanged.
 
 Formatting preserves pinned standard-library inputs, intentional compiler
 fixtures, codegen specification inputs, vendored license text and saved
-accountability evidence. Fixture syntax is also excluded from generic language
-linting; Rust crate linting still checks the implementation and Rust test
-targets.
+accountability evidence, including historical checkpoint receipts and pinned Go
+probe observations/case inputs. Fixture syntax is also excluded from generic
+language linting; Rust crate linting still checks the implementation and Rust
+test targets.
 
 Go probe fragments and Unicode oracle generators are compiled in the pinned Go
 source checkout rather than a Go module in this Rust repository. Generic
@@ -49,3 +50,15 @@ Python helper presence does not imply an arbitrary root pytest suite. The wasm
 package tests additionally require a built `npm/wasm/ts_rust.wasm`, as
 documented in that package; building a release asset remains a separate
 workflow.
+
+The native test harness requires `TS_GO_REPO` to point to the preserved pinned
+Go checkout, including `testdata/fixtures/compiler/checker.ts`. Keep its oracle
+pin unchanged. A fixture-only download from that exact pin can supply this one
+file for local Cargo unit tests; it does not provide the accepted compiler's
+saved binaries, oracle outputs, or project evidence. The extended gate tooling
+Node tests also require Python's `psutil` module.
+
+The YAML policy permits GitHub Actions' `on` key and long embedded shell
+commands without rewriting their text. Other YAML checks remain enabled. Shell
+and Python lint repairs close file handles and quote paths while preserving
+existing output and comparison contracts.

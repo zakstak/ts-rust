@@ -7,21 +7,21 @@ import { memoryFileSystem, runTsc } from "./core.js";
 
 /** Go's syscall error texts, by Node error code. */
 const ERRNO_TEXT = {
-    EACCES: "permission denied",
-    EEXIST: "file exists",
-    EISDIR: "is a directory",
-    ELOOP: "too many levels of symbolic links",
-    ENAMETOOLONG: "file name too long",
-    ENOENT: "no such file or directory",
-    ENOSPC: "no space left on device",
-    ENOTDIR: "not a directory",
-    EPERM: "operation not permitted",
-    EROFS: "read-only file system",
+  EACCES: "permission denied",
+  EEXIST: "file exists",
+  EISDIR: "is a directory",
+  ELOOP: "too many levels of symbolic links",
+  ENAMETOOLONG: "file name too long",
+  ENOENT: "no such file or directory",
+  ENOSPC: "no space left on device",
+  ENOTDIR: "not a directory",
+  EPERM: "operation not permitted",
+  EROFS: "read-only file system",
 };
 
 /** Go's `*fs.PathError` text: `open /a.js: permission denied`. */
 function goError(op, path, error) {
-    return `${op} ${path}: ${ERRNO_TEXT[error.code] ?? error.message}`;
+  return `${op} ${path}: ${ERRNO_TEXT[error.code] ?? error.message}`;
 }
 
 /**
@@ -32,117 +32,135 @@ function goError(op, path, error) {
  * when `path` is a file.
  */
 function mkdirAll(path) {
-    const stat = statOrUndefined(fs.statSync, path);
-    if (stat) return stat.isDirectory() ? undefined : `mkdir ${path}: ${ERRNO_TEXT.ENOTDIR}`;
-    // Any stat error: make the parent, then the directory.
-    let i = path.length - 1;
-    while (i >= 0 && path[i] === "/") i--;
-    while (i >= 0 && path[i] !== "/") i--;
-    const parent = path.slice(0, Math.max(i, 0));
-    // A Windows path keeps its volume name (`C:`).
-    const volume = /^[A-Za-z]:/.test(path) ? 2 : 0;
-    if (parent.length > volume) {
-        const error = mkdirAll(parent);
-        if (error) return error;
-    }
-    try {
-        fs.mkdirSync(path);
-    } catch (error) {
-        // For arguments like "foo/.": the directory is there after all.
-        if (statOrUndefined(fs.lstatSync, path)?.isDirectory()) return undefined;
-        return goError("mkdir", path, error);
-    }
-    return undefined;
+  const stat = statOrUndefined(fs.statSync, path);
+  if (stat)
+    return stat.isDirectory()
+      ? undefined
+      : `mkdir ${path}: ${ERRNO_TEXT.ENOTDIR}`;
+  // Any stat error: make the parent, then the directory.
+  let i = path.length - 1;
+  while (i >= 0 && path[i] === "/") i--;
+  while (i >= 0 && path[i] !== "/") i--;
+  const parent = path.slice(0, Math.max(i, 0));
+  // A Windows path keeps its volume name (`C:`).
+  const volume = /^[A-Za-z]:/.test(path) ? 2 : 0;
+  if (parent.length > volume) {
+    const error = mkdirAll(parent);
+    if (error) return error;
+  }
+  try {
+    fs.mkdirSync(path);
+  } catch (error) {
+    // For arguments like "foo/.": the directory is there after all.
+    if (statOrUndefined(fs.lstatSync, path)?.isDirectory()) return undefined;
+    return goError("mkdir", path, error);
+  }
+  return undefined;
 }
 
 /** `stat(path)`, or undefined on any error, as Go's `err != nil`. */
 function statOrUndefined(stat, path) {
-    try {
-        return stat(path);
-    } catch {
-        return undefined;
-    }
+  try {
+    return stat(path);
+  } catch {
+    return undefined;
+  }
 }
 
 /** The real file system through node:fs, for `runTsc`. */
 export function nodeFileSystem() {
-    const kind = entry =>
-        entry.isDirectory() ? "directory" : entry.isFile() ? "file" : entry.isSymbolicLink() ? "symlink" : "other";
-    return {
-        readFile(path) {
-            try {
-                return fs.readFileSync(path);
-            } catch {
-                return undefined;
-            }
-        },
-        stat(path) {
-            try {
-                const stat = fs.statSync(path, { bigint: true });
-                return {
-                    isDirectory: stat.isDirectory(),
-                    isFile: stat.isFile(),
-                    size: Number(stat.size),
-                    mtimeNs: stat.mtimeNs,
-                };
-            } catch {
-                return undefined;
-            }
-        },
-        readDirectory(path) {
-            try {
-                return fs.readdirSync(path, { withFileTypes: true }).map(entry => ({ name: entry.name, kind: kind(entry) }));
-            } catch {
-                return undefined;
-            }
-        },
-        realpath(path) {
-            try {
-                return fs.realpathSync.native(path).replaceAll("\\", "/");
-            } catch {
-                return undefined;
-            }
-        },
-        // As Go's osvfs writeFileEnsuringDir (internal/vfs/osvfs/os.go:163):
-        // write, and when that fails, make the directory and write again.
-        writeFile(path, data, append) {
-            const write = () => (append ? fs.appendFileSync : fs.writeFileSync)(path, data);
-            try {
-                return write();
-            } catch {
-                // Make the directory below.
-            }
-            const mkdirError = mkdirAll(dirname(path));
-            if (mkdirError) return mkdirError;
-            try {
-                return write();
-            } catch (error) {
-                return goError("open", path, error);
-            }
-        },
-        remove(path) {
-            try {
-                fs.rmSync(path, { recursive: true, force: true });
-            } catch {
-                return false;
-            }
-        },
-        chtimes(path, atimeNs, mtimeNs) {
-            try {
-                const stat = fs.statSync(path, { bigint: true });
-                const seconds = ns => Number(ns) / 1e9;
-                fs.utimesSync(path, seconds(atimeNs ?? stat.atimeNs), seconds(mtimeNs ?? stat.mtimeNs));
-            } catch (error) {
-                return goError("chtimes", path, error);
-            }
-        },
-    };
+  const kind = (entry) =>
+    entry.isDirectory()
+      ? "directory"
+      : entry.isFile()
+        ? "file"
+        : entry.isSymbolicLink()
+          ? "symlink"
+          : "other";
+  return {
+    readFile(path) {
+      try {
+        return fs.readFileSync(path);
+      } catch {
+        return undefined;
+      }
+    },
+    stat(path) {
+      try {
+        const stat = fs.statSync(path, { bigint: true });
+        return {
+          isDirectory: stat.isDirectory(),
+          isFile: stat.isFile(),
+          size: Number(stat.size),
+          mtimeNs: stat.mtimeNs,
+        };
+      } catch {
+        return undefined;
+      }
+    },
+    readDirectory(path) {
+      try {
+        return fs
+          .readdirSync(path, { withFileTypes: true })
+          .map((entry) => ({ name: entry.name, kind: kind(entry) }));
+      } catch {
+        return undefined;
+      }
+    },
+    realpath(path) {
+      try {
+        return fs.realpathSync.native(path).replaceAll("\\", "/");
+      } catch {
+        return undefined;
+      }
+    },
+    // As Go's osvfs writeFileEnsuringDir (internal/vfs/osvfs/os.go:163):
+    // write, and when that fails, make the directory and write again.
+    writeFile(path, data, append) {
+      const write = () =>
+        (append ? fs.appendFileSync : fs.writeFileSync)(path, data);
+      try {
+        return write();
+      } catch {
+        // Make the directory below.
+      }
+      const mkdirError = mkdirAll(dirname(path));
+      if (mkdirError) return mkdirError;
+      try {
+        return write();
+      } catch (error) {
+        return goError("open", path, error);
+      }
+    },
+    remove(path) {
+      try {
+        fs.rmSync(path, { recursive: true, force: true });
+      } catch {
+        return false;
+      }
+    },
+    chtimes(path, atimeNs, mtimeNs) {
+      try {
+        const stat = fs.statSync(path, { bigint: true });
+        const seconds = (ns) => Number(ns) / 1e9;
+        fs.utimesSync(
+          path,
+          seconds(atimeNs ?? stat.atimeNs),
+          seconds(mtimeNs ?? stat.mtimeNs),
+        );
+      } catch (error) {
+        return goError("chtimes", path, error);
+      }
+    },
+  };
 }
 
 /** Go's osvfs check: the file system ignores case when the executable is also found with its case swapped. */
 function caseInsensitive() {
-    const swapped = process.execPath.replace(/\w/g, c => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()));
-    return swapped !== process.execPath && fs.existsSync(swapped);
+  const swapped = process.execPath.replace(/\w/g, (c) =>
+    c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase(),
+  );
+  return swapped !== process.execPath && fs.existsSync(swapped);
 }
 
 const pauseCell = new Int32Array(new SharedArrayBuffer(4));
@@ -155,19 +173,19 @@ const pauseCell = new Int32Array(new SharedArrayBuffer(4));
  * EAGAIN while the reader is slow, and this waits 1 ms and writes again.
  */
 function streamTo(fd) {
-    let open = true;
-    return chunk => {
-        let at = 0;
-        while (open && at < chunk.length) {
-            try {
-                at += fs.writeSync(fd, chunk, at, chunk.length - at);
-            } catch (error) {
-                if (error.code === "EAGAIN") Atomics.wait(pauseCell, 0, 0, 1);
-                else if (error.code === "EPIPE") open = false;
-                else throw error;
-            }
-        }
-    };
+  let open = true;
+  return (chunk) => {
+    let at = 0;
+    while (open && at < chunk.length) {
+      try {
+        at += fs.writeSync(fd, chunk, at, chunk.length - at);
+      } catch (error) {
+        if (error.code === "EAGAIN") Atomics.wait(pauseCell, 0, 0, 1);
+        else if (error.code === "EPIPE") open = false;
+        else throw error;
+      }
+    }
+  };
 }
 
 /**
@@ -175,30 +193,42 @@ function streamTo(fd) {
  * diagnostics, stdout, stderr, files }`, or `{ error, stderr }` when the run
  * crashed.
  */
-export function runRequest({ module, args, cwd, files, env, diagnosticsJson, tty, stream }) {
-    const memory = files ? memoryFileSystem(files) : undefined;
-    const stdout = [];
-    const stderr = [];
-    try {
-        const { exitCode, diagnostics } = runTsc(module, {
-            args,
-            cwd,
-            fs: memory ?? nodeFileSystem(),
-            env,
-            diagnosticsJson,
-            caseInsensitive: memory ? false : caseInsensitive(),
-            tty,
-            stdout: stream ? streamTo(1) : chunk => stdout.push(chunk),
-            stderr: stream ? streamTo(2) : chunk => stderr.push(chunk),
-        });
-        return {
-            exitCode,
-            diagnostics,
-            stdout: Buffer.concat(stdout).toString(),
-            stderr: Buffer.concat(stderr).toString(),
-            files: memory?.files,
-        };
-    } catch (error) {
-        return { error: String(error?.message ?? error), stderr: error?.stderr ?? Buffer.concat(stderr).toString() };
-    }
+export function runRequest({
+  module,
+  args,
+  cwd,
+  files,
+  env,
+  diagnosticsJson,
+  tty,
+  stream,
+}) {
+  const memory = files ? memoryFileSystem(files) : undefined;
+  const stdout = [];
+  const stderr = [];
+  try {
+    const { exitCode, diagnostics } = runTsc(module, {
+      args,
+      cwd,
+      fs: memory ?? nodeFileSystem(),
+      env,
+      diagnosticsJson,
+      caseInsensitive: memory ? false : caseInsensitive(),
+      tty,
+      stdout: stream ? streamTo(1) : (chunk) => stdout.push(chunk),
+      stderr: stream ? streamTo(2) : (chunk) => stderr.push(chunk),
+    });
+    return {
+      exitCode,
+      diagnostics,
+      stdout: Buffer.concat(stdout).toString(),
+      stderr: Buffer.concat(stderr).toString(),
+      files: memory?.files,
+    };
+  } catch (error) {
+    return {
+      error: String(error?.message ?? error),
+      stderr: error?.stderr ?? Buffer.concat(stderr).toString(),
+    };
+  }
 }

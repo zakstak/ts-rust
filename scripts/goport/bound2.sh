@@ -3,20 +3,25 @@
 # goport_emit and goport_typesyms, records commit/fingerprint/binary/oracle hashes, then runs the
 # type-check measures (core, extra, sweep, sweep-extra2) and the emit project comparison.
 set -u
-cd /home/theo/Code/sandbox/ts-rust
-R=$1; O=target/continuation-r97-goport/measure/$R; mkdir -p $O
+cd /home/theo/Code/sandbox/ts-rust || exit
+R=$1
+O=target/continuation-r97-goport/measure/$R
+mkdir -p "$O"
 WT=target/worktrees/checker-port
 REL=${GOPORT_REL:-target/continuation-r97-goport/runtime/cargo-target/release}
 # The run measures the committed source: any dirty or untracked file in the checkout stops it, except
 # crates/ts_goport/CANDIDATE.md (an untracked marker from the retired R96 corpus comparator).
-test -z "$(git -C $WT status --porcelain | grep -v '^?? crates/ts_goport/CANDIDATE.md$')" || { echo "dirty checkout"; exit 1; }
-for b in goport goport_emit goport_typesyms; do cp $REL/$b $O/$b.bin; done
+test -z "$(git -C $WT status --porcelain | grep -v '^?? crates/ts_goport/CANDIDATE.md$')" || {
+  echo "dirty checkout"
+  exit 1
+}
+for b in goport goport_emit goport_typesyms; do cp "$REL"/$b "$O"/$b.bin; done
 export GOPORT_BIN=$PWD/$O/goport.bin
-bash /home/theo/Code/sandbox/ts-rust/scripts/goport/measure.sh $R > $O/summary-main.txt 2>&1
-bash /home/theo/Code/sandbox/ts-rust/scripts/goport/measure-extra.sh $R > $O/summary-extra.txt 2>&1
-bash /home/theo/Code/sandbox/ts-rust/scripts/goport/sweep.sh $R > $O/summary-sweep.txt 2>&1
-bash /home/theo/Code/sandbox/ts-rust/scripts/goport/sweep-extra2.sh $R > $O/summary-sweep-extra2.txt 2>&1
-bash /home/theo/Code/sandbox/ts-rust/scripts/goport/compare-emit.sh $PWD/$O/goport_emit.bin $R > $O/summary-emit.txt 2>&1
+bash /home/theo/Code/sandbox/ts-rust/scripts/goport/measure.sh "$R" >"$O"/summary-main.txt 2>&1
+bash /home/theo/Code/sandbox/ts-rust/scripts/goport/measure-extra.sh "$R" >"$O"/summary-extra.txt 2>&1
+bash /home/theo/Code/sandbox/ts-rust/scripts/goport/sweep.sh "$R" >"$O"/summary-sweep.txt 2>&1
+bash /home/theo/Code/sandbox/ts-rust/scripts/goport/sweep-extra2.sh "$R" >"$O"/summary-sweep-extra2.txt 2>&1
+bash /home/theo/Code/sandbox/ts-rust/scripts/goport/compare-emit.sh "$PWD"/"$O"/goport_emit.bin "$R" >"$O"/summary-emit.txt 2>&1
 python3 - "$O" "$WT" <<'PY'
 import sys,json,hashlib,subprocess,datetime,os
 o,wt=sys.argv[1],sys.argv[2]

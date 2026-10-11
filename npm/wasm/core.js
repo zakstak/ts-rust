@@ -19,10 +19,10 @@ const ENOSYS = 52;
 
 /** Thrown by the WASI `proc_exit` import to end a run. */
 export class WasiExit extends Error {
-    constructor(code) {
-        super(`exit ${code}`);
-        this.code = code;
-    }
+  constructor(code) {
+    super(`exit ${code}`);
+    this.code = code;
+  }
 }
 
 // crates/ts_wasm/src/host.rs `Op`.
@@ -43,9 +43,9 @@ const KIND_CHAR = { file: "f", directory: "d", symlink: "l", other: "o" };
  * example `open /a.js: permission denied`), which tsc then reports.
  */
 function writeResult(result) {
-    if (result === false) return undefined;
-    if (typeof result === "string") return { error: result };
-    return new Uint8Array();
+  if (result === false) return undefined;
+  if (typeof result === "string") return { error: result };
+  return new Uint8Array();
 }
 
 /**
@@ -54,195 +54,220 @@ function writeResult(result) {
  * `{ error }` when it fails with an error text.
  */
 function fsCall(fs, op, request) {
-    const text = decoder.decode(request);
-    switch (op) {
-        case OP_READ: {
-            const data = fs.readFile(text);
-            if (data === undefined) return undefined;
-            return typeof data === "string" ? encoder.encode(data) : data;
-        }
-        case OP_STAT: {
-            const stat = fs.stat(text);
-            if (!stat) return undefined;
-            const kind = stat.isDirectory ? "d" : stat.isFile === false ? "o" : "f";
-            const ns = stat.mtimeNs ?? BigInt(Math.round((stat.mtimeMs ?? 0) * 1e6));
-            return encoder.encode(`${kind} ${stat.size ?? 0} ${ns}`);
-        }
-        case OP_READ_DIR: {
-            const entries = fs.readDirectory(text);
-            if (!entries) return undefined;
-            return encoder.encode(entries.map(e => `${KIND_CHAR[e.kind] ?? "o"}${e.name}\0`).join(""));
-        }
-        case OP_REALPATH: {
-            const real = fs.realpath ? fs.realpath(text) : undefined;
-            return real === undefined ? undefined : encoder.encode(real);
-        }
-        case OP_WRITE:
-        case OP_APPEND: {
-            const nul = request.indexOf(0);
-            const path = decoder.decode(request.subarray(0, nul));
-            const data = request.subarray(nul + 1);
-            if (!fs.writeFile) return undefined;
-            return writeResult(fs.writeFile(path, data, op === OP_APPEND));
-        }
-        case OP_REMOVE:
-            if (!fs.remove) return undefined;
-            return writeResult(fs.remove(text));
-        case OP_CHTIMES: {
-            const [path, atime, mtime] = text.split("\0");
-            if (!fs.chtimes) return new Uint8Array();
-            return writeResult(fs.chtimes(path, atime ? BigInt(atime) : undefined, mtime ? BigInt(mtime) : undefined));
-        }
+  const text = decoder.decode(request);
+  switch (op) {
+    case OP_READ: {
+      const data = fs.readFile(text);
+      if (data === undefined) return undefined;
+      return typeof data === "string" ? encoder.encode(data) : data;
     }
-    return undefined;
+    case OP_STAT: {
+      const stat = fs.stat(text);
+      if (!stat) return undefined;
+      const kind = stat.isDirectory ? "d" : stat.isFile === false ? "o" : "f";
+      const ns = stat.mtimeNs ?? BigInt(Math.round((stat.mtimeMs ?? 0) * 1e6));
+      return encoder.encode(`${kind} ${stat.size ?? 0} ${ns}`);
+    }
+    case OP_READ_DIR: {
+      const entries = fs.readDirectory(text);
+      if (!entries) return undefined;
+      return encoder.encode(
+        entries.map((e) => `${KIND_CHAR[e.kind] ?? "o"}${e.name}\0`).join(""),
+      );
+    }
+    case OP_REALPATH: {
+      const real = fs.realpath ? fs.realpath(text) : undefined;
+      return real === undefined ? undefined : encoder.encode(real);
+    }
+    case OP_WRITE:
+    case OP_APPEND: {
+      const nul = request.indexOf(0);
+      const path = decoder.decode(request.subarray(0, nul));
+      const data = request.subarray(nul + 1);
+      if (!fs.writeFile) return undefined;
+      return writeResult(fs.writeFile(path, data, op === OP_APPEND));
+    }
+    case OP_REMOVE:
+      if (!fs.remove) return undefined;
+      return writeResult(fs.remove(text));
+    case OP_CHTIMES: {
+      const [path, atime, mtime] = text.split("\0");
+      if (!fs.chtimes) return new Uint8Array();
+      return writeResult(
+        fs.chtimes(
+          path,
+          atime ? BigInt(atime) : undefined,
+          mtime ? BigInt(mtime) : undefined,
+        ),
+      );
+    }
+  }
+  return undefined;
 }
 
 /** The state and imports of one run (`runTsc`, `runTscAsync`). */
 function prepareRun(module, options) {
-    const {
-        args = [],
-        cwd = "/",
-        fs,
-        env = {},
-        stdout = () => {},
-        stderr = () => {},
-        diagnosticsJson = false,
-        caseInsensitive = false,
-        tty = false,
-    } = options;
-    let memory;
-    let staged;
-    let stderrText = "";
-    const u8 = () => new Uint8Array(memory.buffer);
-    const dv = () => new DataView(memory.buffer);
+  const {
+    args = [],
+    cwd = "/",
+    fs,
+    env = {},
+    stdout = () => {},
+    stderr = () => {},
+    diagnosticsJson = false,
+    caseInsensitive = false,
+    tty = false,
+  } = options;
+  let memory;
+  let staged;
+  let stderrText = "";
+  const u8 = () => new Uint8Array(memory.buffer);
+  const dv = () => new DataView(memory.buffer);
 
-    const envBytes = Object.entries(env).map(([k, v]) => encoder.encode(`${k}=${v}\0`));
-    const writeStrings = (list, ptrs, buf) => {
-        const view = dv();
-        let at = buf;
-        list.forEach((bytes, i) => {
-            view.setUint32(ptrs + i * 4, at, true);
-            u8().set(bytes, at);
-            at += bytes.length;
-        });
-        return SUCCESS;
-    };
-    const sizes = (list, countPtr, sizePtr) => {
-        dv().setUint32(countPtr, list.length, true);
-        dv().setUint32(sizePtr, list.reduce((n, b) => n + b.length, 0), true);
-        return SUCCESS;
-    };
+  const envBytes = Object.entries(env).map(([k, v]) =>
+    encoder.encode(`${k}=${v}\0`),
+  );
+  const writeStrings = (list, ptrs, buf) => {
+    const view = dv();
+    let at = buf;
+    list.forEach((bytes, i) => {
+      view.setUint32(ptrs + i * 4, at, true);
+      u8().set(bytes, at);
+      at += bytes.length;
+    });
+    return SUCCESS;
+  };
+  const sizes = (list, countPtr, sizePtr) => {
+    dv().setUint32(countPtr, list.length, true);
+    dv().setUint32(
+      sizePtr,
+      list.reduce((n, b) => n + b.length, 0),
+      true,
+    );
+    return SUCCESS;
+  };
 
-    const wasi = {
-        args_sizes_get: (countPtr, sizePtr) => sizes([], countPtr, sizePtr),
-        args_get: () => SUCCESS,
-        environ_sizes_get: (countPtr, sizePtr) => sizes(envBytes, countPtr, sizePtr),
-        environ_get: (ptrs, buf) => writeStrings(envBytes, ptrs, buf),
-        clock_time_get: (id, _precision, out) => {
-            // Wall time with sub-millisecond steps (not Date.now): tsc leaves
-            // out a statistics row whose time is zero.
-            const ms = id === 0 ? performance.timeOrigin + performance.now() : performance.now();
-            const ns = BigInt(Math.round(ms * 1e6));
-            dv().setBigUint64(out, ns, true);
-            return SUCCESS;
-        },
-        clock_res_get: (_id, out) => {
-            dv().setBigUint64(out, 1000n, true);
-            return SUCCESS;
-        },
-        random_get: (buf, len) => {
-            for (let at = 0; at < len; at += 65536) {
-                crypto.getRandomValues(u8().subarray(buf + at, buf + Math.min(len, at + 65536)));
-            }
-            return SUCCESS;
-        },
-        fd_write: (fd, iovs, iovsLen, nwritten) => {
-            if (fd !== 1 && fd !== 2) return EBADF;
-            const view = dv();
-            let total = 0;
-            for (let i = 0; i < iovsLen; i++) {
-                const ptr = view.getUint32(iovs + i * 8, true);
-                const len = view.getUint32(iovs + i * 8 + 4, true);
-                const chunk = u8().slice(ptr, ptr + len);
-                if (fd === 1) stdout(chunk);
-                else {
-                    stderrText += decoder.decode(chunk);
-                    stderr(chunk);
-                }
-                total += len;
-            }
-            view.setUint32(nwritten, total, true);
-            return SUCCESS;
-        },
-        fd_fdstat_get: (fd, out) => {
-            if (fd > 2) return EBADF;
-            // A character device without seek rights is a terminal for Rust's
-            // `IsTerminal`.
-            u8().fill(0, out, out + 24);
-            dv().setUint8(out, fd === 1 && tty ? 2 : 0);
-            return SUCCESS;
-        },
-        fd_prestat_get: () => EBADF,
-        proc_exit: code => {
-            throw new WasiExit(code);
-        },
-        sched_yield: () => SUCCESS,
-        poll_oneoff: (_in, _out, _n, nevents) => {
-            dv().setUint32(nevents, 0, true);
-            return SUCCESS;
-        },
-    };
-    const imports = { wasi_snapshot_preview1: {}, ts_host: {} };
-    for (const { module: name, name: field } of WebAssembly.Module.imports(module)) {
-        if (name === "wasi_snapshot_preview1") imports[name][field] = wasi[field] ?? (() => ENOSYS);
-    }
-    imports.ts_host.fs = (op, ptr, len) => {
-        const result = fsCall(fs, op, u8().slice(ptr, ptr + len));
-        if (result === undefined) return -1;
-        if (result.error !== undefined) {
-            staged = encoder.encode(result.error);
-            return -2 - staged.length;
+  const wasi = {
+    args_sizes_get: (countPtr, sizePtr) => sizes([], countPtr, sizePtr),
+    args_get: () => SUCCESS,
+    environ_sizes_get: (countPtr, sizePtr) =>
+      sizes(envBytes, countPtr, sizePtr),
+    environ_get: (ptrs, buf) => writeStrings(envBytes, ptrs, buf),
+    clock_time_get: (id, _precision, out) => {
+      // Wall time with sub-millisecond steps (not Date.now): tsc leaves
+      // out a statistics row whose time is zero.
+      const ms =
+        id === 0
+          ? performance.timeOrigin + performance.now()
+          : performance.now();
+      const ns = BigInt(Math.round(ms * 1e6));
+      dv().setBigUint64(out, ns, true);
+      return SUCCESS;
+    },
+    clock_res_get: (_id, out) => {
+      dv().setBigUint64(out, 1000n, true);
+      return SUCCESS;
+    },
+    random_get: (buf, len) => {
+      for (let at = 0; at < len; at += 65536) {
+        crypto.getRandomValues(
+          u8().subarray(buf + at, buf + Math.min(len, at + 65536)),
+        );
+      }
+      return SUCCESS;
+    },
+    fd_write: (fd, iovs, iovsLen, nwritten) => {
+      if (fd !== 1 && fd !== 2) return EBADF;
+      const view = dv();
+      let total = 0;
+      for (let i = 0; i < iovsLen; i++) {
+        const ptr = view.getUint32(iovs + i * 8, true);
+        const len = view.getUint32(iovs + i * 8 + 4, true);
+        const chunk = u8().slice(ptr, ptr + len);
+        if (fd === 1) stdout(chunk);
+        else {
+          stderrText += decoder.decode(chunk);
+          stderr(chunk);
         }
-        staged = result;
-        return staged.length;
-    };
-    imports.ts_host.fs_take = ptr => {
-        u8().set(staged, ptr);
-        staged = undefined;
-    };
+        total += len;
+      }
+      view.setUint32(nwritten, total, true);
+      return SUCCESS;
+    },
+    fd_fdstat_get: (fd, out) => {
+      if (fd > 2) return EBADF;
+      // A character device without seek rights is a terminal for Rust's
+      // `IsTerminal`.
+      u8().fill(0, out, out + 24);
+      dv().setUint8(out, fd === 1 && tty ? 2 : 0);
+      return SUCCESS;
+    },
+    fd_prestat_get: () => EBADF,
+    proc_exit: (code) => {
+      throw new WasiExit(code);
+    },
+    sched_yield: () => SUCCESS,
+    poll_oneoff: (_in, _out, _n, nevents) => {
+      dv().setUint32(nevents, 0, true);
+      return SUCCESS;
+    },
+  };
+  const imports = { wasi_snapshot_preview1: {}, ts_host: {} };
+  for (const { module: name, name: field } of WebAssembly.Module.imports(
+    module,
+  )) {
+    if (name === "wasi_snapshot_preview1")
+      imports[name][field] = wasi[field] ?? (() => ENOSYS);
+  }
+  imports.ts_host.fs = (op, ptr, len) => {
+    const result = fsCall(fs, op, u8().slice(ptr, ptr + len));
+    if (result === undefined) return -1;
+    if (result.error !== undefined) {
+      staged = encoder.encode(result.error);
+      return -2 - staged.length;
+    }
+    staged = result;
+    return staged.length;
+  };
+  imports.ts_host.fs_take = (ptr) => {
+    u8().set(staged, ptr);
+    staged = undefined;
+  };
 
-    let exports;
-    return {
-        imports,
-        /** Writes the request into `instance` and returns its `ts_run`. */
-        start(instance) {
-            exports = instance.exports;
-            memory = exports.memory;
-            let flags = 0;
-            if (diagnosticsJson) flags |= FLAG_DIAGNOSTICS_JSON;
-            if (caseInsensitive) flags |= FLAG_CASE_INSENSITIVE;
-            const request = encoder.encode([cwd, String(flags), ...args].join("\0"));
-            u8().set(request, exports.ts_input(request.length));
-            return exports.ts_run;
-        },
-        /** The result of a `ts_run` call that returned `exitCode` or threw `error`. */
-        result(exitCode, error) {
-            if (error !== undefined) {
-                if (!(error instanceof WasiExit)) {
-                    error.stderr = stderrText;
-                    throw error;
-                }
-                exitCode = error.code;
-            }
-            let diagnostics;
-            if (diagnosticsJson) {
-                const ptr = exports.ts_output();
-                const len = exports.ts_output_len();
-                diagnostics = len ? JSON.parse(decoder.decode(u8().subarray(ptr, ptr + len))) : [];
-            }
-            return { exitCode, diagnostics };
-        },
-    };
+  let exports;
+  return {
+    imports,
+    /** Writes the request into `instance` and returns its `ts_run`. */
+    start(instance) {
+      exports = instance.exports;
+      memory = exports.memory;
+      let flags = 0;
+      if (diagnosticsJson) flags |= FLAG_DIAGNOSTICS_JSON;
+      if (caseInsensitive) flags |= FLAG_CASE_INSENSITIVE;
+      const request = encoder.encode([cwd, String(flags), ...args].join("\0"));
+      u8().set(request, exports.ts_input(request.length));
+      return exports.ts_run;
+    },
+    /** The result of a `ts_run` call that returned `exitCode` or threw `error`. */
+    result(exitCode, error) {
+      if (error !== undefined) {
+        if (!(error instanceof WasiExit)) {
+          error.stderr = stderrText;
+          throw error;
+        }
+        exitCode = error.code;
+      }
+      let diagnostics;
+      if (diagnosticsJson) {
+        const ptr = exports.ts_output();
+        const len = exports.ts_output_len();
+        diagnostics = len
+          ? JSON.parse(decoder.decode(u8().subarray(ptr, ptr + len)))
+          : [];
+      }
+      return { exitCode, diagnostics };
+    },
+  };
 }
 
 /**
@@ -262,16 +287,16 @@ function prepareRun(module, options) {
  * error) throws, with the stderr text so far in `error.stderr`.
  */
 export function runTsc(module, options) {
-    const run = prepareRun(module, options);
-    const tsRun = run.start(new WebAssembly.Instance(module, run.imports));
-    let exitCode;
-    let error;
-    try {
-        exitCode = tsRun();
-    } catch (thrown) {
-        error = thrown;
-    }
-    return run.result(exitCode, error);
+  const run = prepareRun(module, options);
+  const tsRun = run.start(new WebAssembly.Instance(module, run.imports));
+  let exitCode;
+  let error;
+  try {
+    exitCode = tsRun();
+  } catch (thrown) {
+    error = thrown;
+  }
+  return run.result(exitCode, error);
 }
 
 /**
@@ -283,18 +308,20 @@ export function runTsc(module, options) {
  * not used there.
  */
 export async function runTscAsync(module, options) {
-    const run = prepareRun(module, options);
-    const tsRun = run.start(await WebAssembly.instantiate(module, run.imports));
-    const jspi = typeof WebAssembly.promising === "function" && typeof document === "undefined";
-    const call = jspi ? WebAssembly.promising(tsRun) : tsRun;
-    let exitCode;
-    let error;
-    try {
-        exitCode = await call();
-    } catch (thrown) {
-        error = thrown;
-    }
-    return run.result(exitCode, error);
+  const run = prepareRun(module, options);
+  const tsRun = run.start(await WebAssembly.instantiate(module, run.imports));
+  const jspi =
+    typeof WebAssembly.promising === "function" &&
+    typeof document === "undefined";
+  const call = jspi ? WebAssembly.promising(tsRun) : tsRun;
+  let exitCode;
+  let error;
+  try {
+    exitCode = await call();
+  } catch (thrown) {
+    error = thrown;
+  }
+  return run.result(exitCode, error);
 }
 
 /**
@@ -303,41 +330,48 @@ export async function runTscAsync(module, options) {
  * from `files` after the run.
  */
 export function memoryFileSystem(files = new Map()) {
-    const map = files instanceof Map ? files : new Map(Object.entries(files));
-    const dirPrefix = path => (path.endsWith("/") ? path : `${path}/`);
-    const isDir = path => {
-        const prefix = dirPrefix(path);
-        for (const key of map.keys()) if (key.startsWith(prefix)) return true;
-        return false;
-    };
-    return {
-        files: map,
-        readFile: path => map.get(path),
-        stat(path) {
-            const text = map.get(path);
-            if (text !== undefined) return { isDirectory: false, size: text.length, mtimeMs: 0 };
-            return isDir(path) ? { isDirectory: true, size: 0, mtimeMs: 0 } : undefined;
-        },
-        readDirectory(path) {
-            const prefix = dirPrefix(path);
-            const entries = new Map();
-            for (const key of map.keys()) {
-                if (!key.startsWith(prefix)) continue;
-                const rest = key.slice(prefix.length);
-                const slash = rest.indexOf("/");
-                const name = slash < 0 ? rest : rest.slice(0, slash);
-                if (!entries.has(name)) entries.set(name, slash < 0 ? "file" : "directory");
-            }
-            return entries.size || isDir(path) ? [...entries].map(([name, kind]) => ({ name, kind })) : undefined;
-        },
-        realpath: path => (map.has(path) || isDir(path) ? path : undefined),
-        writeFile(path, data, append) {
-            const text = fileDecoder.decode(data);
-            map.set(path, append ? (map.get(path) ?? "") + text : text);
-        },
-        remove(path) {
-            const prefix = dirPrefix(path);
-            for (const key of [...map.keys()]) if (key === path || key.startsWith(prefix)) map.delete(key);
-        },
-    };
+  const map = files instanceof Map ? files : new Map(Object.entries(files));
+  const dirPrefix = (path) => (path.endsWith("/") ? path : `${path}/`);
+  const isDir = (path) => {
+    const prefix = dirPrefix(path);
+    for (const key of map.keys()) if (key.startsWith(prefix)) return true;
+    return false;
+  };
+  return {
+    files: map,
+    readFile: (path) => map.get(path),
+    stat(path) {
+      const text = map.get(path);
+      if (text !== undefined)
+        return { isDirectory: false, size: text.length, mtimeMs: 0 };
+      return isDir(path)
+        ? { isDirectory: true, size: 0, mtimeMs: 0 }
+        : undefined;
+    },
+    readDirectory(path) {
+      const prefix = dirPrefix(path);
+      const entries = new Map();
+      for (const key of map.keys()) {
+        if (!key.startsWith(prefix)) continue;
+        const rest = key.slice(prefix.length);
+        const slash = rest.indexOf("/");
+        const name = slash < 0 ? rest : rest.slice(0, slash);
+        if (!entries.has(name))
+          entries.set(name, slash < 0 ? "file" : "directory");
+      }
+      return entries.size || isDir(path)
+        ? [...entries].map(([name, kind]) => ({ name, kind }))
+        : undefined;
+    },
+    realpath: (path) => (map.has(path) || isDir(path) ? path : undefined),
+    writeFile(path, data, append) {
+      const text = fileDecoder.decode(data);
+      map.set(path, append ? (map.get(path) ?? "") + text : text);
+    },
+    remove(path) {
+      const prefix = dirPrefix(path);
+      for (const key of map.keys())
+        if (key === path || key.startsWith(prefix)) map.delete(key);
+    },
+  };
 }

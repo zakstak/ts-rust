@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # The exit rule of the goport runs that gate.sh (measure, determinism) and the sweeps (sweep.sh,
 # sweep-wide.sh, sweep-extra2.sh, sweep-hono-runtime.sh) judge against saved Go output. Those stages do
 # not run Go, so they cannot know Go's exit in the same run: the Go pin of the run decides. Source this

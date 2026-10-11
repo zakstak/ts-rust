@@ -28,7 +28,10 @@ for project in "${projects[@]}"; do
     lock) chmod -R a-w -- "$source_dir" ;;
     unlock) chmod -R u+w -- "$source_dir" ;;
     status) ;;
-    *) echo "Usage: $0 lock|unlock|status [project...]" >&2; exit 2 ;;
+    *)
+      echo "Usage: $0 lock|unlock|status [project...]" >&2
+      exit 2
+      ;;
   esac
   writable="$(find "$source_dir" -perm /222 -not -type l -print -quit)"
   printf '%-16s %s\n' "$project" "$([[ -z "$writable" ]] && echo read-only || echo WRITABLE)"

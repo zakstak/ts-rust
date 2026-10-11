@@ -42,6 +42,7 @@ reports it.
 
 Last stdout line: a summary. Exit 0, or 2 on bad input.
 """
+
 import argparse
 import gzip
 import hashlib
@@ -52,45 +53,75 @@ import subprocess
 import sys
 from pathlib import Path
 
+
+def _read_file(path, *args, **kwargs):
+    with open(path, *args, **kwargs) as stream:
+        return stream.read()
+
+
 ROOT = Path(__file__).resolve().parents[2]
-PIN_PY = ROOT / 'scripts' / 'upstream' / 'pin.py'
-LAYOUT = '5f647a841a layout'
+PIN_PY = ROOT / "scripts" / "upstream" / "pin.py"
+LAYOUT = "5f647a841a layout"
 # The baseline file extensions of the compiler runner (after the configured name).
-REF_EXTS = ('.types', '.symbols', '.js', '.errors.txt', '.sourcemap.txt', '.js.map', '.trace.json', '.contentmapper')
-SUBMODULE_COPIES = ('submoduleAccepted/', 'submoduleTriaged/')
+REF_EXTS = (
+    ".types",
+    ".symbols",
+    ".js",
+    ".errors.txt",
+    ".sourcemap.txt",
+    ".js.map",
+    ".trace.json",
+    ".contentmapper",
+)
+SUBMODULE_COPIES = ("submoduleAccepted/", "submoduleTriaged/")
 # Go test files (relative to goCheckout) and the port tests (suite, name) that mirror them.
 GO_TEST_FILES = {
-    'internal/testutil/baseline/baseline_test.go': (
-        ('go_baselines', 'support::baseline::tests::baseline_submodule_accepted_files_exist'),
-        ('go_baselines', 'support::baseline::tests::baseline_submodule_triaged_files_exist'),
+    "internal/testutil/baseline/baseline_test.go": (
+        (
+            "go_baselines",
+            "support::baseline::tests::baseline_submodule_accepted_files_exist",
+        ),
+        (
+            "go_baselines",
+            "support::baseline::tests::baseline_submodule_triaged_files_exist",
+        ),
     ),
 }
 # Go: testrunner/test_case_parser.go optionRegex.
-OPTION = re.compile(r'^//\s*@(\w+)\s*:\s*([^\r\n]*)', re.M)
+OPTION = re.compile(r"^//\s*@(\w+)\s*:\s*([^\r\n]*)", re.MULTILINE)
 # "<stem>(<variant>)<rest>" of a configured case name or a reference file.
-VARIANT = re.compile(r'([^()]+)\(([^()]+)\)(.+)')
+VARIANT = re.compile(r"([^()]+)\(([^()]+)\)(.+)")
 
 
 def die(msg):
-    print(f'layout-name-map.py: {msg}', file=sys.stderr)
+    print(f"layout-name-map.py: {msg}", file=sys.stderr)
     sys.exit(2)
 
 
 def load(path):
     try:
-        raw = open(path, 'rb').read()
-        doc = json.loads(gzip.decompress(raw) if path.endswith('.gz') else raw)
+        raw = _read_file(path, "rb")
+        doc = json.loads(gzip.decompress(raw) if path.endswith(".gz") else raw)
     except (OSError, EOFError, ValueError) as err:
-        die(f'{path}: {err}')
-    if not isinstance(doc, dict) or not isinstance(doc.get('suites'), dict) or not isinstance(doc.get('pin'), str):
+        die(f"{path}: {err}")
+    if (
+        not isinstance(doc, dict)
+        or not isinstance(doc.get("suites"), dict)
+        or not isinstance(doc.get("pin"), str)
+    ):
         die(f'{path}: not a goport-tests.sh results file (no "suites" or "pin")')
     return doc, hashlib.sha256(raw).hexdigest()
 
 
 def pin_record(pin):
-    run = subprocess.run([sys.executable, str(PIN_PY), 'show', pin], capture_output=True, text=True)
+    run = subprocess.run(
+        [sys.executable, str(PIN_PY), "show", pin],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if run.returncode != 0:
-        die(f'pin.py show {pin}: {run.stderr.strip()}')
+        die(f"pin.py show {pin}: {run.stderr.strip()}")
     return json.loads(run.stdout)
 
 
@@ -98,23 +129,30 @@ def load_collisions(path):
     """{(suite, old file name): new file name, or None for an identical (merged) case}."""
     out = {}
     try:
-        lines = open(path, encoding='utf-8').read().splitlines()
+        lines = _read_file(path, encoding="utf-8").splitlines()
     except OSError as err:
-        die(f'{path}: {err}')
+        die(f"{path}: {err}")
     for i, line in enumerate(lines, 1):
         f = line.split()
-        if not f or f[0].startswith('#'):
+        if not f or f[0].startswith("#"):
             continue
-        if f[0] == 'identical' and len(f) == 2:
+        if f[0] == "identical" and len(f) == 2:
             old, new = f[1], None
-        elif f[0].startswith('renamed-promoted') and len(f) == 4 and f[2] == '->':
+        elif f[0].startswith("renamed-promoted") and len(f) == 4 and f[2] == "->":
             old, new = f[1], f[3]
         else:
-            die(f'{path}:{i}: not "identical <path>" or "renamed-promoted* <old> -> <new>"')
-        suite = old.split('/', 1)[0]
-        if new is not None and (new.split('/', 1)[0] != suite or os.path.dirname(new) != os.path.dirname(old)):
-            die(f'{path}:{i}: the rename moves the case to another dir')
-        out[(suite, os.path.basename(old))] = None if new is None else os.path.basename(new)
+            die(
+                f'{path}:{i}: not "identical <path>" or "renamed-promoted* <old> -> <new>"'
+            )
+        suite = old.split("/", 1)[0]
+        if new is not None and (
+            new.split("/", 1)[0] != suite
+            or os.path.dirname(new) != os.path.dirname(old)
+        ):
+            die(f"{path}:{i}: the rename moves the case to another dir")
+        out[(suite, os.path.basename(old))] = (
+            None if new is None else os.path.basename(new)
+        )
     return out
 
 
@@ -129,7 +167,10 @@ class Renamer:
         # {(suite, old stem): (old file, new stem or None)}
         self.stems = {}
         for (suite, old), new in collisions.items():
-            self.stems[(suite, split_ext(old)[0])] = (old, None if new is None else split_ext(new)[0])
+            self.stems[(suite, split_ext(old)[0])] = (
+                old,
+                None if new is None else split_ext(new)[0],
+            )
 
     def case(self, suite, cname):
         """(new configured name or None when merged, collision kind) of "<stem>[(<variant>)]<ext>"."""
@@ -137,10 +178,12 @@ class Renamer:
             if s != suite:
                 continue
             ext = split_ext(old)[1]
-            if cname == old or (cname.startswith(stem + '(') and cname.endswith(')' + ext)):
+            if cname == old or (
+                cname.startswith(stem + "(") and cname.endswith(")" + ext)
+            ):
                 if new_stem is None:
-                    return None, 'identical'
-                return new_stem + cname[len(stem):], 'renamed-promoted'
+                    return None, "identical"
+                return new_stem + cname[len(stem) :], "renamed-promoted"
         return cname, None
 
     def reference(self, suite, file):
@@ -148,11 +191,11 @@ class Renamer:
         for (s, stem), (_, new_stem) in self.stems.items():
             if s != suite or not file.startswith(stem):
                 continue
-            rest = file[len(stem):]
-            if rest.startswith('(') or rest in REF_EXTS:
+            rest = file[len(stem) :]
+            if rest.startswith("(") or rest in REF_EXTS:
                 if new_stem is None:
-                    return None, 'identical'
-                return new_stem + rest, 'renamed-promoted'
+                    return None, "identical"
+                return new_stem + rest, "renamed-promoted"
         return file, None
 
 
@@ -168,7 +211,7 @@ def case_files(root):
 
 def option_values(value):
     """The lower-case values of an option value "a, b,c" (Go: harnessutil.go splitOptionValues, without * and -)."""
-    return [v.strip().lower() for v in value.split(',') if v.strip()]
+    return [v.strip().lower() for v in value.split(",") if v.strip()]
 
 
 class Variants:
@@ -187,8 +230,10 @@ class Variants:
         """{lower-case option: value} of a case file, as Go's extractCompilerSettings reads them (the last wins)."""
         path = self.roots[side] / self.cases[side][(suite, file)]
         if path not in self.options:
-            text = path.read_text(encoding='utf-8', errors='replace')
-            self.options[path] = {k.lower(): v.strip().removesuffix(';') for k, v in OPTION.findall(text)}
+            text = path.read_text(encoding="utf-8", errors="replace")
+            self.options[path] = {
+                k.lower(): v.strip().removesuffix(";") for k, v in OPTION.findall(text)
+            }
         return self.options[path]
 
     def rename(self, suite, name, reference):
@@ -202,25 +247,36 @@ class Variants:
             return name, None
         old, new = self.read(0, suite, files[0]), self.read(1, suite, files[0])
         keep, dropped = [], []
-        for part in variant.split(','):
-            key, _, value = part.partition('=')
-            was, now = option_values(old.get(key, '')), option_values(new.get(key, ''))
+        for part in variant.split(","):
+            key, _, value = part.partition("=")
+            was, now = option_values(old.get(key, "")), option_values(new.get(key, ""))
             if len(was) > 1 and value in was and now == [value]:
-                dropped.append(f'@{key}: {old[key]} at {self.pins[0]} -> {new[key]} at {self.pins[1]}')
+                dropped.append(
+                    f"@{key}: {old[key]} at {self.pins[0]} -> {new[key]} at {self.pins[1]}"
+                )
             else:
                 keep.append(part)
         if not dropped:
             return name, None
-        new_name = stem + (f'({",".join(keep)})' if keep else '') + rest
-        return new_name, f'case-file diff {self.cases[1][(suite, files[0])]}: {"; ".join(dropped)} (one value)'
+        new_name = stem + (f"({','.join(keep)})" if keep else "") + rest
+        return (
+            new_name,
+            f"case-file diff {self.cases[1][(suite, files[0])]}: {'; '.join(dropped)} (one value)",
+        )
 
 
 def git_blob(rec, path):
     """The blob of <path> (relative to the pin's goCheckout) at the pin commit, or None when it is not there."""
-    run = subprocess.run(['git', '-C', rec['goCheckout'], 'ls-tree', rec['commit'], '--', path],
-                         capture_output=True, text=True)
+    run = subprocess.run(
+        ["git", "-C", rec["goCheckout"], "ls-tree", rec["commit"], "--", path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if run.returncode != 0:
-        die(f'git -C {rec["goCheckout"]} ls-tree {rec["commit"]} -- {path}: {run.stderr.strip()}')
+        die(
+            f"git -C {rec['goCheckout']} ls-tree {rec['commit']} -- {path}: {run.stderr.strip()}"
+        )
     return run.stdout.split()[2] if run.stdout.strip() else None
 
 
@@ -229,151 +285,222 @@ def build(base, renamer, variants, gone_tests):
 
     gone_tests: {(suite, name): evidence} of the port tests whose Go test file is gone."""
     lines = []
-    b = base['suites']
+    b = base["suites"]
 
     def subtests(suite, new_suite):
         for name in sorted(b.get(suite, {})):
-            kind, _, key = name.partition(' ')
-            where, _, rest = key.partition('/')
-            if where != 'submodule' or '/' not in rest:
+            kind, _, key = name.partition(" ")
+            where, _, rest = key.partition("/")
+            if where != "submodule" or "/" not in rest:
                 continue
-            case_suite, cname = rest.split('/', 1)
+            case_suite, cname = rest.split("/", 1)
             new_cname, why = renamer.case(case_suite, cname)
             if new_cname is None:
-                lines.append((suite, name, None, None,
-                              f'promotedTestCollisions.txt identical: merged into local/{case_suite}/{cname}'))
+                lines.append(
+                    (
+                        suite,
+                        name,
+                        None,
+                        None,
+                        f"promotedTestCollisions.txt identical: merged into local/{case_suite}/{cname}",
+                    )
+                )
                 continue
-            ev = f'{LAYOUT}: submodule case in testdata/tests/cases, TestLocal runs it'
+            ev = f"{LAYOUT}: submodule case in testdata/tests/cases, TestLocal runs it"
             if why:
-                ev += f'; promotedTestCollisions.txt {why}: {cname} -> {new_cname}'
+                ev += f"; promotedTestCollisions.txt {why}: {cname} -> {new_cname}"
             new_cname, diff = variants.rename(case_suite, new_cname, reference=False)
             if diff:
-                ev += f'; {diff}'
-            lines.append((suite, name, new_suite, f'{kind} local/{case_suite}/{new_cname}', ev))
+                ev += f"; {diff}"
+            lines.append(
+                (suite, name, new_suite, f"{kind} local/{case_suite}/{new_cname}", ev)
+            )
 
-    subtests('go_baselines_submodule', 'go_baselines_local')
-    subtests('go_baselines_transpile', 'go_baselines_transpile')
-    for name in sorted(b.get('go_baselines_submodule_shards', {})):
-        m = re.fullmatch(r'compiler_runner::test_submodule (\d+/\d+)', name)
+    subtests("go_baselines_submodule", "go_baselines_local")
+    subtests("go_baselines_transpile", "go_baselines_transpile")
+    for name in sorted(b.get("go_baselines_submodule_shards", {})):
+        m = re.fullmatch(r"compiler_runner::test_submodule (\d+/\d+)", name)
         if m:
-            lines.append(('go_baselines_submodule_shards', name, 'go_baselines_local_shards',
-                          f'compiler_runner::test_local {m.group(1)}',
-                          f'{LAYOUT}: no TestSubmodule; TestLocal runs every case in the shards'))
-    if 'compiler_runner::test_local' in b.get('go_baselines', {}):
-        lines.append(('go_baselines', 'compiler_runner::test_local', None, None,
-                      f'{LAYOUT}: TestLocal runs every case, in the 4 shards (go_baselines_local_shards)'))
+            lines.append(
+                (
+                    "go_baselines_submodule_shards",
+                    name,
+                    "go_baselines_local_shards",
+                    f"compiler_runner::test_local {m.group(1)}",
+                    f"{LAYOUT}: no TestSubmodule; TestLocal runs every case in the shards",
+                )
+            )
+    if "compiler_runner::test_local" in b.get("go_baselines", {}):
+        lines.append(
+            (
+                "go_baselines",
+                "compiler_runner::test_local",
+                None,
+                None,
+                f"{LAYOUT}: TestLocal runs every case, in the 4 shards (go_baselines_local_shards)",
+            )
+        )
     for (suite, name), ev in gone_tests.items():
         if name in b.get(suite, {}):
             lines.append((suite, name, None, None, ev))
-    for path in sorted(b.get('go_baselines_reference', {})):
-        if path.endswith('.diff') or path.startswith(SUBMODULE_COPIES):
-            lines.append(('go_baselines_reference', path, None, None,
-                          f'{LAYOUT}: no .diff baselines and no submoduleAccepted/submoduleTriaged dirs'))
+    for path in sorted(b.get("go_baselines_reference", {})):
+        if path.endswith(".diff") or path.startswith(SUBMODULE_COPIES):
+            lines.append(
+                (
+                    "go_baselines_reference",
+                    path,
+                    None,
+                    None,
+                    f"{LAYOUT}: no .diff baselines and no submoduleAccepted/submoduleTriaged dirs",
+                )
+            )
             continue
-        if not path.startswith('submodule/'):
+        if not path.startswith("submodule/"):
             continue
-        rest = path[len('submodule/'):]
-        d, _, file = rest.rpartition('/')
-        new_file, why = renamer.reference(d.split('/', 1)[0], file) if d else (file, None)
+        rest = path[len("submodule/") :]
+        d, _, file = rest.rpartition("/")
+        new_file, why = (
+            renamer.reference(d.split("/", 1)[0], file) if d else (file, None)
+        )
         if new_file is None:
-            lines.append(('go_baselines_reference', path, None, None,
-                          f'promotedTestCollisions.txt identical: merged into {rest}'))
+            lines.append(
+                (
+                    "go_baselines_reference",
+                    path,
+                    None,
+                    None,
+                    f"promotedTestCollisions.txt identical: merged into {rest}",
+                )
+            )
             continue
-        ev = f'{LAYOUT}: reference/submodule merged into reference'
+        ev = f"{LAYOUT}: reference/submodule merged into reference"
         if why:
-            ev += f'; promotedTestCollisions.txt {why}: {file} -> {new_file}'
+            ev += f"; promotedTestCollisions.txt {why}: {file} -> {new_file}"
         if d:
-            new_file, diff = variants.rename(d.split('/', 1)[0], new_file, reference=True)
+            new_file, diff = variants.rename(
+                d.split("/", 1)[0], new_file, reference=True
+            )
             if diff:
-                ev += f'; {diff}'
-        lines.append(('go_baselines_reference', path, 'go_baselines_reference', f'{d}/{new_file}' if d else new_file,
-                      ev))
+                ev += f"; {diff}"
+        lines.append(
+            (
+                "go_baselines_reference",
+                path,
+                "go_baselines_reference",
+                f"{d}/{new_file}" if d else new_file,
+                ev,
+            )
+        )
     # The rules must give an explicit one-to-one map (compare-tests.py rejects anything else).
     seen = {}
     for old_suite, old, suite, name, _ in lines:
         if suite is None:
             continue
         if (suite, name) in seen:
-            die(f'{old_suite} {old} and {seen[(suite, name)]} both map to {suite} {name}')
-        seen[(suite, name)] = f'{old_suite} {old}'
+            die(
+                f"{old_suite} {old} and {seen[(suite, name)]} both map to {suite} {name}"
+            )
+        seen[(suite, name)] = f"{old_suite} {old}"
         if name in b.get(suite, {}):
-            die(f'{old_suite} {old} maps to {suite} {name}, which is a base name')
+            die(f"{old_suite} {old} maps to {suite} {name}, which is a base name")
     return lines
 
 
 def absent_reason(suite, name, new, cases, pin):
     """Why a mapped name is missing from the new results."""
-    n = new['suites']
-    if suite == 'go_baselines_reference':
-        return f'no reference file {name} at {pin}'
-    kind, _, key = name.partition(' ')
-    where, _, rest = key.partition('/')
-    case_suite, _, cname = rest.partition('/')
+    n = new["suites"]
+    if suite == "go_baselines_reference":
+        return f"no reference file {name} at {pin}"
+    kind, _, key = name.partition(" ")
+    _where, _, rest = key.partition("/")
+    case_suite, _, cname = rest.partition("/")
     stem, ext = split_ext(cname)
-    file = (stem.split('(', 1)[0] + ext) if cname.endswith(')' + ext) else cname
-    if case_suite == 'transpile' or (case_suite, file) in cases:
-        if any(k.partition(' ')[2] == key for k in n.get(suite, {})):
-            return f'the {kind} subtest of {key} does not run at {pin}'
-        where_file = cases.get((case_suite, file), f'transpile/{file}')
-        return f'case {where_file} is at {pin}, but not the configuration {cname}'
-    return f'no case file {case_suite}/**/{file} at {pin}'
+    file = (stem.split("(", 1)[0] + ext) if cname.endswith(")" + ext) else cname
+    if case_suite == "transpile" or (case_suite, file) in cases:
+        if any(k.partition(" ")[2] == key for k in n.get(suite, {})):
+            return f"the {kind} subtest of {key} does not run at {pin}"
+        where_file = cases.get((case_suite, file), f"transpile/{file}")
+        return f"case {where_file} is at {pin}, but not the configuration {cname}"
+    return f"no case file {case_suite}/**/{file} at {pin}"
 
 
 def main():
-    ap = argparse.ArgumentParser(description='Old-name map from a typescript-go layout run to a tsc/ layout run.')
-    ap.add_argument('base')
-    ap.add_argument('new')
-    ap.add_argument('--out', required=True)
-    ap.add_argument('--absent')
-    ap.add_argument('--collisions')
+    ap = argparse.ArgumentParser(
+        description="Old-name map from a typescript-go layout run to a tsc/ layout run."
+    )
+    ap.add_argument("base")
+    ap.add_argument("new")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--absent")
+    ap.add_argument("--collisions")
     a = ap.parse_args()
     base, base_sha = load(a.base)
     new, new_sha = load(a.new)
-    base_rec, new_rec = pin_record(base['pin']), pin_record(new['pin'])
-    if base_rec.get('layout') != 'typescript-go' or new_rec.get('layout') != 'typescript':
-        die(f'base pin {base["pin"]} has layout {base_rec.get("layout")!r} and new pin {new["pin"]} '
-            f'{new_rec.get("layout")!r}; want typescript-go and typescript')
-    collisions = a.collisions or os.path.join(new_rec['goCheckout'], 'testdata', 'promotedTestCollisions.txt')
-    col_sha = hashlib.sha256(open(collisions, 'rb').read()).hexdigest()
-    variants = Variants(os.path.join(base_rec['goCheckout'], '_submodules', 'TypeScript', 'tests', 'cases'),
-                        os.path.join(new_rec['goCheckout'], 'testdata', 'tests', 'cases'), base['pin'], new['pin'])
+    base_rec, new_rec = pin_record(base["pin"]), pin_record(new["pin"])
+    if (
+        base_rec.get("layout") != "typescript-go"
+        or new_rec.get("layout") != "typescript"
+    ):
+        die(
+            f"base pin {base['pin']} has layout {base_rec.get('layout')!r} and new pin {new['pin']} "
+            f"{new_rec.get('layout')!r}; want typescript-go and typescript"
+        )
+    collisions = a.collisions or os.path.join(
+        new_rec["goCheckout"], "testdata", "promotedTestCollisions.txt"
+    )
+    col_sha = hashlib.sha256(_read_file(collisions, "rb")).hexdigest()
+    variants = Variants(
+        os.path.join(
+            base_rec["goCheckout"], "_submodules", "TypeScript", "tests", "cases"
+        ),
+        os.path.join(new_rec["goCheckout"], "testdata", "tests", "cases"),
+        base["pin"],
+        new["pin"],
+    )
     gone_tests = {}
     for path, tests in GO_TEST_FILES.items():
-        if not any(name in base['suites'].get(suite, {}) for suite, name in tests):
+        if not any(name in base["suites"].get(suite, {}) for suite, name in tests):
             continue
         blob = git_blob(base_rec, path)
         if blob and git_blob(new_rec, path) is None:
-            ls_tree = f'git -C {new_rec["goCheckout"]} ls-tree {new_rec["commit"][:12]} -- {path}'
+            ls_tree = f"git -C {new_rec['goCheckout']} ls-tree {new_rec['commit'][:12]} -- {path}"
             for test in tests:
-                gone_tests[test] = (f'Go test file {path} is at {base["pin"]} (blob {blob[:12]}), '
-                                    f'not at {new["pin"]} ({ls_tree}: empty)')
+                gone_tests[test] = (
+                    f"Go test file {path} is at {base['pin']} (blob {blob[:12]}), "
+                    f"not at {new['pin']} ({ls_tree}: empty)"
+                )
     lines = build(base, Renamer(load_collisions(collisions)), variants, gone_tests)
 
     cases = variants.cases[1]
-    incomplete = set(new.get('incomplete', []))
+    incomplete = set(new.get("incomplete", []))
     absent = []
     for old_suite, old, suite, name, _ in lines:
-        if suite is None or suite in incomplete or name in new['suites'].get(suite, {}):
+        if suite is None or suite in incomplete or name in new["suites"].get(suite, {}):
             continue
-        reason = absent_reason(suite, name, new, cases, new['pin'])
-        absent.append((old_suite, old, base['suites'][old_suite][old], suite, name, reason))
+        reason = absent_reason(suite, name, new, cases, new["pin"])
+        absent.append(
+            (old_suite, old, base["suites"][old_suite][old], suite, name, reason)
+        )
 
-    with open(a.out, 'w', encoding='utf-8') as f:
+    with open(a.out, "w", encoding="utf-8") as f:
         # compare-tests.py skips the header only as the first line.
-        f.write('oldSuite\toldName\tnewSuite\tnewName\tevidence\n')
-        f.write(f'# layout-name-map.py: base {a.base} (sha256 {base_sha}, pin {base["pin"]}), new {a.new} '
-                f'(sha256 {new_sha}, pin {new["pin"]}), collisions {collisions} (sha256 {col_sha})\n')
+        f.write("oldSuite\toldName\tnewSuite\tnewName\tevidence\n")
+        f.write(
+            f"# layout-name-map.py: base {a.base} (sha256 {base_sha}, pin {base['pin']}), new {a.new} "
+            f"(sha256 {new_sha}, pin {new['pin']}), collisions {collisions} (sha256 {col_sha})\n"
+        )
         for old_suite, old, suite, name, ev in lines:
-            f.write(f'{old_suite}\t{old}\t{suite or "-"}\t{name or "-"}\t{ev}\n')
+            f.write(f"{old_suite}\t{old}\t{suite or '-'}\t{name or '-'}\t{ev}\n")
     if a.absent:
-        with open(a.absent, 'w', encoding='utf-8') as f:
-            f.write('oldSuite\toldName\tbaseStatus\tnewSuite\tnewName\treason\n')
-            for row in absent:
-                f.write('\t'.join(row) + '\n')
+        with open(a.absent, "w", encoding="utf-8") as f:
+            f.write("oldSuite\toldName\tbaseStatus\tnewSuite\tnewName\treason\n")
+            f.writelines("\t".join(row) + "\n" for row in absent)
     removed = sum(1 for line in lines if line[2] is None)
-    print(f'{len(lines)} map lines ({removed} removed), {len(absent)} mapped names absent in new '
-          f'({sum(1 for r in absent if r[2] == "ok")} of them ok in base); map {a.out}')
+    print(
+        f"{len(lines)} map lines ({removed} removed), {len(absent)} mapped names absent in new "
+        f"({sum(1 for r in absent if r[2] == 'ok')} of them ok in base); map {a.out}"
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

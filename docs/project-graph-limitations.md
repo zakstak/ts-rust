@@ -19,8 +19,8 @@ import other = require("pkg");
 `canonical_module_resolution_modes.rs` checks this through public canonical
 queries, value types, declaration owners, and replay in both source orders.
 Declaration-only tests with `skipLibCheck` also check explicit `resolution-mode`
-attributes, an unresolved target in only one mode, and shared ambient targets.
-A JSX test checks that a successful require lookup cannot hide a missing
+attributes, an unresolved target in only one mode, and shared ambient targets. A
+JSX test checks that a successful require lookup cannot hide a missing
 import-mode runtime.
 
 Unresolved source `import = require` checking remains explicitly unsupported.
@@ -33,9 +33,10 @@ parity. The graph snapshot remains a report of retained inputs and results.
 
 The config resolver retains an ordered prefix of its existing probes, reads,
 extends decisions, and cycles. This adds no filesystem calls. The observation
-limit is 16,384 events and 16 MiB of UTF-8 string data. Omitted events are counted.
-`is_complete` describes retention only. It does not mean that the config was
-valid, that resolution succeeded, or that the complete Program was observed.
+limit is 16,384 events and 16 MiB of UTF-8 string data. Omitted events are
+counted. `is_complete` describes retention only. It does not mean that the
+config was valid, that resolution succeeded, or that the complete Program was
+observed.
 
 Read events contain the VFS text passed to parsing, not raw disk bytes. The VFS
 can remove a BOM or decode UTF-16. Report fields use `parserInputText`,
@@ -45,10 +46,9 @@ place. `ProgramGraphConfig::source_text` and the report's
 `diagnosticSourceTextDigest` describe that later text, which can differ.
 
 Resolved module records retain the lookup candidate before optional realpath
-handling. Every resolution attempt retains the effective import or require
-mode, including default-mode and failed attempts. Config parse and extends
-gaps remain when observations are incomplete. A missing leaf text remains a
-separate gap.
+handling. Every resolution attempt retains the effective import or require mode,
+including default-mode and failed attempts. Config parse and extends gaps remain
+when observations are incomplete. A missing leaf text remains a separate gap.
 
 ## Resolver package inputs
 
@@ -78,11 +78,11 @@ without a package still have a final decision. Bundled libraries do not make
 these package-scope calls.
 
 `sourcePackageScopeObservation` serializes every retained event in order. The
-report resolves each event's program-local `FileId` to its loaded source path
-in `sourceFile`. It does not infer a source from the package JSON path or
-publish a `FileId` as a persistent identity. Read text uses the same VFS parser
-input fields as config and resolver inputs. It is not raw disk-byte evidence.
-The graph digest includes both package-input reports and their omission counts.
+report resolves each event's program-local `FileId` to its loaded source path in
+`sourceFile`. It does not infer a source from the package JSON path or publish a
+`FileId` as a persistent identity. Read text uses the same VFS parser input
+fields as config and resolver inputs. It is not raw disk-byte evidence. The
+graph digest includes both package-input reports and their omission counts.
 
 The `source_package_scopes` gap clears only when all observed events and a
 matching final format decision for every source that is not a default library
@@ -92,16 +92,16 @@ path-reference loads still do not record filesystem realpaths.
 ## Selected paths
 
 The report includes `preserveSymlinks` in its explicit resolution options.
-Resolved file names are selected lookup paths, not a guarantee that realpath
-was called. Original file names remain the lookup candidates before optional
+Resolved file names are selected lookup paths, not a guarantee that realpath was
+called. Original file names remain the lookup candidates before optional
 realpath handling. These fields do not close the `source_real_paths` gap.
 
 Nested package imports such as `"#dep": "pkg"` now classify
 `externalLibraryImport` from the selected nested target path. A symlink target
 outside `node_modules` therefore produces false when symlinks are not preserved.
-The 192-case comparison matches pinned Go, with 18 corrected flags and no changes
-to Rust paths, host calls, retained inputs, or modes. Earlier input-evidence
-reports still describe the commits they tested.
+The 192-case comparison matches pinned Go, with 18 corrected flags and no
+changes to Rust paths, host calls, retained inputs, or modes. Earlier
+input-evidence reports still describe the commits they tested.
 
 Broader module-resolution differences remain. Under NodeNext, explicitly
 disabling package imports blocks `#dep` in Rust but not in pinned Go. For nested

@@ -17,12 +17,15 @@ about 100 KB of the wasm module. The port keeps the same data in about 8 KB:
 The script checks that the tables give back each Go entry. Run it again when
 the Go file changes (new Unicode data at a pin bump).
 """
+
 import pathlib
 import re
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
-OUT = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else HERE / "../src/scanner_util/js_case_tables.rs").resolve()
+OUT = pathlib.Path(
+    sys.argv[2] if len(sys.argv) > 2 else HERE / "../src/scanner_util/js_case_tables.rs"
+).resolve()
 UPPER_LOWER = "UPPER_LOWER"
 
 go = pathlib.Path(sys.argv[1]).read_text()
@@ -115,14 +118,19 @@ out = [
     f"/// {len(deltas):,} entries in {len(ranges)} runs.",
     "pub(super) static CASE_RANGES: &[(u32, u32, i32, i32)] = &[",
 ]
-out += [f"    (0x{lo:X}, 0x{hi:X}, {lower}, {upper})," for lo, hi, lower, upper in ranges]
+out += [
+    f"    (0x{lo:X}, 0x{hi:X}, {lower}, {upper})," for lo, hi, lower, upper in ranges
+]
 out += [
     "];",
     "",
     "/// The other entries, sorted: `(code point, lower, upper)`.",
     "pub(super) static SPECIAL_CASE_MAPPINGS: &[(u32, &str, &str)] = &[",
 ]
-out += [f"    (0x{code:X}, {rust_str(lower)}, {rust_str(upper)})," for code, lower, upper in special]
+out += [
+    f"    (0x{code:X}, {rust_str(lower)}, {rust_str(upper)}),"
+    for code, lower, upper in special
+]
 out += [
     "];",
     "",

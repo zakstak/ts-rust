@@ -23,13 +23,16 @@ the `intern::tests::lib_names_find_themselves` test in core.rs fails: update
 the copy and run this script again. Run it again too when the lib files
 change (a stale table is only slower).
 """
+
 import pathlib
 import re
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 LIBS = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else HERE / "../libs").resolve()
-OUT = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else HERE / "../src/core/lib_names.rs").resolve()
+OUT = pathlib.Path(
+    sys.argv[2] if len(sys.argv) > 2 else HERE / "../src/core/lib_names.rs"
+).resolve()
 
 M64 = (1 << 64) - 1
 K = 0xF1357AEA2E62A9C5
@@ -53,10 +56,10 @@ def hash_bytes(b):
     if n <= 16:
         if n >= 8:
             s0 ^= le(b[0:8])
-            s1 ^= le(b[n - 8:])
+            s1 ^= le(b[n - 8 :])
         elif n >= 4:
             s0 ^= le(b[0:4])
-            s1 ^= le(b[n - 4:])
+            s1 ^= le(b[n - 4 :])
         elif n > 0:
             s0 ^= b[0]
             s1 ^= (b[n - 1] << 8) | b[n // 2]
@@ -107,7 +110,7 @@ TOKEN = re.compile(
     r"|`(?:[^`\\]|\\.)*`"
     r"|[0-9][A-Za-z0-9_$.]*"
     rf"|(?P<id>{IDENT})",
-    re.S,
+    re.DOTALL,
 )
 WORD = re.compile(IDENT)
 TAG = re.compile(r"@([A-Za-z_$][A-Za-z0-9_$]*)")
@@ -219,4 +222,6 @@ pub(super) static BUCKETS: [u16; (1 << BUCKET_BITS) + 1] = [
 """
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(out, encoding="utf-8")
-print(f"{OUT}: {count} names, {offsets[-1]} bytes, {1 << bits} buckets from {len(files)} files")
+print(
+    f"{OUT}: {count} names, {offsets[-1]} bytes, {1 << bits} buckets from {len(files)} files"
+)

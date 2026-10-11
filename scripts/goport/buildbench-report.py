@@ -7,6 +7,7 @@ Reads every <runs-dir>/results.tsv and the cargo timing pages in <runs-dir>/logs
 cell (label without its -rN suffix); each value column lists the runs as "a / b". "lib" is the
 ts_goport lib unit time, "front" its time to metadata (the frontend part, before codegen).
 """
+
 import csv
 import json
 import re
@@ -18,7 +19,9 @@ from pathlib import Path
 def lib_times(html: Path):
     try:
         text = html.read_text()
-        units = json.loads(re.search(r"const UNIT_DATA = (\[.*?\]);\n", text, re.S).group(1))
+        units = json.loads(
+            re.search(r"const UNIT_DATA = (\[.*?\]);\n", text, re.DOTALL).group(1)
+        )
     except (OSError, AttributeError, ValueError):
         return None, None
     for u in units:
@@ -46,7 +49,9 @@ for d in map(Path, sys.argv[1:]):
         lib, front = lib_times(d / "logs" / f"{row['label']}.html")
         cells.setdefault(cell, []).append((row, lib, front))
 
-print("| cell | toolchain | profile | RUSTFLAGS | incr | runs | wall s | user s | sys s | max RSS GiB | lib s | front s | rc |")
+print(
+    "| cell | toolchain | profile | RUSTFLAGS | incr | runs | wall s | user s | sys s | max RSS GiB | lib s | front s | rc |"
+)
 print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 for cell, runs in cells.items():
     r0 = runs[0][0]

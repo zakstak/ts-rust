@@ -1,8 +1,8 @@
 # Constructor property write semantic review
 
-Candidate: `6b93562f5a91af2d4ceda8b816845fa538274c8a`.
-Base: `9b1f0c304a72002e246c5f65b06e3bf68327d4d6`.
-Decision: hold semantic approval for the two findings below.
+Candidate: `6b93562f5a91af2d4ceda8b816845fa538274c8a`. Base:
+`9b1f0c304a72002e246c5f65b06e3bf68327d4d6`. Decision: hold semantic approval for
+the two findings below.
 
 This review changes tests and this report only. The write provider, class
 metadata, source executor, flow provider, super selection, and existing tests
@@ -16,26 +16,27 @@ parameter on a cold check. Pinned Go accepts it with no diagnostics.
 ```typescript
 declare let cachedOptional: number | undefined;
 class OptionalParameterControl {
-    constructor(public readonly value?: number) {
-        this.value = 1;
-        const parameter = value;
-    }
+  constructor(public readonly value?: number) {
+    this.value = 1;
+    const parameter = value;
+  }
 }
 ```
 
-`review_constructor_optional_parameter_failure_precedes_writes` proves that
-the error also occurs without the write. The parameter value cache and the
-write expression cache are still empty after the failure. Querying the unrelated
-`number | undefined` annotation through `get_type_from_type_node` then makes
-the same source check succeed. The probe changes no AST or option and uses no
-cache mutation test hook.
+`review_constructor_optional_parameter_failure_precedes_writes` proves that the
+error also occurs without the write. The parameter value cache and the write
+expression cache are still empty after the failure. Querying the unrelated
+`number | undefined` annotation through `get_type_from_type_node` then makes the
+same source check succeed. The probe changes no AST or option and uses no cache
+mutation test hook.
 
-The source constructor planner calls `optional_constructor_parameter_type`
-at `classes.rs:445`. That helper only looks up the optional union and returns
-`None` while it is cold, at `classes.rs:4241`. The new early constructor dispatch
-at `source.rs:3295` then falls through because `try_plan_source_class` turns the
-unsupported source plan into `None` at `source.rs:7704`. The legacy reader rejects
-the extra local at `classes.rs:4474` and reports a class invariant.
+The source constructor planner calls `optional_constructor_parameter_type` at
+`classes.rs:445`. That helper only looks up the optional union and returns
+`None` while it is cold, at `classes.rs:4241`. The new early constructor
+dispatch at `source.rs:3295` then falls through because `try_plan_source_class`
+turns the unsupported source plan into `None` at `source.rs:7704`. The legacy
+reader rejects the extra local at `classes.rs:4474` and reports a class
+invariant.
 
 This is a constructor-dispatch and class-provider integration gap. It occurs
 before the new write target executes. The class-provider cache lookup and the
@@ -54,8 +55,8 @@ completes two forced warm checks.
 
 ## P2. Accepted write diagnostics do not match pinned Go
 
-The write executor uses the shared assignment reporter at `source.rs:29094`.
-Its exact-optional rewrite at `source.rs:29244` changes the primary message but
+The write executor uses the shared assignment reporter at `source.rs:29094`. Its
+exact-optional rewrite at `source.rs:29244` changes the primary message but
 cannot restore the missing union detail lines. The shared reporter at
 `source.rs:31670` also retains a nullable target name that Go omits for a plain
 string mismatch.
@@ -65,12 +66,12 @@ Rust omits the final line shown below.
 
 ```typescript
 class OptionalUnionSource {
-    value?: number;
-    source?: number;
-    constructor() {
-        this.value = this.source;
-        const after: number = this.value;
-    }
+  value?: number;
+  source?: number;
+  constructor() {
+    this.value = this.source;
+    const after: number = this.value;
+  }
 }
 ```
 
@@ -89,10 +90,10 @@ A second message difference occurs without exact optional types:
 
 ```typescript
 class PlainParameter {
-    value?: number;
-    constructor(input: string) {
-        this.value = input;
-    }
+  value?: number;
+  constructor(input: string) {
+    this.value = input;
+  }
 }
 ```
 
@@ -107,9 +108,11 @@ the shared reporter's existing behavior.
 
 ## Passing checks
 
-- All 12 existing public class-body tests and all 7 public class-write tests pass.
-- The unchanged original `optional_class_property_assignment_keeps_the_real_flow_type`
-  unit test passes.
+- All 12 existing public class-body tests and all 7 public class-write tests
+  pass.
+- The unchanged original
+  `optional_class_property_assignment_keeps_the_real_flow_type` unit test
+  passes.
 - Distinct public `value` and private `#value` fields preserve TS2565, field
   identity, read types, and forced warm state.
 - A write with `this` on both sides before `super()` preserves both TS17009
@@ -134,26 +137,27 @@ classification. Their complete executed snapshot is saved at
 `/tmp/ts-rust-wave141-class-writes-followup.log`. No retained assertion was
 changed, and no existing test was changed or ignored.
 
-Optional private identifiers remain the documented unsupported declaration
-case. Their Go result is not counted as a passing Rust oracle control. No new
-claim covers inherited, static, accessor, computed, compound, guard, loop, or
+Optional private identifiers remain the documented unsupported declaration case.
+Their Go result is not counted as a passing Rust oracle control. No new claim
+covers inherited, static, accessor, computed, compound, guard, loop, or
 nested-function writes.
 
 ## Execution evidence
 
-- Session `3919`: 3 of the initial 11 review probes passed. All 19 existing public
-  tests passed. Build time was 38.22 seconds. The three test binaries took 0.06,
-  0.08, and 0.10 seconds. Exit 101.
+- Session `3919`: 3 of the initial 11 review probes passed. All 19 existing
+  public tests passed. Build time was 38.22 seconds. The three test binaries
+  took 0.06, 0.08, and 0.10 seconds. Exit 101.
 - Session `58847`: the original property-flow unit test passed, with 3,723 tests
-  filtered out. Build time was 55.95 seconds. Execution took 0.01 seconds. Exit 0.
+  filtered out. Build time was 55.95 seconds. Execution took 0.01 seconds.
+  Exit 0.
 - Session `19207`: 6 of the expanded 18 review probes passed. Five failures were
   accepted-write diagnostic differences, three were cold optional-parameter
-  failures, and four were the separately classified broad probes. Build time
-  was 0.63 seconds. Execution took 0.11 seconds. Exit 101.
+  failures, and four were the separately classified broad probes. Build time was
+  0.63 seconds. Execution took 0.11 seconds. Exit 101.
 - Session `17870`: the final focused file had 6 passes and 8 failures. The five
-  message differences and three cold optional-parameter failures remain.
-  Build time was 0.71 seconds. Execution took 0.10 seconds. Exit 101. Output is
-  saved at `/tmp/ts-rust-wave141-class-writes-focused.log`.
+  message differences and three cold optional-parameter failures remain. Build
+  time was 0.71 seconds. Execution took 0.10 seconds. Exit 101. Output is saved
+  at `/tmp/ts-rust-wave141-class-writes-focused.log`.
 
 Two of those six passing probes are failure-location controls. They establish
 the cache dependency and the independent alias limitation, not Go parity.
@@ -161,9 +165,9 @@ the cache dependency and the independent alias limitation, not Go parity.
 The final file contains 14 tests with unchanged retained assertions. No test or
 production source edit followed the final run. All command sessions are
 collected. All Cargo commands use the shared capped runner, an absolute
-manifest, `--locked --offline`, 16 GiB memory, a 16 MiB Rust stack, and the unique
-target `target/worktrees/wave141-class-writes-semantics`. TMPDIR is unchanged.
-No outer lock or queue bypass was added.
+manifest, `--locked --offline`, 16 GiB memory, a 16 MiB Rust stack, and the
+unique target `target/worktrees/wave141-class-writes-semantics`. TMPDIR is
+unchanged. No outer lock or queue bypass was added.
 
 The focused test file passes Rustfmt. The staged diff has no whitespace errors.
 The existing tests and production source still match the reviewed candidate.
@@ -184,9 +188,9 @@ and the pinned checkout's `es5.d.ts`. The optional-cache fixture passes with
 zero diagnostics under both settings. The error fixture's full output is saved
 as `ordinary.log` and `exact.log`.
 
-Relevant Go code is `checker.go:12717` for assignment errors,
-`checker.go:13074` for exact-optional mismatches, `checker.go:27139` for readonly
-writes, and `flow.go:220`, `flow.go:1576`, and `flow.go:2374` for assignment flow,
-receiver matching, and assignment type reduction. The tests compare Go's sorted
+Relevant Go code is `checker.go:12717` for assignment errors, `checker.go:13074`
+for exact-optional mismatches, `checker.go:27139` for readonly writes, and
+`flow.go:220`, `flow.go:1576`, and `flow.go:2374` for assignment flow, receiver
+matching, and assignment type reduction. The tests compare Go's sorted
 diagnostic presentation and separately retain raw diagnostic order for warm
 checks. No production diagnostic sort was added.

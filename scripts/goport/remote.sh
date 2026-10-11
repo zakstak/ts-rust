@@ -36,31 +36,43 @@ T=$REPO/target
 # The ssh config names the minis over Tailscale. These options set the LAN name, and HostKeyAlias checks
 # the host key that ~/.ssh/known_hosts has for the Tailscale name (the config's HostName, from ssh -G, so
 # the tailnet name stays out of the repo). dbook-lan is a LAN alias in the ssh config.
-ts_name() { ssh -G "$1" 2> /dev/null | awk '$1 == "hostname" { print $2 }'; }
+ts_name() { ssh -G "$1" 2>/dev/null | awk '$1 == "hostname" { print $2 }'; }
 declare -A SSH_OPTS=(
-  [mini-743d]="-o HostName=mini-743d.local -o HostKeyAlias=$(ts_name mini-743d)"
+  [mini - 743d]="-o HostName=mini-743d.local -o HostKeyAlias=$(ts_name mini-743d)"
 )
 # The name remote.sh uses for a host. Tailscale names of LAN hosts map to their LAN route.
 canon() {
   case $1 in
-    dbook|dbook-ts) echo dbook-lan ;;
+    dbook | dbook-ts) echo dbook-lan ;;
     mini-743d-ts) echo mini-743d ;;
-    mini-abf9-1|mini-abf9-1-ts|mini-abf9-ts) echo mini-abf9 ;;
+    mini-abf9-1 | mini-abf9-1-ts | mini-abf9-ts) echo mini-abf9 ;;
     *) echo "$1" ;;
   esac
 }
-read -ra HOSTS <<< "${REMOTE_HOSTS:-alvin cup2 dbook-lan mini-743d}"
+read -ra HOSTS <<<"${REMOTE_HOSTS:-alvin cup2 dbook-lan mini-743d}"
 for i in "${!HOSTS[@]}"; do HOSTS[i]=$(canon "${HOSTS[i]}"); done
-read -ra RESERVED <<< "${REMOTE_RESERVED-dbook-lan}"
+read -ra RESERVED <<<"${REMOTE_RESERVED-dbook-lan}"
 # True when host $1 is kept for revision evidence (see Reserved above).
-reserved() { local r; for r in "${RESERVED[@]}"; do [[ $(canon "$r") == "$1" ]] && return 0; done; return 1; }
+reserved() {
+  local r
+  for r in "${RESERVED[@]}"; do [[ $(canon "$r") == "$1" ]] && return 0; done
+  return 1
+}
 RS=(rsync -aH --mkpath --compress --compress-choice=zstd --info=progress2)
 # rsync to or from host $1 with its ssh options.
-rs() { local h=$1 e=(); shift; [[ -n ${SSH_OPTS[$h]:-} ]] && e=(-e "ssh ${SSH_OPTS[$h]}"); "${RS[@]}" "${e[@]}" "$@"; }
+rs() {
+  local h=$1 e=()
+  shift
+  [[ -n ${SSH_OPTS[$h]:-} ]] && e=(-e "ssh ${SSH_OPTS[$h]}")
+  "${RS[@]}" "${e[@]}" "$@"
+}
 # ssh options for a short, non-interactive call.
 QUICK=(-o ConnectTimeout=5 -o BatchMode=yes)
 
-die() { echo "remote.sh: $*" >&2; exit 2; }
+die() {
+  echo "remote.sh: $*" >&2
+  exit 2
+}
 # Absolute path with symlinks kept, so it names the same place on both sides.
 abs() { (cd "$REPO" && realpath -ms "$1"); }
 # Never write into project inputs. Their measure/ output dirs are allowed (the sweep scripts write there).
@@ -69,37 +81,43 @@ guard() { [[ $1 != "$T"/project-inputs* || $1 == "$T"/project-inputs*/measure/?*
 lockfile() { echo "/tmp/goport-remote-${1%-lan}.lock"; }
 # True when this process has host $1's lock file open, because a caller that holds the lock passed it on.
 inherited() {
-  local f l; l=$(lockfile "$1")
-  for f in /proc/$$/fd/*; do [[ $(readlink "$f") == "$l" ]] && return 0; done
+  local f l
+  l=$(lockfile "$1")
+  for f in /proc/"$$"/fd/*; do [[ $(readlink "$f") == "$l" ]] && return 0; done
   return 1
 }
 # "free", or "held <age> by <command>, <n> waiting" for host $1's lock. The holder is the oldest process with the
 # lock file open that is not waiting for it (a flock waiter and the shell that started it are skipped) and is not
 # this remote.sh (inside a job it has the lock file open too).
 lockstate() {
-  local l ma mi ino id w p s cmd pids; l=$(lockfile "$1")
-  { [[ ! -e $l ]] || flock -n "$l" true; } && { echo free; return; }
+  local l ma mi ino id w p s cmd pids
+  l=$(lockfile "$1")
+  { [[ ! -e $l ]] || flock -n "$l" true; } && {
+    echo free
+    return
+  }
   read -r ma mi ino < <(stat -c '%Hd %Ld %i' "$l")
   id=$(printf '%02x:%02x:%d' "$ma" "$mi" "$ino")
   w=$(awk -v id="$id" '$2 == "->" && $7 == id { print $6 }' /proc/locks)
-  pids=$(find /proc/[0-9]*/fd -lname "$l" 2> /dev/null | cut -d/ -f3 | sort -u)
-  for p in $w; do pids=$(grep -vxE "$p|$(ps -o ppid= -p "$p" | tr -d ' ')" <<< "$pids"); done
-  pids=$(grep -vxE "$$|$BASHPID" <<< "$pids")
-  [[ -n $pids ]] && read -r s p cmd < <(ps -o etimes=,pid=,args= -p "$(paste -sd, <<< "$pids")" | sort -k1,1nr -k2,2n | head -1)
-  cmd=${cmd//$REPO\//} s=${s:-0}; ((s < 3600)) && s="$((s / 60))m" || s="$((s / 3600))h$(printf %02d $((s % 3600 / 60)))m"
-  printf 'held %s by %.100s%s\n' "$s" "${cmd:-?}" "${w:+, $(wc -w <<< "$w") waiting}"
+  pids=$(find /proc/[0-9]*/fd -lname "$l" 2>/dev/null | cut -d/ -f3 | sort -u)
+  for p in $w; do pids=$(grep -vxE "$p|$(ps -o ppid= -p "$p" | tr -d ' ')" <<<"$pids"); done
+  pids=$(grep -vxE "$$|$BASHPID" <<<"$pids")
+  [[ -n $pids ]] && read -r s p cmd < <(ps -o etimes=,pid=,args= -p "$(paste -sd, <<<"$pids")" | sort -k1,1nr -k2,2n | head -1)
+  cmd=${cmd//$REPO\//} s=${s:-0}
+  ((s < 3600)) && s="$((s / 60))m" || s="$((s / 3600))h$(printf %02d $((s % 3600 / 60)))m"
+  printf 'held %s by %.100s%s\n' "$s" "${cmd:-?}" "${w:+, $(wc -w <<<"$w") waiting}"
 }
 # Take host $1's lock for this process and its children (LOCKFD stays open), unless a caller holds it already.
 lock() {
   inherited "$1" && return
-  exec {LOCKFD}> "$(lockfile "$1")"
+  exec {LOCKFD}>"$(lockfile "$1")"
   flock -n "$LOCKFD" && return
   echo "remote.sh: waiting for the $1 lock ($(lockstate "$1")). A quick look needs no lock: remote.sh look $1 ..." >&2
   flock "$LOCKFD"
 }
 # True when host $1's repo path resolves to itself (else tools print other paths) and its load is under half its cores.
 quiet() {
-  ssh -n "${QUICK[@]}" ${SSH_OPTS[$1]:-} "$1" "{ [ -x ~/.local/bin/zbook-paths ] || [ \"\$(realpath $REPO)\" = $REPO ]; } && awk -v n=\$(nproc) '{exit !(\$1 < n / 2)}' /proc/loadavg" 2> /dev/null
+  ssh -n "${QUICK[@]}" "${SSH_OPTS[$1]:-}" "$1" "{ [ -x ~/.local/bin/zbook-paths ] || [ \"\$(realpath $REPO)\" = $REPO ]; } && awk -v n=\$(nproc) '{exit !(\$1 < n / 2)}' /proc/loadavg" 2>/dev/null
 }
 # Sets HOST to the first free, quiet host and holds its lock. Checks again every 30 s until one is free.
 pick() {
@@ -107,9 +125,13 @@ pick() {
   while :; do
     for h in "${HOSTS[@]}"; do
       reserved "$h" && continue
-      exec {LOCKFD}> "$(lockfile "$h")"
+      exec {LOCKFD}>"$(lockfile "$h")"
       if flock -n "$LOCKFD"; then
-        quiet "$h" && { HOST=$h; echo "remote.sh: auto picked $h" >&2; return; }
+        quiet "$h" && {
+          HOST=$h
+          echo "remote.sh: auto picked $h" >&2
+          return
+        }
         flock -u "$LOCKFD"
       fi
       exec {LOCKFD}>&-
@@ -119,10 +141,11 @@ pick() {
   done
 }
 status() {
-  local h d; d=$(mktemp -d)
+  local h d
+  d=$(mktemp -d)
   for h in "$@"; do
     # The busiest process (average CPU since it started) when it uses 20% or more, not the probe itself.
-    ssh "${QUICK[@]}" ${SSH_OPTS[$h]:-} "$h" bash -s > "$d/$h" 2> /dev/null <<'EOF' || echo unreachable > "$d/$h" &
+    ssh "${QUICK[@]}" "${SSH_OPTS[$h]:-}" "$h" bash -s >"$d/$h" 2>/dev/null <<'EOF' || echo unreachable >"$d/$h" &
 read l _ < /proc/loadavg
 m=$(awk '/MemAvailable/ { print int($2 / 1048576) }' /proc/meminfo)
 t=$(ps -eo pcpu=,comm= --sort=-pcpu | grep -vm1 -E ' (ps|bash|sshd|sshd-session|grep)$' | awk '$1 >= 20 { print ", top", $2, $1 "%" }')
@@ -130,29 +153,32 @@ echo "load $l of $(nproc), ${m}G free$t"
 EOF
   done
   wait
-  for h in "$@"; do printf '%-10s %-44s | %s\n' "$h" "$(< "$d/$h")" "$(lockstate "$h")"; done
+  for h in "$@"; do printf '%-10s %-44s | %s\n' "$h" "$(<"$d/$h")" "$(lockstate "$h")"; done
   rm -rf "$d"
 }
 sync_bins() {
-  local h=$1 d; shift
+  local h=$1 d
+  shift
   for d in "$@"; do
-    d=$(abs "$d"); [[ -d $d ]] || die "not a dir: $d"; guard "$d"
+    d=$(abs "$d")
+    [[ -d $d ]] || die "not a dir: $d"
+    guard "$d"
     rs "$h" --exclude='*/' --exclude='*.d' --exclude='*.rlib' --exclude='.*' "$d/" "$h:$d/" || return
   done
 }
 # Tooling that changes between runs. Data (inputs, oracle caches, corpus cases, goldens) is mirrored once.
 sync_scripts() {
-  local h=$1 r=continuation-r97-goport f
+  local h=$1 r=continuation-r97-goport synced_script
   # .git is needed: gate.sh resolves --commit with git rev-parse. --delete only acts on the included paths.
   rs "$h" --delete --filter='- /.git/worktrees/' --filter='- __pycache__/' --filter='+ /.git/***' \
     --filter='+ /UPSTREAM.json' --filter='+ /scripts/***' --filter='+ /tools/***' --filter='+ /crates/' --filter='+ /crates/*/' \
     --filter='+ /crates/*/scripts/***' --filter='- *' "$REPO/" "$h:$REPO/" || return
   # Runner scripts under target/. lsp_oracle.py is only in the goport-int7 and goport-ls worktrees.
   cd "$T" || return
-  for f in $r/{tools-port,sample-f1,emit,typesyms,typesyms/scale,build-mode,corpus-full,corpus-variants}/*.{py,sh} \
-      $r/{corpus-int3,corpus-p5,emit-corpus,compat,compat/p5-corpus,compat/all-configs-p5,all-configs}/*.{py,sh} \
-      $r/{cli-complete,tsgo-bin}/audit-r3/*.{py,sh} worktrees/goport-{int7,ls}/scripts/goport project-inputs-extra/sweep-extra2.sh; do
-    [[ -e $f ]] && echo "$f"
+  for synced_script in "$r"/{tools-port,sample-f1,emit,typesyms,typesyms/scale,build-mode,corpus-full,corpus-variants}/*.{py,sh} \
+    "$r"/{corpus-int3,corpus-p5,emit-corpus,compat,compat/p5-corpus,compat/all-configs-p5,all-configs}/*.{py,sh} \
+    "$r"/{cli-complete,tsgo-bin}/audit-r3/*.{py,sh} worktrees/goport-{int7,ls}/scripts/goport project-inputs-extra/sweep-extra2.sh; do
+    [[ -e $synced_script ]] && echo "$synced_script"
   done | rs "$h" -r --exclude=__pycache__/ --files-from=- "$T/" "$h:$T/" || return
   # Legacy: compat/p5-corpus and typesyms/scale call /tmp/port/treehash.py. /tmp is tmpfs on alvin and cup2.
   # New tools go in scripts/, never /tmp (scripts/goport/tmp-port.sh restores /tmp/port on zbook).
@@ -161,9 +187,12 @@ sync_scripts() {
 # The pin's oracle, Go checkout, caches and UPSTREAM.json, over the same route as the other commands.
 sync_pin() { RSYNC_RSH="ssh ${SSH_OPTS[$1]:-}" python3 "$REPO/scripts/upstream/pin.py" sync "$@"; }
 push() {
-  local h=$1 p; shift
+  local h=$1 p
+  shift
   for p in "$@"; do
-    p=$(abs "$p"); [[ -e $p ]] || die "no such file or dir: $p"; guard "$p"
+    p=$(abs "$p")
+    [[ -e $p ]] || die "no such file or dir: $p"
+    guard "$p"
     if [[ -d $p ]]; then rs "$h" "$p/" "$h:$p/"; else rs "$h" "$p" "$h:$p"; fi || return
   done
 }
@@ -172,7 +201,8 @@ push() {
 # ~/.local/bin/zbook-paths wrapper, a no-root mount namespace with zbook's paths and a private /tmp.
 # dbook logs in as user dbook but has a real /home/theo dir, so HOME=/home/theo gives zbook's ~ paths.
 wrap() {
-  local h=$1 cmd; shift
+  local h=$1 cmd
+  shift
   # GOPORT_PIN (scripts/upstream/pin.py) is passed on to the remote command.
   [[ -n ${GOPORT_PIN:-} ]] && set -- "export GOPORT_PIN=${GOPORT_PIN//[^0-9a-f]/};" "$@"
   printf -v cmd %q "$*"
@@ -184,47 +214,80 @@ wrap() {
 # A tty (when there is one) lets Ctrl-C stop the remote command too. ssh closes every inherited fd above 2 when
 # it starts, so this shell stays alive (no exec) and holds the lock until ssh ends.
 run() {
-  local h=$1 t=(); shift
+  local h=$1 t=()
+  shift
   [[ -t 0 && -t 1 ]] && t=(-t)
   lock "$h"
-  ssh "${t[@]}" -o ServerAliveInterval=60 ${SSH_OPTS[$h]:-} "$h" "$(wrap "$h" "$@")"
+  ssh "${t[@]}" -o ServerAliveInterval=60 "${SSH_OPTS[$h]:-}" "$h" "$(wrap "$h" "$@")"
 }
-look() { local h=$1; shift; exec timeout 120 ssh "${QUICK[@]}" ${SSH_OPTS[$h]:-} "$h" "$(wrap "$h" "$@")"; }
-job() { lock "$1"; export REMOTE_HOST=$1; shift; "$@"; }
+look() {
+  local h=$1
+  shift
+  exec timeout 120 ssh "${QUICK[@]}" "${SSH_OPTS[$h]:-}" "$h" "$(wrap "$h" "$@")"
+}
+job() {
+  lock "$1"
+  export REMOTE_HOST=$1
+  shift
+  "$@"
+}
 fetch() {
-  local h=$1 d; shift
+  local h=$1 d
+  shift
   for d in "$@"; do
-    d=$(abs "$d"); guard "$d"
-    case $d in "$T"/worktrees*) die "refusing to write into a worktree: $d" ;; "$T"/?*|/tmp/?*) ;; *) die "results live under $T or /tmp: $d" ;; esac
+    d=$(abs "$d")
+    guard "$d"
+    case $d in "$T"/worktrees*) die "refusing to write into a worktree: $d" ;; "$T"/?* | /tmp/?*) ;; *) die "results live under $T or /tmp: $d" ;; esac
     rs "$h" --ignore-existing "$h:$d/" "$d/" || return
   done
 }
 usage() { sed -n '/^# usage:/,/^# dbook and the minis/p' "$0"; }
-[[ $# -ge 1 ]] || { usage; exit 2; }
-cmd=$1; shift
+[[ $# -ge 1 ]] || {
+  usage
+  exit 2
+}
+cmd=$1
+shift
 case $cmd in
-  help|-h|--help) usage; exit ;;
-  status) (($#)) || set -- "${HOSTS[@]}"; hs=(); for h; do hs+=("$(canon "$h")"); done; status "${hs[@]}"; exit ;;
-  look|run|job|sync-bins|sync-scripts|sync-pin|push|fetch) ;;
+  help | -h | --help)
+    usage
+    exit
+    ;;
+  status)
+    (($#)) || set -- "${HOSTS[@]}"
+    hs=()
+    for h; do hs+=("$(canon "$h")"); done
+    status "${hs[@]}"
+    exit
+    ;;
+  look | run | job | sync-bins | sync-scripts | sync-pin | push | fetch) ;;
   *) die "unknown command $cmd" ;;
 esac
 [[ $# -ge 1 ]] || die "$cmd needs a host"
 # dbook and the minis are on the same LAN as zbook: always use the LAN route, never the Tailscale name.
-host=$(canon "$1"); shift
+host=$(canon "$1")
+shift
 # mini-abf9 is Theo's own machine again since 2026-10-04: no command may use it.
 [[ $host == mini-abf9 ]] && die "mini-abf9 is Theo's machine since 2026-10-04. Do not use it. Time on mini-743d."
 [[ $cmd == sync-scripts || $cmd == sync-pin || $# -ge 1 ]] || die "$cmd needs more arguments"
 if [[ $host == auto ]]; then
   [[ $cmd == run || $cmd == job ]] || die "'auto' only works with run and job; inside a job, use \$REMOTE_HOST"
   # pick holds the lock of the host it picks, so run and job do not lock again.
-  pick; host=$HOST
+  pick
+  host=$HOST
 fi
 if [[ ($cmd == run || $cmd == job) && ${REMOTE_USE_RESERVED:-0} != 1 ]] && reserved "$host"; then
   die "$host is kept for revision evidence (candidate.sh side). Use auto, or mini-743d for timing. The auditor and reviewer set REMOTE_USE_RESERVED=1 to repeat a revision run."
 fi
 if [[ $host == all ]]; then
   [[ $cmd == sync-* ]] || die "'all' only works with sync-bins, sync-scripts and sync-pin"
-  pids=(); for h in "${HOSTS[@]}"; do "${cmd//-/_}" "$h" "$@" & pids+=($!); done
-  rc=0; for p in "${pids[@]}"; do wait "$p" || rc=1; done; exit $rc
+  pids=()
+  for h in "${HOSTS[@]}"; do
+    "${cmd//-/_}" "$h" "$@" &
+    pids+=($!)
+  done
+  rc=0
+  for p in "${pids[@]}"; do wait "$p" || rc=1; done
+  exit $rc
 fi
 "${cmd//-/_}" "$host" "$@"

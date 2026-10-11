@@ -41,53 +41,96 @@ set -uo pipefail
 REPO=/home/theo/Code/sandbox/ts-rust
 R=$REPO/target/continuation-r97-goport
 TP=$R/tools-port
-X=$REPO/target/project-inputs-extra
 HERE=$(cd "$(dirname "$0")" && pwd)
 SELF=$HERE/$(basename "$0")
 ALLOW=$HERE/gate-allow.txt
 EMIT_SAMPLE=$HERE/gate-emit-sample.txt
 # The exit rule of the measure, determinism and sweep stages: GOPORT_MAX_EXIT from the Go pin.
+# shellcheck source=scripts/goport/exit-rule.sh
 . "$HERE/exit-rule.sh" || exit 2
 
-usage() { sed -n '2,/^set -uo/p' "$SELF" | sed '$d'; exit 2; }
-LABEL=${1:-}; [[ -n $LABEL && $LABEL != -* ]] || usage; shift
-[[ $LABEL =~ ^[A-Za-z0-9._-]+$ ]] || { echo "label must match [A-Za-z0-9._-]+" >&2; exit 2; }
-BINS=$R/runtime/cargo-target/release; MODE=full; COMMIT=
+usage() {
+  sed -n '2,/^set -uo/p' "$SELF" | sed '$d'
+  exit 2
+}
+LABEL=${1:-}
+[[ -n $LABEL && $LABEL != -* ]] || usage
+shift
+[[ $LABEL =~ ^[A-Za-z0-9._-]+$ ]] || {
+  echo "label must match [A-Za-z0-9._-]+" >&2
+  exit 2
+}
+BINS=$R/runtime/cargo-target/release
+MODE=full
+COMMIT=
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --bins) BINS=$2; shift 2 ;;
-    --quick) MODE=quick; shift ;;
-    --full) MODE=full; shift ;;
-    --commit) COMMIT=$2; shift 2 ;;
+    --bins)
+      BINS=$2
+      shift 2
+      ;;
+    --quick)
+      MODE=quick
+      shift
+      ;;
+    --full)
+      MODE=full
+      shift
+      ;;
+    --commit)
+      COMMIT=$2
+      shift 2
+      ;;
     *) usage ;;
   esac
 done
 BINS=$(realpath "$BINS")
 for b in goport goport_emit goport_typesyms goport_build tsgo; do
-  [[ -x $BINS/$b ]] || { echo "missing binary $BINS/$b" >&2; exit 2; }
+  [[ -x $BINS/$b ]] || {
+    echo "missing binary $BINS/$b" >&2
+    exit 2
+  }
 done
-[[ -f $ALLOW ]] || { echo "missing allow-list $ALLOW" >&2; exit 2; }
-[[ -f $EMIT_SAMPLE ]] || { echo "missing corpus-emit sample $EMIT_SAMPLE" >&2; exit 2; }
-if [[ -z $COMMIT && -f $BINS/COMMIT ]]; then COMMIT=$(tr -d '[:space:]' < "$BINS/COMMIT"); fi
+[[ -f $ALLOW ]] || {
+  echo "missing allow-list $ALLOW" >&2
+  exit 2
+}
+[[ -f $EMIT_SAMPLE ]] || {
+  echo "missing corpus-emit sample $EMIT_SAMPLE" >&2
+  exit 2
+}
+if [[ -z $COMMIT && -f $BINS/COMMIT ]]; then COMMIT=$(tr -d '[:space:]' <"$BINS/COMMIT"); fi
 COMMIT_FULL=unknown
 if [[ -n $COMMIT ]]; then
-  COMMIT_FULL=$(git -C "$REPO" rev-parse --verify --quiet "$COMMIT^{commit}") || { echo "unknown commit $COMMIT" >&2; exit 2; }
+  COMMIT_FULL=$(git -C "$REPO" rev-parse --verify --quiet "$COMMIT^{commit}") || {
+    echo "unknown commit $COMMIT" >&2
+    exit 2
+  }
 else
   echo "warning: no --commit and no $BINS/COMMIT; manifest records commit unknown" >&2
 fi
 
 # Cached oracle outputs must exist, or the sweep scripts would write new ones.
 for n in query-core-tests query-core-legacy hono-spec hono-full ts-pattern-tests svelte svelte-runtime effect \
-         pathe ufo tiny-invariant rhf-app hono-rt-bun hono-rt-fastly hono-rt-lambda hono-rt-lambda-edge \
-         hono-rt-node hono-rt-workerd hono-perf-scripts; do
-  [[ -f $R/oracle-sweep/$n.txt ]] || { echo "missing cached oracle $R/oracle-sweep/$n.txt" >&2; exit 2; }
+  pathe ufo tiny-invariant rhf-app hono-rt-bun hono-rt-fastly hono-rt-lambda hono-rt-lambda-edge \
+  hono-rt-node hono-rt-workerd hono-perf-scripts; do
+  [[ -f $R/oracle-sweep/$n.txt ]] || {
+    echo "missing cached oracle $R/oracle-sweep/$n.txt" >&2
+    exit 2
+  }
 done
 
-exec 9> /tmp/goport-gate.lock
-flock -n 9 || { echo "another gate run holds /tmp/goport-gate.lock; waiting"; flock 9; }
+exec 9>/tmp/goport-gate.lock
+flock -n 9 || {
+  echo "another gate run holds /tmp/goport-gate.lock; waiting"
+  flock 9
+}
 
 OUT=$R/compat/gate/$LABEL
-[[ -e $OUT ]] && { echo "$OUT exists; use a new label" >&2; exit 2; }
+[[ -e $OUT ]] && {
+  echo "$OUT exists; use a new label" >&2
+  exit 2
+}
 mkdir -p "$OUT"/{runs,logs,items}
 STARTED=$(date -u +%FT%TZ)
 export GOPORT_BIN=$BINS/goport
@@ -557,24 +600,31 @@ py() { python3 -c "$PY" "$@"; }
 
 # stage <name> <command...>: runs one stage, logs to logs/<name>.log, records rc and seconds.
 stage() {
-  local name=$1; shift
+  local name=$1
+  shift
   echo "== $name"
-  local s=$(date +%s.%N)
-  "$@" > "$OUT/logs/$name.log" 2>&1
+  local s
+  s="$(date +%s.%N)"
+  "$@" >"$OUT/logs/$name.log" 2>&1
   local rc=$?
-  local secs=$(python3 -c 'import sys;print(round(float(sys.argv[2])-float(sys.argv[1]),1))' "$s" "$(date +%s.%N)")
-  printf '{"stage":"%s","rc":%d,"seconds":%s}\n' "$name" "$rc" "$secs" >> "$OUT/stages.jsonl"
+  local secs
+  secs=$(python3 -c 'import sys;print(round(float(sys.argv[2])-float(sys.argv[1]),1))' "$s" "$(date +%s.%N)")
+  printf '{"stage":"%s","rc":%d,"seconds":%s}\n' "$name" "$rc" "$secs" >>"$OUT/stages.jsonl"
   echo "   rc=$rc ${secs}s, last line: $(tail -n 1 "$OUT/logs/$name.log" | cut -c1-150)"
 }
 # parse <name> <runs dir> <expected>: turns a bash stage log into items.
-parse() { py parse "$1" "$OUT/logs/$1.log" "$2" "$OUT/items/$1.jsonl" "$3" >> "$OUT/logs/$1.log" 2>&1; }
+# shellcheck disable=SC2094 # Parser reads the complete stage log before appending diagnostics; append does not truncate it.
+parse() { py parse "$1" "$OUT/logs/$1.log" "$2" "$OUT/items/$1.jsonl" "$3" >>"$OUT/logs/$1.log" 2>&1; }
 
 # The existing scripts write to measure/<round>; a ../ round keeps their output under $OUT/runs.
 RUNS_REL=../compat/gate/$LABEL/runs
 cd "$REPO" || exit 2
-stage measure bash "$TP/measure.sh" "$RUNS_REL/measure"; parse measure "$OUT/runs/measure" 8
-stage measure-extra bash "$TP/measure-extra.sh" "$RUNS_REL/measure-extra"; parse measure-extra "$OUT/runs/measure-extra" 3
-stage sweep bash "$HERE/sweep.sh" "$RUNS_REL/sweep"; parse sweep "$OUT/runs/sweep" 12
+stage measure bash "$TP/measure.sh" "$RUNS_REL/measure"
+parse measure "$OUT/runs/measure" 8
+stage measure-extra bash "$TP/measure-extra.sh" "$RUNS_REL/measure-extra"
+parse measure-extra "$OUT/runs/measure-extra" 3
+stage sweep bash "$HERE/sweep.sh" "$RUNS_REL/sweep"
+parse sweep "$OUT/runs/sweep" 12
 stage sweep-extra2 bash "$HERE/sweep-extra2.sh" "../../continuation-r97-goport/compat/gate/$LABEL/runs/extra2"
 parse sweep-extra2 "$OUT/runs/extra2" 31
 # Wide real-world sweep (51 projects, 292 configs; target/project-inputs-wide), full mode only.
@@ -582,18 +632,22 @@ if [[ $MODE == full ]]; then
   stage sweep-wide bash "$HERE/sweep-wide.sh" "../../continuation-r97-goport/compat/gate/$LABEL/runs/wide"
   parse sweep-wide "$OUT/runs/wide" 292
 fi
-stage sweep-hono-runtime bash "$HERE/sweep-hono-runtime.sh" "$RUNS_REL/hono-rt"; parse sweep-hono-runtime "$OUT/runs/hono-rt" 7
+stage sweep-hono-runtime bash "$HERE/sweep-hono-runtime.sh" "$RUNS_REL/hono-rt"
+parse sweep-hono-runtime "$OUT/runs/hono-rt" 7
 stage f1 python3 "$R/sample-f1/run-f1.py" "$BINS/goport" "$OUT/runs/f1"
-py f1 "$OUT/runs/f1/summary.json" "$OUT/items/f1.jsonl" >> "$OUT/logs/f1.log" 2>&1
-stage emit env JOBS=4 bash "$HERE/compare-emit.sh" "$BINS/goport_emit" "gate-$LABEL"; parse emit "/tmp/goport-emit-gate-$LABEL" 45
-TS_NAMES=(query hono); [[ $MODE == full ]] && TS_NAMES+=(effect)
+py f1 "$OUT/runs/f1/summary.json" "$OUT/items/f1.jsonl" >>"$OUT/logs/f1.log" 2>&1
+stage emit env JOBS=4 bash "$HERE/compare-emit.sh" "$BINS/goport_emit" "gate-$LABEL"
+parse emit "/tmp/goport-emit-gate-$LABEL" 45
+TS_NAMES=(query hono)
+[[ $MODE == full ]] && TS_NAMES+=(effect)
 stage typesyms py typesyms "$BINS/goport_typesyms" "$OUT/runs/typesyms" "$OUT/items/typesyms.jsonl" "${TS_NAMES[@]}"
 build_seq() {
   local S=$HERE/compare-build.sh
   GOPORT_BUILD=$BINS/goport_build bash "$S" seq repro cold edits flags foreign
   GOPORT_BUILD=$BINS/goport_build bash "$S" seq query-chain cold edits flags foreign
 }
-stage build build_seq; parse build /tmp/goport-build 32
+stage build build_seq
+parse build /tmp/goport-build 32
 stage determinism py determinism "$BINS/goport" "$OUT/runs/determinism" "$OUT/items/determinism.jsonl"
 # The editor leak in R122 and R123 passed every other stage. 2 projects x 4 scenarios = 8 sessions.
 editor_bench() {
@@ -601,13 +655,14 @@ editor_bench() {
     --projects query-core,hono --scenarios typing-paced,errfix-paced,imports,long --out "$OUT/runs/editor"
 }
 stage editor editor_bench
-py editor "$OUT/runs/editor/result.json" "$OUT/items/editor.jsonl" 8 >> "$OUT/logs/editor.log" 2>&1
+py editor "$OUT/runs/editor/result.json" "$OUT/items/editor.jsonl" 8 >>"$OUT/logs/editor.log" 2>&1
 if [[ $MODE == full ]]; then
   stage corpus-diag py corpus-diag "$BINS/goport" "$COMMIT_FULL" "$OUT/runs/corpus-diag" "$OUT/items/corpus-diag.jsonl"
   stage corpus-emit py corpus-emit "$BINS/goport_emit" "$COMMIT_FULL" "$OUT/runs/corpus-emit" "$OUT/items/corpus-emit.jsonl" "$EMIT_SAMPLE"
 fi
 
-META=$(python3 - "$LABEL" "$MODE" "$STARTED" "$COMMIT" "$COMMIT_FULL" "$BINS" "$SELF" "$ALLOW" <<'EOF'
+META=$(
+  python3 - "$LABEL" "$MODE" "$STARTED" "$COMMIT" "$COMMIT_FULL" "$BINS" "$SELF" "$ALLOW" <<'EOF'
 import hashlib, json, os, sys
 from pathlib import Path
 label, mode, started, commit_in, commit, bins, gate, allow = sys.argv[1:]

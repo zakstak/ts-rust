@@ -25,22 +25,22 @@ formatting checks passed. No production Rust behavior changed.
 
 The semantic smoke report compares diagnostics, `.types`, and `.symbols`:
 
-| Outcome | Variants |
-| --- | ---: |
-| Executed | 95 |
-| Exact | 48 |
-| Unsupported | 46 |
-| Artifact mismatch | 1 |
-| Fatal invariant | 0 |
+| Outcome           | Variants |
+| ----------------- | -------: |
+| Executed          |       95 |
+| Exact             |       48 |
+| Unsupported       |       46 |
+| Artifact mismatch |        1 |
+| Fatal invariant   |        0 |
 
 One upstream skip remains. `jsDocTypedefTagNamespace` became exact through the
-callback alias repair. No previous exact result was lost. The remaining
-artifact mismatch is `functionExpandoPropertyDeclaration`.
+callback alias repair. No previous exact result was lost. The remaining artifact
+mismatch is `functionExpandoPropertyDeclaration`.
 
 The diagnostic-only milestone retains all 397 exact results in 511 executed
-variants. Its other 114 results remain unsupported. There are no status
-changes, exact losses, supported diagnostic mismatches, or fatal invariants.
-Diagnostic equality alone is not semantic parity.
+variants. Its other 114 results remain unsupported. There are no status changes,
+exact losses, supported diagnostic mismatches, or fatal invariants. Diagnostic
+equality alone is not semantic parity.
 
 Both final reports identify clean `74fd417a`. Their manifests and variant keys
 are unchanged. The callback-only reports at clean `dff2502f` have the same
@@ -61,8 +61,8 @@ results. Later input-script changes do not change the Rust checker or runner.
   diagnostic evidence exists. Unproven child-message boundaries remain
   unavailable. Library summary masking preserves the reviewed byte rules.
 
-Each provider and the combined project changes received independent reviews.
-The project composition also passed 574 focused compiler and fixture tests.
+Each provider and the combined project changes received independent reviews. The
+project composition also passed 574 focused compiler and fixture tests.
 
 ## Project inputs
 
@@ -102,18 +102,18 @@ nonzero because their unsupported and mismatched variants remain explicit.
 
 Iterator source integration, constructor composition, loop effects, expando
 replay, additional artifact queries, and broader generic support remain on
-separate branches. Their partial tests are not part of this checkpoint's
-support claim. The later contextual-arrow flag repair is also separate.
+separate branches. Their partial tests are not part of this checkpoint's support
+claim. The later contextual-arrow flag repair is also separate.
 
 New package-input and source-package-scope observations have separate provider
 reviews. They are not part of this checkpoint. Package identity, source
 realpaths, fresh diagnostic production, and other project evidence gaps remain
 explicit where unavailable.
 
-Go probes traced Hono's 91 changed type lines to cache-dependent rendering,
-even without a source reset. The separate 221 pointer failures remain. The
-original oracle reports, strict gates, and project inputs are unchanged.
-Neither those probes nor the new object-creation witnesses establish parity.
+Go probes traced Hono's 91 changed type lines to cache-dependent rendering, even
+without a source reset. The separate 221 pointer failures remain. The original
+oracle reports, strict gates, and project inputs are unchanged. Neither those
+probes nor the new object-creation witnesses establish parity.
 
 ## Build rules
 

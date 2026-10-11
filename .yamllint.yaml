@@ -1,0 +1,8 @@
+---
+extends: default
+rules:
+  # Action shell blocks and expressions must retain their command text.
+  line-length: disable
+  truthy:
+    allowed-values: ["true", "false", "on"]
+  document-start: disable

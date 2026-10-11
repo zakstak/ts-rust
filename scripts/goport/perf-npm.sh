@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016 # Embedded child programs intentionally expand in the child interpreter.
 # Times tsc run directly and through npm, for a Rust and a Go package set (npm-pack.sh) installed
 # with npm (npm-test.sh makes <work-dir>/proj). Cells, with hyperfine -N (mean of the runs):
 #   rs-direct   <rs-proj>/node_modules/@typescript/typescript-linux-x64/lib/tsc
@@ -23,33 +24,42 @@
 # Output: target/continuation-r97-goport/perf-npm/<label>/ (hyperfine JSON and text, table.txt).
 set -euo pipefail
 cd /home/theo/Code/sandbox/ts-rust
-[[ $# == 3 ]] || { sed -n '22p' "$0" >&2; exit 2; }
+[[ $# == 3 ]] || {
+  sed -n '22p' "$0" >&2
+  exit 2
+}
 label=$1 rs=$(realpath "$2") go=$(realpath "$3")
 out=target/continuation-r97-goport/perf-npm/$label
 mkdir -p "$out"
-for p in "$rs" "$go"; do [[ -x $p/node_modules/.bin/tsc ]] || { echo "no npm project: $p" >&2; exit 2; }; done
+for p in "$rs" "$go"; do [[ -x $p/node_modules/.bin/tsc ]] || {
+  echo "no npm project: $p" >&2
+  exit 2
+}; done
 
 max=${PERF_MAX_LOAD:-1.5}
 load=$(cut -d' ' -f1 /proc/loadavg)
 awk -v l="$load" -v m="$max" 'BEGIN { exit !(l <= m) }' ||
-  { echo "load $load > $max on $(hostname): timing would be noise" >&2; exit 3; }
+  {
+    echo "load $load > $max on $(hostname): timing would be noise" >&2
+    exit 3
+  }
 
 plat=node_modules/@typescript/typescript-linux-x64/lib/tsc
 names=(rs-direct rs-npm rs-npm-js go-direct go-npm)
 cmds=("$rs/$plat" "$rs/node_modules/.bin/tsc" "/usr/bin/env node $rs/node_modules/typescript/lib/tsc.js"
-      "$go/$plat" "$go/node_modules/.bin/tsc")
+  "$go/$plat" "$go/node_modules/.bin/tsc")
 P=target/project-inputs
 hono="-p $P/hono/source/tsconfig.build.json --noEmit --pretty false"
 declare -A args=([version]="--version"
   [query]="-p $P/query/source/packages/query-core/tsconfig.prod.json --noEmit --pretty false"
   [hono]="$hono --composite false --incremental false"
-  [hono-noop]="$hono --tsBuildInfoFile $(realpath "$out")/SIDE.tsbuildinfo")
+  [hono - noop]="$hono --tsBuildInfoFile $(realpath "$out")/SIDE.tsbuildinfo")
 rm -f "$out"/*.tsbuildinfo
 runs=${PERF_RUNS:-30}
-echo "host $(hostname) load $load node $(node --version) runs $runs" > "$out/host.txt"
+echo "host $(hostname) load $load node $(node --version) runs $runs" >"$out/host.txt"
 cells=(version query hono hono-noop)
 # The exit code of each cell: tsc exits 2 on hono at pin 673a5f17d713, as Go's tsc does (2 TS7031).
-declare -A want=([version]=0 [query]=0 [hono]=2 [hono-noop]=2)
+declare -A want=([version]=0 [query]=0 [hono]=2 [hono - noop]=2)
 for cell in "${cells[@]}"; do
   hf=()
   for i in "${!names[@]}"; do hf+=(-n "${names[i]}" "${cmds[i]} ${args[$cell]//SIDE/${names[i]%%-*}}"); done
@@ -57,19 +67,26 @@ for cell in "${cells[@]}"; do
   # of codes), so only a cell that must exit non-zero uses it, and every run's code is checked below.
   ignore=()
   [[ ${want[$cell]} == 0 ]] || ignore=(-i)
-  hyperfine -N "${ignore[@]}" --warmup 3 --runs "$runs" --export-json "$out/$cell.json" "${hf[@]}" > "$out/$cell.txt" 2>&1 ||
-    { echo "$cell: hyperfine failed (a run did not exit ${want[$cell]}?):" >&2; tail -5 "$out/$cell.txt" >&2; exit 1; }
+  hyperfine -N "${ignore[@]}" --warmup 3 --runs "$runs" --export-json "$out/$cell.json" "${hf[@]}" >"$out/$cell.txt" 2>&1 ||
+    {
+      echo "$cell: hyperfine failed (a run did not exit ${want[$cell]}?):" >&2
+      tail -5 "$out/$cell.txt" >&2
+      exit 1
+    }
   node -e '
     const [file, want] = process.argv.slice(1);
     const bad = JSON.parse(require("fs").readFileSync(file, "utf8")).results
       .filter(r => !r.exit_codes.every(c => c === Number(want)))
       .map(r => `${r.command}: ${[...new Set(r.exit_codes)].join(",")}`);
     if (bad.length) { console.error(`exit codes other than ${want}: ${bad.join("; ")}`); process.exit(1); }
-  ' "$out/$cell.json" "${want[$cell]}" || { echo "$cell: wrong exit code" >&2; exit 1; }
+  ' "$out/$cell.json" "${want[$cell]}" || {
+    echo "$cell: wrong exit code" >&2
+    exit 1
+  }
 done
-echo "load at end $(cut -d' ' -f1 /proc/loadavg)" >> "$out/host.txt"
+echo "load at end $(cut -d' ' -f1 /proc/loadavg)" >>"$out/host.txt"
 
-node - "$out" > "$out/table.txt" <<'EOF'
+node - "$out" >"$out/table.txt" <<'EOF'
 // A Markdown table: the means in ms, then the ratios Go / Rust.
 const fs = require("fs");
 const out = process.argv[2];

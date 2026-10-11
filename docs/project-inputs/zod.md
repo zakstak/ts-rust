@@ -1,14 +1,14 @@
 # Zod prepared inputs
 
-Recorded on August 26, 2026. This is dependency preparation, not compiler parity.
-No project build, test suite, TypeScript typecheck, Rust build, or Go compiler run
-was performed.
+Recorded on August 26, 2026. This is dependency preparation, not compiler
+parity. No project build, test suite, TypeScript typecheck, Rust build, or Go
+compiler run was performed.
 
 The preparation facts below describe the historical receipt from commit
 `9cd67c92`. The later security repair changed the script and tested it in
 disposable directories. It did not change the prepared input or the real source
-cache. The guarded procedure below uses verified archive contents and produces
-a different tool manifest. It has not regenerated this historical receipt.
+cache. The guarded procedure below uses verified archive contents and produces a
+different tool manifest. It has not regenerated this historical receipt.
 
 ## Prepared paths
 
@@ -25,9 +25,10 @@ Paths below are relative to the main ts-rust checkout.
 | Reproduction script             | `scripts/prepare-zod-project-input.mjs`                       |
 
 The prepared source is
-`/home/theo/Code/sandbox/ts-rust/target/project-inputs/zod/source` on this machine.
-The script uses the common Git directory to locate the main checkout when it
-runs from a worktree. `ZOD_INPUT_OUT` can set an explicit output directory.
+`/home/theo/Code/sandbox/ts-rust/target/project-inputs/zod/source` on this
+machine. The script uses the common Git directory to locate the main checkout
+when it runs from a worktree. `ZOD_INPUT_OUT` can set an explicit output
+directory.
 
 ## Source pin
 
@@ -82,9 +83,9 @@ missing build outputs.
 ## Install and hooks
 
 The full eight-project workspace was installed with pnpm 10.12.1. No package
-filter was used. pnpm reports the lockfile as current and skips resolution.
-Its recorded module state includes regular, development, and optional
-dependencies, with the isolated node linker.
+filter was used. pnpm reports the lockfile as current and skips resolution. Its
+recorded module state includes regular, development, and optional dependencies,
+with the isolated node linker.
 
 The install uses these settings:
 
@@ -98,30 +99,31 @@ The install uses these settings:
 ```
 
 The package store, package manager cache, user config, and temporary files stay
-under the output directory. Node 24.13.0 and Corepack 0.34.5 were copied from the
-existing host tools. pnpm was downloaded into the isolated Corepack cache. No
-global package manager was installed or changed.
+under the output directory. Node 24.13.0 and Corepack 0.34.5 were copied from
+the existing host tools. pnpm was downloaded into the isolated Corepack cache.
+No global package manager was installed or changed.
 
 The root `prepare` hook runs Husky. The docs package has a `fumadocs-mdx`
 `postinstall`, and the tsc benchmark package has a `prepublish` build. The Git
 hooks run version checks, comment checks, formatting, and tests. No pnpm hook
 file was present. These hooks were not run.
 
-The installed package manifests contain 73 packages with lifecycle scripts.
-pnpm retains 11 pending-build entries, including repeats after the install
-replay. The eight distinct entries are the root, `packages/docs`, `packages/tsc`,
-`sharp@0.34.5`, `@biomejs/biome@1.9.4`, and esbuild versions 0.25.5, 0.25.8,
-and 0.27.7. Nothing was rebuilt to clear that list.
+The installed package manifests contain 73 packages with lifecycle scripts. pnpm
+retains 11 pending-build entries, including repeats after the install replay.
+The eight distinct entries are the root, `packages/docs`, `packages/tsc`,
+`sharp@0.34.5`, `@biomejs/biome@1.9.4`, and esbuild versions 0.25.5, 0.25.8, and
+0.27.7. Nothing was rebuilt to clear that list.
 
 ## Resource and machine facts
 
 Each install ran in a user systemd scope with a 2 GiB memory limit and no swap.
-The final setup uses a 768 MiB Node heap and one package worker. In pnpm 10.12.1,
-`PNPM_WORKERS` is an idle-CPU count, not the requested worker count. The script
-sets it to the available CPU count. That was 32 here and leaves one worker.
+The final setup uses a 768 MiB Node heap and one package worker. In pnpm
+10.12.1, `PNPM_WORKERS` is an idle-CPU count, not the requested worker count.
+The script sets it to the available CPU count. That was 32 here and leaves one
+worker.
 
-The first attempt did not set that package-worker limit. The kernel ended its
-2 GiB scope for an OOM condition. The source and lockfile still matched their
+The first attempt did not set that package-worker limit. The kernel ended its 2
+GiB scope for an OOM condition. The source and lockfile still matched their
 pins. The bounded retry completed, and a later frozen install replay reported
 that dependencies were already current. The first attempt's progress log is
 retained as `evidence/install-initial-terminated.log`.
@@ -138,32 +140,33 @@ retained as `evidence/install-initial-terminated.log`.
 | pnpm          | 10.12.1                                     |
 | Config reader | TypeScript 5.5.4 from the root lockfile     |
 
-These are preparation facts. They are not compiler timing or memory results.
-The historical tool manifest hashes 1,167 copied tool entries, including the
-package manager worker code. Node's executable SHA-256 is
-`53fb205ae78805130177e24bcb459a69a1518c8d98f8965f31d85aae7ea840fc`.
-The TypeScript reader's SHA-256 is
+These are preparation facts. They are not compiler timing or memory results. The
+historical tool manifest hashes 1,167 copied tool entries, including the package
+manager worker code. Node's executable SHA-256 is
+`53fb205ae78805130177e24bcb459a69a1518c8d98f8965f31d85aae7ea840fc`. The
+TypeScript reader's SHA-256 is
 `f7ff3e27aafe5dcc82d0307575e9a7dc5b053b141da123bec81c858537765b56`.
 
 ## Package content and links
 
 The final tree has 1,061 physical dependency packages, with 48,052 package file
-entries and 1,170,055,147 regular-file bytes. All contents were hashed, including
-declarations and license files. The module state records 187 skipped optional
-package entries for this install profile. Their names remain in the receipt,
-and they were not removed from the lockfile.
+entries and 1,170,055,147 regular-file bytes. All contents were hashed,
+including declarations and license files. The module state records 187 skipped
+optional package entries for this install profile. Their names remain in the
+receipt, and they were not removed from the lockfile.
 
-All 3,343 dependency symlinks resolve inside the prepared source. None is broken.
-Eleven are workspace links to `packages/zod`:
+All 3,343 dependency symlinks resolve inside the prepared source. None is
+broken. Eleven are workspace links to `packages/zod`:
 
 - The root `node_modules/zod` link.
-- One link in each of `bench`, `integration`, `resolution`, `treeshake`, and `tsc`.
+- One link in each of `bench`, `integration`, `resolution`, `treeshake`, and
+  `tsc`.
 - Five peer links in `@ai-sdk/gateway`, `@ai-sdk/openai`,
   `@ai-sdk/provider-utils`, `ai`, and `drizzle-zod` virtual package directories.
 
 Full paths and literal link targets are in `dependency-links.jsonl`. Other
-installed Zod versions remain separate registry packages. They were not
-replaced with the workspace package.
+installed Zod versions remain separate registry packages. They were not replaced
+with the workspace package.
 
 ## Content hashes
 
@@ -190,8 +193,8 @@ prepared source.
 | `preparation.json`            | `539b3e0cba6f7e6345f78d3d7f3e0c6689bd13c9b9e41bee96a36e3aeade1315` |
 
 JSONL manifests contain one JSON object per line with a final LF. Paths are
-sorted by UTF-8 bytes. Each package content hash covers its sorted relative
-file records, with file content hashes, executable flags, and literal symlink
+sorted by UTF-8 bytes. Each package content hash covers its sorted relative file
+records, with file content hashes, executable flags, and literal symlink
 targets. Dependency symlinks are not followed while hashing package contents.
 The root list contains one repository-relative path per line with a final LF.
 
@@ -229,16 +232,16 @@ match the historical SHA-256 above, including when the archive is reused.
 | YAML 2.8.3       | `yaml-2.8.3.tgz`                 | Complete package, 233 files   |
 
 The Node archive SHA-256 is
-`6223aad1a81f9d1e7b682c59d12e2de233f7b4c37475cd40d1c89c42b737ffa8`.
-The npm archive SHA-512 values are in `toolPins` in the script. Archives are
-stored under `toolchain/archives`. Every tool use compares the extracted file
-set, file modes, and file contents with its pinned archive. Missing, added, or
-changed files fail the check before execution. Version output is not an
-integrity check. Existing tool trees that fail verification are not replaced.
+`6223aad1a81f9d1e7b682c59d12e2de233f7b4c37475cd40d1c89c42b737ffa8`. The npm
+archive SHA-512 values are in `toolPins` in the script. Archives are stored
+under `toolchain/archives`. Every tool use compares the extracted file set, file
+modes, and file contents with its pinned archive. Missing, added, or changed
+files fail the check before execution. Version output is not an integrity check.
+Existing tool trees that fail verification are not replaced.
 
-Corepack no longer runs. The verified Node executable runs pnpm directly.
-Audit parsing loads separate, verified TypeScript and YAML package copies.
-It does not execute the reader copies from installed project dependencies.
+Corepack no longer runs. The verified Node executable runs pnpm directly. Audit
+parsing loads separate, verified TypeScript and YAML package copies. It does not
+execute the reader copies from installed project dependencies.
 
 The host Node, Git, curl, Python interpreter, and preparation script are trusted
 bootstrap tools. These path checks do not claim to prevent concurrent filesystem
@@ -295,11 +298,11 @@ systemd-run --user --scope --quiet --collect \
   node --test scripts/prepare-zod-project-input.test.mjs
 ```
 
-Set `ZOD_TEST_PUBLISHED_TOOLS=1` in the test environment to also download the four
-pinned tool archives into disposable storage. This test verifies their complete
-selected contents, runs Node and pnpm version commands, and loads the verified
-TypeScript and YAML readers. It does not install Zod dependencies or run a
-project build, test, or typecheck.
+Set `ZOD_TEST_PUBLISHED_TOOLS=1` in the test environment to also download the
+four pinned tool archives into disposable storage. This test verifies their
+complete selected contents, runs Node and pnpm version commands, and loads the
+verified TypeScript and YAML readers. It does not install Zod dependencies or
+run a project build, test, or typecheck.
 
 ## Remaining evidence
 
@@ -310,6 +313,6 @@ the listed resolution probes are not that verification.
 Go diagnostics, `.types`, and `.symbols` digests remain absent. Cold runs,
 forced warm replay, Rust comparisons, and performance measurements remain
 pending. The host's glibc version is recorded, but system libraries are not
-archived with the copied Node binary. Skipped lifecycle hooks and published-entry builds
-remain untested. This document does not make a complete project-ring manifest
-or a passing parity claim.
+archived with the copied Node binary. Skipped lifecycle hooks and
+published-entry builds remain untested. This document does not make a complete
+project-ring manifest or a passing parity claim.

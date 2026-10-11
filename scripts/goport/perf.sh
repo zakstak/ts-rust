@@ -10,35 +10,57 @@
 # side on the same host.
 # Output: target/continuation-r97-goport/perf/<label>/ (per-run .time files, load.txt).
 set -uo pipefail
-cd /home/theo/Code/sandbox/ts-rust
+cd /home/theo/Code/sandbox/ts-rust || exit
 # tsgo on 4 KiB pages hands the work to a worker (R137), so wait4 RSS and CPU would show only the
 # launcher. Measure the process that does the work.
 export GOPORT_LAUNCH=0
 if [[ $# -eq 2 && -x $1 && ! -x $2 ]]; then set -- "$2" "$1"; fi
-[[ $# -ge 2 ]] || { sed -n '2,11p' "$0"; exit 2; }
-L=$1; shift; BINS=("$@")
-for b in "${BINS[@]}"; do [[ -x $b ]] || { echo "not executable: $b" >&2; exit 2; }; done
-O=target/continuation-r97-goport/perf/$L; mkdir -p "$O"; P=target/project-inputs
+[[ $# -ge 2 ]] || {
+  sed -n '2,11p' "$0"
+  exit 2
+}
+L=$1
+shift
+BINS=("$@")
+for b in "${BINS[@]}"; do [[ -x $b ]] || {
+  echo "not executable: $b" >&2
+  exit 2
+}; done
+O=target/continuation-r97-goport/perf/$L
+mkdir -p "$O"
+P=target/project-inputs
 
-exec 8> /tmp/goport-perf.lock
-flock -n 8 || { echo "another perf.sh run holds /tmp/goport-perf.lock; waiting"; flock 8; }
+exec 8>/tmp/goport-perf.lock
+flock -n 8 || {
+  echo "another perf.sh run holds /tmp/goport-perf.lock; waiting"
+  flock 8
+}
 max=${PERF_MAX_LOAD:-1.5}
 load() { cut -d' ' -f1 /proc/loadavg; }
 quiet() { awk -v l="$(load)" -v m="$max" 'BEGIN { exit !(l <= m) }'; }
 if ! quiet; then
-  [[ ${PERF_WAIT:-0} == 1 ]] || { echo "load $(load) > $max on $(hostname): timing would be noise. Use a quiet host or PERF_WAIT=1." >&2; exit 3; }
-  for _ in $(seq 180); do quiet && break; sleep 10; done
-  quiet || { echo "load still $(load) after 30 minutes" >&2; exit 3; }
+  [[ ${PERF_WAIT:-0} == 1 ]] || {
+    echo "load $(load) > $max on $(hostname): timing would be noise. Use a quiet host or PERF_WAIT=1." >&2
+    exit 3
+  }
+  for _ in $(seq 180); do
+    quiet && break
+    sleep 10
+  done
+  quiet || {
+    echo "load still $(load) after 30 minutes" >&2
+    exit 3
+  }
 fi
 
 PAIRS=("query:$P/query/source/packages/query-core/tsconfig.prod.json" "hono:$P/hono/source/tsconfig.build.json"
-       "zod:$P/zod/source/packages/zod/tsconfig.json" "effect:$P/effect/source/packages/effect/tsconfig.json")
+  "zod:$P/zod/source/packages/zod/tsconfig.json" "effect:$P/effect/source/packages/effect/tsconfig.json")
 for i in 1 2 3; do
   for pair in "${PAIRS[@]}"; do
     n=${pair%%:*} c=${pair#*:}
     for k in "${!BINS[@]}"; do
-      echo "$i $n bin$k load $(load)" >> "$O/load.txt"
-      /usr/bin/time -f "%e %M" -o "$O/$n-bin$k-$i.time" "${BINS[k]}" -p "$c" > /dev/null 2>&1
+      echo "$i $n bin$k load $(load)" >>"$O/load.txt"
+      /usr/bin/time -f "%e %M" -o "$O/$n-bin$k-$i.time" "${BINS[k]}" -p "$c" >/dev/null 2>&1
     done
   done
 done

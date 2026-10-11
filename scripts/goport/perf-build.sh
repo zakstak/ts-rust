@@ -18,10 +18,16 @@
 # allocator variables are removed and GOPORT_LAUNCH=0 is set, as in perf.sh (PERF_LAUNCH=1 keeps the launcher).
 # Output: target/continuation-r97-goport/perf-build/<label>/ (runs.jsonl, host.json, table.txt).
 set -uo pipefail
-[[ $# -ge 2 ]] || { sed -n '2,18p' "$0"; exit 2; }
-exec 8> /tmp/goport-perf.lock
-flock -n 8 || { echo "another perf run holds /tmp/goport-perf.lock; waiting"; flock 8; }
-exec python3 - "$@" << 'PY'
+[[ $# -ge 2 ]] || {
+  sed -n '2,18p' "$0"
+  exit 2
+}
+exec 8>/tmp/goport-perf.lock
+flock -n 8 || {
+  echo "another perf run holds /tmp/goport-perf.lock; waiting"
+  flock 8
+}
+exec python3 - "$@" <<'PY'
 import argparse, hashlib, json, os, platform, random, shutil, statistics, subprocess, sys, time
 
 REPO = '/home/theo/Code/sandbox/ts-rust'

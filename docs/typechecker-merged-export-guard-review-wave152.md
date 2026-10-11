@@ -2,9 +2,9 @@
 
 Status: two confirmed guard defects. Root owns the production repair.
 
-Candidate: `ebe995e1cd7c342ebb7c89fc8ca66600f7ef9715`.
-Original probes: `1bc9e76fea46c4556871b27ca8763976f4b67a9a`.
-Fixture-only repair: `47eae0c98a6cf0054a03cd006c665015010b5235`.
+Candidate: `ebe995e1cd7c342ebb7c89fc8ca66600f7ef9715`. Original probes:
+`1bc9e76fea46c4556871b27ca8763976f4b67a9a`. Fixture-only repair:
+`47eae0c98a6cf0054a03cd006c665015010b5235`.
 
 ## Measured result
 
@@ -14,9 +14,9 @@ took 1 minute 9 seconds. Tests took 0.25 seconds. All 75 original selected
 controls passed, including the seven-case merged-owner test and both source
 class/namespace controls.
 
-Two failures reached the final negative assertions after unchanged snapshots
-and healthy restoration. They confirm wrong public type results. The third
-failure occurred during cold-fixture setup and is not a production finding.
+Two failures reached the final negative assertions after unchanged snapshots and
+healthy restoration. They confirm wrong public type results. The third failure
+occurred during cold-fixture setup and is not a production finding.
 
 ## Redirect and flags
 
@@ -27,9 +27,9 @@ rejected. The pair makes both repeated public queries return the planted number.
 The export route returns `Ok(None)` and the remaining source flags lack CLASS.
 
 `store.rs::source_symbol_flags` uses current redirects to select original binder
-flags. The changed redirect removes the class from that set. The source guard
-in `name_resolution.rs::lookup_name` then fails to recognize a class before
-value filtering. The export route falls through to the node-type cache in
+flags. The changed redirect removes the class from that set. The source guard in
+`name_resolution.rs::lookup_name` then fails to recognize a class before value
+filtering. The export route falls through to the node-type cache in
 `artifact_queries.rs::get_type_at_location`.
 
 ## Foreign global target
@@ -66,15 +66,16 @@ check with the separate production repair. No combined repair pass is claimed.
 ## Evidence and isolation
 
 The first run used its own initially empty target in
-`target/agent-targets/wave152/merged-export-guard-review`. All five frozen source
-hashes still matched after collection. No artifact or fingerprint was copied.
-The root capped runner used an absolute manifest, locked offline dependencies,
-16 GiB memory, 16 MiB process and Rust stacks, the common lock, and unchanged
-TMPDIR. The existing unused `allows_string_fallback` warning remains.
+`target/agent-targets/wave152/merged-export-guard-review`. All five frozen
+source hashes still matched after collection. No artifact or fingerprint was
+copied. The root capped runner used an absolute manifest, locked offline
+dependencies, 16 GiB memory, 16 MiB process and Rust stacks, the common lock,
+and unchanged TMPDIR. The existing unused `allows_string_fallback` warning
+remains.
 
-Log: `/tmp/ts-rust-wave152-merged-export-guard-review-tests-1.log`.
-Log SHA-256: `c87354503b7e31f1dd648389e1d7f9a0230afbd7362cb9f0a4414c9f40900238`.
-Binary SHA-256: `559d6f5d6e9b7f074c8f9c51eb80556791e98469d9b7b24c7bbc5f64c4566e9a`.
+Log: `/tmp/ts-rust-wave152-merged-export-guard-review-tests-1.log`. Log SHA-256:
+`c87354503b7e31f1dd648389e1d7f9a0230afbd7362cb9f0a4414c9f40900238`. Binary
+SHA-256: `559d6f5d6e9b7f074c8f9c51eb80556791e98469d9b7b24c7bbc5f64c4566e9a`.
 Corrected fixture file SHA-256:
 `86bc5f27b2628e8fd46ddfbda896424dac4686360cea41dd253268bd01713cf8`.
 

@@ -21,7 +21,14 @@ jiff = { version = "=0.2.37", default-features = false, features = ["std"] }
 # Native only: wasm has no processes, signals, terminals or pipes (see
 # crates/ts_wasm).
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-rustix = { version = "=1.1.5", features = ["event", "fs", "pipe", "process", "stdio", "termios"] }
+rustix = { version = "=1.1.5", features = [
+  "event",
+  "fs",
+  "pipe",
+  "process",
+  "stdio",
+  "termios",
+] }
 # Go `os/signal` Notify for `signal.NotifyContext` in cmd/tsc (--watch, --lsp).
 signal-hook = "=0.4.4"
 
@@ -42,14 +49,21 @@ tikv-jemalloc-ctl = { version = "=0.7.0", optional = true }
 # its zone. jiff does the same with `tz-system`; Windows has no zoneinfo
 # files, so the zone data comes with the binary. See
 # execute/tsc/diagnostics.rs `init_local`.
-jiff = { version = "=0.2.37", default-features = false, features = ["std", "tz-system", "tzdb-bundle-platform"] }
+jiff = { version = "=0.2.37", default-features = false, features = [
+  "std",
+  "tz-system",
+  "tzdb-bundle-platform",
+] }
 miow = "=0.6.1"
 same-file = "=1.0.6"
 
 # `process`: prctl(PR_SET_THP_DISABLE) in thp_guard.rs. `signal`: the
 # signal mask at start in bin/tsgo.rs (`unblock_go_signals`).
 [target.'cfg(target_os = "linux")'.dependencies]
-nix = { version = "=0.31.3", default-features = false, features = ["process", "signal"] }
+nix = { version = "=0.31.3", default-features = false, features = [
+  "process",
+  "signal",
+] }
 
 [features]
 default = ["jemalloc"]

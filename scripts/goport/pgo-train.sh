@@ -34,7 +34,10 @@
 # Written for bash 3.2 (macOS).
 set -euo pipefail
 
-usage() { sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'; exit 2; }
+usage() {
+  sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'
+  exit 2
+}
 [[ $# -ge 2 ]] || usage
 cmd=$1
 dir=$2
@@ -49,7 +52,7 @@ abs() {
 # Bash ln -s copies the dir).
 link_dir() {
   if [[ -n $exe ]]; then
-    MSYS_NO_PATHCONV=1 cmd /c mklink /J "$(cygpath -w "$2")" "$(cygpath -w "$1")" > /dev/null
+    MSYS_NO_PATHCONV=1 cmd /c mklink /J "$(cygpath -w "$2")" "$(cygpath -w "$1")" >/dev/null
   else
     ln -s "$1" "$2"
   fi
@@ -114,7 +117,7 @@ projects() {
 # stays; tsconfig allows it). A child config cannot remove the plugin: the Effect options merge
 # across extends.
 no_plugin() {
-  awk '/"plugins": \[/ { skip = 1 } !skip { print } skip && /^    \}\]/ { skip = 0 }' "$1" > "$1.tmp"
+  awk '/"plugins": \[/ { skip = 1 } !skip { print } skip && /^    \}\]/ { skip = 0 }' "$1" >"$1.tmp"
   mv "$1.tmp" "$1"
   if grep -q language-service "$1" || ! grep -q '"jsx"' "$1"; then
     echo "error: cannot drop the plugin entry of $1 (its format changed?)" >&2
@@ -139,7 +142,7 @@ setup() {
     git -C "$p" -c advice.detachedHead=false checkout -q FETCH_HEAD
     case $name in *-noplugin) no_plugin "$p/tsconfig.base.json" ;; esac
     mkdir -p "$deps"
-    echo '{ "private": true }' > "$deps/package.json"
+    echo '{ "private": true }' >"$deps/package.json"
     (cd "$deps" && npm install --ignore-scripts --no-audit --no-fund --no-package-lock --legacy-peer-deps \
       --before="$npm_before" --loglevel=error "$@")
     link_dir "$deps/node_modules" "$p/node_modules"
@@ -152,14 +155,20 @@ setup() {
 run_set() {
   local tsc=$1
   [[ -d $tsc ]] && tsc=$tsc/tsgo$exe
-  [[ -x $tsc ]] || { echo "error: $tsc is not an executable tsc" >&2; exit 2; }
+  [[ -x $tsc ]] || {
+    echo "error: $tsc is not an executable tsc" >&2
+    exit 2
+  }
   rm -rf "${dir:?}/bin" "${dir:?}/out"
   mkdir -p "$dir/bin" "$dir/out"
   "$repo/crates/ts_goport/scripts/copy-libs.sh" "$dir/bin"
   cp "$tsc" "$dir/bin/tsc$exe"
   project() {
     local name=$1 config=$5 runs=$6 o="$dir/out/$1" s
-    [[ -f $dir/deps/$name/.done ]] || { echo "error: $name is not set up (pgo-train.sh setup $dir)" >&2; exit 2; }
+    [[ -f $dir/deps/$name/.done ]] || {
+      echo "error: $name is not set up (pgo-train.sh setup $dir)" >&2
+      exit 2
+    }
     mkdir -p "$o"
     s=$SECONDS
     one "$name" check -p "$config" --noEmit --pretty false --tsBuildInfoFile "$o/check.tsbuildinfo"
@@ -186,8 +195,8 @@ one() {
     cd "$dir/projects/$name" || exit 3
     [[ -z ${PGO_PROFILE_DIR:-} ]] || export LLVM_PROFILE_FILE="$PGO_PROFILE_DIR/$name-$run-%p.profraw"
     "$dir/bin/tsc$exe" "$@"
-  ) > "$o.out" 2> "$o.err" || rc=$?
-  echo "$rc" > "$o.rc"
+  ) >"$o.out" 2>"$o.err" || rc=$?
+  echo "$rc" >"$o.rc"
   if ((rc > 2)); then
     echo "error: tsc exited $rc on $name $run: $*" >&2
     tail -5 "$o.err" >&2
@@ -215,7 +224,7 @@ case $cmd in
     mv "$dir/out" "$dir/out-a"
     run_set "$4"
     mv "$dir/out" "$dir/out-b"
-    if ! diff -r "$dir/out-a" "$dir/out-b" > "$dir/compare.diff"; then
+    if ! diff -r "$dir/out-a" "$dir/out-b" >"$dir/compare.diff"; then
       echo "error: $3 and $4 differ (diff -r $dir/out-a $dir/out-b):" >&2
       head -40 "$dir/compare.diff" >&2
       exit 1
