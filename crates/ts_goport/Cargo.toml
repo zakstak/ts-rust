@@ -9,14 +9,14 @@ license.workspace = true
 # (see src/goport_util_root.rs and src/goport_lsproto_root.rs).
 goport_lsproto = { path = "parts/goport_lsproto" }
 goport_util = { path = "parts/goport_util" }
-rustc-hash = "=2.1.2"
-indexmap = "=2.14.0"
-memchr = "=2.8.2"
-smallvec = "=1.15.1"
+rustc-hash = "=2.1.3"
+indexmap = "=2.14.2"
+memchr = "=2.8.3"
+smallvec = "=1.16.3"
 bumpalo = "=3.20.3"
-xxhash-rust = { version = "=0.8.15", features = ["xxh3"] }
+xxhash-rust = { version = "=0.8.19", features = ["xxh3"] }
 flate2 = "=1.1.10"
-jiff = { version = "=0.2.37", default-features = false, features = ["std"] }
+jiff = { version = "=0.2.38", default-features = false, features = ["std"] }
 
 # Native only: wasm has no processes, signals, terminals or pipes (see
 # crates/ts_wasm).
@@ -30,7 +30,7 @@ rustix = { version = "=1.1.5", features = [
   "termios",
 ] }
 # Go `os/signal` Notify for `signal.NotifyContext` in cmd/tsc (--watch, --lsp).
-signal-hook = "=0.4.4"
+signal-hook = "=0.4.5"
 
 # jemalloc does not build for Windows (msvc, or gnu through zig) or wasm; the
 # `jemalloc` feature does nothing there.
@@ -49,7 +49,7 @@ tikv-jemalloc-ctl = { version = "=0.7.0", optional = true }
 # its zone. jiff does the same with `tz-system`; Windows has no zoneinfo
 # files, so the zone data comes with the binary. See
 # execute/tsc/diagnostics.rs `init_local`.
-jiff = { version = "=0.2.37", default-features = false, features = [
+jiff = { version = "=0.2.38", default-features = false, features = [
   "std",
   "tz-system",
   "tzdb-bundle-platform",

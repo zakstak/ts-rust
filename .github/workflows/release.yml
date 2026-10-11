@@ -117,7 +117,7 @@ jobs:
       # LF in the working tree, as on the other hosts (README.md, "Develop on Windows").
       - if: runner.os == 'Windows'
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # llvm-tools: the llvm-profdata of this rustc's LLVM (build-pgo.sh checks it).
@@ -138,9 +138,9 @@ jobs:
           target=${{ matrix.target }}
           target=${target^^}
           echo "CARGO_TARGET_${target//-/_}_LINKER=$(cygpath -m "$lld")" | tee -a "$GITHUB_ENV"
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-${{ matrix.target }}
@@ -219,7 +219,7 @@ jobs:
             echo "::error::tsc.exe imports the Visual C++ runtime (vcruntime140.dll)"
             exit 1
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tsc-${{ matrix.platform }}
           path: ${{ runner.temp }}/out/tsc${{ matrix.exe }}
@@ -232,7 +232,7 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # main's Go pin, as ci.yml resolves it.
@@ -245,7 +245,7 @@ jobs:
       # npm-pack.sh reads the pin's package input (packages/), its lib files, its LICENSE.txt and
       # NOTICE.txt, and builds the JS API with the repo's own tsc (npm workspaces at the root).
       - name: Check out the pinned Go source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.pin.outputs.repo }}
           ref: ${{ steps.pin.outputs.commit }}
@@ -254,12 +254,12 @@ jobs:
             packages
             ${{ steps.pin.outputs.subdir }}/internal/bundled/libs
           persist-credentials: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: go-pin
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           pattern: tsc-*
           path: ${{ runner.temp }}/bins
@@ -294,7 +294,7 @@ jobs:
           cp "$pkg"/*.tgz "$dist/"
           (cd "$dist" && sha256sum -- *.tgz *.tar.gz *.zip > SHA256SUMS)
           cat "$dist/SHA256SUMS"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release
           path: ${{ runner.temp }}/dist
@@ -332,10 +332,10 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-      - uses: actions/download-artifact@v5
+          node-version: 26
+      - uses: actions/download-artifact@v8
         with:
           name: release
           path: ${{ runner.temp }}/dist
@@ -394,12 +394,12 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
       # Trusted publishing needs npm 11.5.1 or later.
-      - run: npm install -g npm@11 && npm --version
-      - uses: actions/download-artifact@v5
+      - run: npm install -g npm@12.2.0 && npm --version
+      - uses: actions/download-artifact@v8
         with:
           name: release
           path: dist

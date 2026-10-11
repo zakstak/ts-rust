@@ -38,7 +38,7 @@ jobs:
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal -c rustfmt,clippy
@@ -79,7 +79,7 @@ jobs:
       # gives the test fixtures and the scripts CRLF (README.md, "Develop on Windows").
       - if: runner.os == 'Windows'
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # main's Go pin is the saved state's batch.upstreamPin.to. UPSTREAM.json "current" can be an older
@@ -94,7 +94,7 @@ jobs:
           "$py" scripts/upstream/pin.py show ${key:+"$key"} > "$RUNNER_TEMP/pin.json"
           jq -r '"repo=\(.repo)", "commit=\(.commit)", "subdir=\(.subdir // "")"' "$RUNNER_TEMP/pin.json" >> "$GITHUB_OUTPUT"
       - name: Check out the pinned Go source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.pin.outputs.repo }}
           ref: ${{ steps.pin.outputs.commit }}
@@ -148,7 +148,7 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Windows' }}
         id: go
         run: jq -r '"version=\(.oracle.go | ltrimstr("go"))"' "$RUNNER_TEMP/pin.json" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         if: ${{ !cancelled() && runner.os == 'Windows' }}
         with:
           go-version: ${{ steps.go.outputs.version }}
