@@ -41,3 +41,11 @@ source checkout rather than a Go module in this Rust repository. Generic
 standalone `golangci-lint` excludes `docs/probes/` and
 `scripts/goport/gen/unicode/`; their pinned-Go validation remains in the
 compiler workflow.
+
+The pre-push hook runs the locked Rust workspace, the documented accountability
+Node tooling tests and the API oracle's Python protocol tests through Pragma's
+failure reporting. Go helper fragments are not a standalone Go project, and
+Python helper presence does not imply an arbitrary root pytest suite. The wasm
+package tests additionally require a built `npm/wasm/ts_rust.wasm`, as
+documented in that package; building a release asset remains a separate
+workflow.
