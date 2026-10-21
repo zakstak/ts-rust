@@ -117,11 +117,21 @@ pub fn checker_is_empty_object_literal(expression: Node) -> bool {
 // `*ast.Node` alias, so it is `Node`.
 
 // Go: checker/utilities.go:89 getAssignmentTargetKind
+// PERF: deferbody1. Inline with the first step of `get_assignment_target`:
+// most calls end there with no target, with no call. The kind of a target
+// is read out of line.
+#[inline(always)]
 pub fn get_assignment_target_kind(node: Node) -> AssignmentKind {
     let target = get_assignment_target(node);
     if target.is_nil() {
         return AssignmentKind::NONE;
     }
+    assignment_kind_of_target(target)
+}
+
+/// `getAssignmentTargetKind` of a non-nil assignment target.
+#[inline(never)]
+fn assignment_kind_of_target(target: Node) -> AssignmentKind {
     match target.kind() {
         SyntaxKind::BinaryExpression => {
             let binary_operator = target.operator_token().kind();
@@ -593,11 +603,17 @@ impl Checker {
         let has_declaration = !sym.declarations.is_empty();
         let declaration = sym.declarations.first().copied().unwrap_or(Node::NIL);
         let (file, file_index, pos, order) = if declaration.is_some() {
-            let file = get_source_file_of_node(declaration);
+            // PERF: noderef1 G2. The file and the position through one view
+            // (`NodeRef`).
+            let declaration_ref = NodeRef::new(declaration);
+            let file = declaration_ref
+                .source_file_root()
+                .unwrap_or_else(|| get_source_file_of_node(declaration));
+            debug_assert_eq!(file, get_source_file_of_node(declaration));
             if file != last_file.0 || file.is_nil() {
                 *last_file = (file, self.file_index_map.get(&file).copied().unwrap_or(-1));
             }
-            let pos = declaration.pos();
+            let pos = declaration_ref.loc().pos();
             if last_file.1 >= 0 {
                 // The sign bit flip maps `i32` order onto `u32` order.
                 let order =

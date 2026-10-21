@@ -406,15 +406,23 @@ impl Default for InferenceContext {
 // Go: checker/checker.go:290 InferenceInfo
 // PORT: Go `*InferenceInfo` is an index into `InferenceContext::inferences`.
 // PERF (infermem1): 32 bytes (asserted below), not 72. The two candidate
-// lists are in one box that the first candidate makes (typebox: about 6M
-// infos, under a third of them with candidates). `candidates()` and
-// `contra_candidates()` give Go's nil lists while it is absent.
+// lists are in one box that the second candidate makes (typebox: about 6M
+// infos, under a third of them with candidates). The first candidate is
+// kept inline in `first_candidate`, so a single candidate needs no box and
+// no list (inferfast1). `candidates()` and `contra_candidates()` give Go's
+// lists.
 #[derive(Clone, Debug, Default)]
 pub struct InferenceInfo {
     /// Type parameter for which inferences are being made
     pub type_parameter: TypeId,
-    /// Go `candidates` and `contraCandidates`, or `None` while both are nil.
-    pub candidate_lists: Option<Box<InferenceCandidates>>,
+    /// Go `candidates` and `contraCandidates` when they hold more than one
+    /// candidate, else `None`. Written only through `push_candidate`,
+    /// `clear_candidates` and a copy (`clone_inference_info`, `Clone`).
+    pub(super) candidate_lists: Option<Box<InferenceCandidates>>,
+    /// The one candidate while `candidate_lists` is `None` (NIL when there
+    /// is none). `first_is_contra` tells its list.
+    pub(super) first_candidate: TypeId,
+    pub(super) first_is_contra: bool,
     /// Cache for resolved inferred type
     pub inferred_type: TypeId,
     /// Priority of current inference set
@@ -442,22 +450,73 @@ pub struct InferenceCandidates {
 
 impl InferenceInfo {
     /// Go `info.candidates`.
+    #[inline]
     #[must_use]
     pub fn candidates(&self) -> &[TypeId] {
-        self.candidate_lists.as_ref().map_or(&[], |l| &l.candidates)
+        match &self.candidate_lists {
+            Some(l) => &l.candidates,
+            None if self.first_candidate.is_some() && !self.first_is_contra => {
+                std::slice::from_ref(&self.first_candidate)
+            }
+            None => &[],
+        }
     }
 
     /// Go `info.contraCandidates`.
+    #[inline]
     #[must_use]
     pub fn contra_candidates(&self) -> &[TypeId] {
-        self.candidate_lists
-            .as_ref()
-            .map_or(&[], |l| &l.contra_candidates)
+        match &self.candidate_lists {
+            Some(l) => &l.contra_candidates,
+            None if self.first_candidate.is_some() && self.first_is_contra => {
+                std::slice::from_ref(&self.first_candidate)
+            }
+            None => &[],
+        }
     }
 
-    /// The candidate lists for a write. Makes the box on the first write.
-    pub fn candidate_lists_mut(&mut self) -> &mut InferenceCandidates {
-        self.candidate_lists.get_or_insert_default()
+    /// Go `info.candidates = append(info.candidates, t)`, or
+    /// `info.contraCandidates` when `contra`. The first candidate goes
+    /// inline; the second moves both into the box.
+    #[inline]
+    pub fn push_candidate(&mut self, t: TypeId, contra: bool) {
+        // A nil first candidate would read as no candidate. Go appends
+        // only inferred source types, which are never nil.
+        debug_assert!(t.is_some(), "nil inference candidate");
+        if self.candidate_lists.is_none() {
+            if self.first_candidate.is_nil() {
+                self.first_candidate = t;
+                self.first_is_contra = contra;
+                return;
+            }
+            self.spill_first_candidate();
+        }
+        let lists = self.candidate_lists.as_mut().unwrap();
+        if contra {
+            lists.contra_candidates.push(t);
+        } else {
+            lists.candidates.push(t);
+        }
+    }
+
+    /// Moves the inline candidate into a new box.
+    #[cold]
+    fn spill_first_candidate(&mut self) {
+        let mut lists = Box::<InferenceCandidates>::default();
+        let first = std::mem::take(&mut self.first_candidate);
+        if self.first_is_contra {
+            lists.contra_candidates.push(first);
+        } else {
+            lists.candidates.push(first);
+        }
+        self.candidate_lists = Some(lists);
+    }
+
+    /// Go `info.candidates = nil; info.contraCandidates = nil`.
+    #[inline]
+    pub fn clear_candidates(&mut self) {
+        self.candidate_lists = None;
+        self.first_candidate = TypeId::NIL;
     }
 }
 
@@ -793,8 +852,10 @@ impl FlatKey for TypeId {
 //   which the declarations symbol tracker and declaration diagnostics use
 //   (see its note).
 // - `sync.Once` fields become `bool` "done" flags.
-// - `*T` pools and shared structs (`*Relation`, `*Relater`, `*FlowState`,
+// - `*T` pools and shared structs (`*Relation`, `*Relater`,
 //   `*InferenceState`) are `Rc<RefCell<T>>`; nil-able ones are `Option`.
+//   `*FlowState` is `&mut FlowState` on the walk's stack, with no free list
+//   (see `FlowState`).
 // - `ast.NodeId` map keys are `Node` handles.
 pub struct Checker {
     pub id: u32,
@@ -903,38 +964,50 @@ pub struct Checker {
     // Go N' checker.go:673 mergedExportsChecked (ts#64566)
     pub merged_exports_checked: FxHashSet<SymbolId>,
     pub factory: NodeFactory,
-    pub node_links: LinkStore<Node, NodeLinks>,
-    pub signature_links: LinkStore<Node, Box<SignatureLinks>>,
+    // Link stores (lspage1). Sparse pages where few keys of a page have a
+    // record (2% to 30% on VS Code). Dense pages for `value_symbol_links`
+    // (80% to 98%), for the symbols made in runs (`mapped_symbol_links`,
+    // `reverse_mapped_symbol_links`: up to 63% and 40%), and for small
+    // stores with hot reads (`alias_symbol_links`, `variance_links`), as a
+    // sparse read or new record costs a few more instructions.
+    pub node_links: SparseLinkStore<Node, NodeLinks>,
+    pub signature_links: SparseLinkStore<Node, SignatureLinks>,
     pub symbol_node_links: NodeLinkStore<SymbolNodeLinks>,
-    pub type_node_links: LinkStore<Node, Box<TypeNodeLinks>>,
-    pub enum_member_links: LinkStore<Node, Box<EnumMemberLinks>>,
-    pub assertion_links: LinkStore<Node, AssertionLinks>,
-    pub array_literal_links: LinkStore<Node, ArrayLiteralLinks>,
-    pub switch_statement_links: LinkStore<Node, Box<SwitchStatementLinks>>,
-    pub jsx_element_links: LinkStore<Node, Box<JsxElementLinks>>,
-    pub computed_name_links: LinkStore<Node, Box<ComputedNameNodeLinks>>,
-    pub symbol_reference_links: LinkStore<SymbolId, SymbolReferenceLinks>,
+    pub type_node_links: SparseLinkStore<Node, TypeNodeLinks>,
+    pub enum_member_links: SparseLinkStore<Node, Box<EnumMemberLinks>>,
+    pub assertion_links: SparseLinkStore<Node, AssertionLinks>,
+    pub array_literal_links: SparseLinkStore<Node, ArrayLiteralLinks>,
+    pub switch_statement_links: SparseLinkStore<Node, Box<SwitchStatementLinks>>,
+    pub jsx_element_links: SparseLinkStore<Node, Box<JsxElementLinks>>,
+    pub computed_name_links: SparseLinkStore<Node, Box<ComputedNameNodeLinks>>,
+    pub symbol_reference_links: SparseLinkStore<SymbolId, SymbolReferenceLinks>,
     pub value_symbol_links: ValueSymbolLinkStore,
     pub mapped_symbol_links: LinkStore<SymbolId, MappedSymbolLinks>,
-    pub deferred_symbol_links: LinkStore<SymbolId, Box<DeferredSymbolLinks>>,
+    pub deferred_symbol_links: SparseLinkStore<SymbolId, Box<DeferredSymbolLinks>>,
     pub alias_symbol_links: LinkStore<SymbolId, Box<AliasSymbolLinks>>,
-    pub module_symbol_links: LinkStore<SymbolId, Box<ModuleSymbolLinks>>,
-    pub late_bound_links: LinkStore<SymbolId, LateBoundLinks>,
-    pub export_type_links: LinkStore<SymbolId, Box<ExportTypeLinks>>,
-    pub members_and_exports_links: LinkStore<SymbolId, MembersAndExportsLinks>,
-    pub type_alias_links: LinkStore<SymbolId, Box<TypeAliasLinks>>,
-    pub declared_type_links: LinkStore<SymbolId, DeclaredTypeLinks>,
-    pub spread_links: LinkStore<SymbolId, SpreadLinks>,
+    pub module_symbol_links: SparseLinkStore<SymbolId, Box<ModuleSymbolLinks>>,
+    pub late_bound_links: SparseLinkStore<SymbolId, LateBoundLinks>,
+    pub export_type_links: SparseLinkStore<SymbolId, Box<ExportTypeLinks>>,
+    pub members_and_exports_links: SparseLinkStore<SymbolId, MembersAndExportsLinks>,
+    pub type_alias_links: SparseLinkStore<SymbolId, Box<TypeAliasLinks>>,
+    pub declared_type_links: SparseLinkStore<SymbolId, DeclaredTypeLinks>,
+    pub spread_links: SparseLinkStore<SymbolId, SpreadLinks>,
     pub variance_links: LinkStore<SymbolId, Box<VarianceLinks>>,
     /// Go `ReverseMappedSymbolLinks` (exported field name).
     pub reverse_mapped_symbol_links: LinkStore<SymbolId, ReverseMappedSymbolLinks>,
-    pub marked_assignment_symbol_links: LinkStore<SymbolId, MarkedAssignmentSymbolLinks>,
-    pub symbol_container_links: LinkStore<SymbolId, Box<ContainingSymbolLinks>>,
+    pub marked_assignment_symbol_links: SparseLinkStore<SymbolId, MarkedAssignmentSymbolLinks>,
+    pub symbol_container_links: SparseLinkStore<SymbolId, Box<ContainingSymbolLinks>>,
     // ts#64469, Go N' checker.go:701. Go nil is `None`.
     pub external_module_containers:
         Option<Box<crate::checker::symbol_accessibility::ExternalModuleContainerIndex>>,
-    pub source_file_links: LinkStore<Node, Box<SourceFileLinks>>,
+    pub source_file_links: SparseLinkStore<Node, Box<SourceFileLinks>>,
     pub pattern_for_type: FxHashMap<TypeId, Node>,
+    /// Go `lazyMemberTables` (microsoft/TypeScript#64475, not in the pin;
+    /// lazy_members.rs). Empty unless `lazy_members` is on.
+    pub(crate) lazy_member_tables: crate::checker::lazy_members::LazyMemberTables,
+    /// lazymem1: `GOPORT_LAZY_MEMBERS=1` or fast mode (lazy_members.rs). Not in Go. Set
+    /// once at creation; off, no lazy member table is made.
+    pub lazy_members: bool,
     pub context_free_types: FxHashMap<Node, TypeId>,
     pub any_type: TypeId,
     pub auto_type: TypeId,
@@ -1044,7 +1117,6 @@ pub struct Checker {
     pub last_get_combined_modifier_flags_node: Node,
     pub last_get_combined_modifier_flags_result: ModifierFlags,
     pub freeinference_state: Option<Rc<RefCell<InferenceState>>>,
-    pub free_flow_state: Option<Rc<RefCell<FlowState>>>,
     pub flow_loop_cache: FxHashMap<FlowLoopKey, TypeId>,
     pub flow_loop_stack: Vec<FlowLoopInfo>,
     pub shared_flows: Vec<SharedFlow>,
@@ -1174,6 +1246,10 @@ pub struct Checker {
     pub(crate) merge_version: u64,
     /// PERF: not in Go. See `is_type_subset_of_union`.
     pub(crate) union_subset_answers: FxHashMap<(TypeId, TypeId), bool>,
+    /// nevfast1: `GOPORT_FAST_NEVER_ORDER=1` (`fast_never_order_from_env`).
+    /// Not in Go. Set once at creation; on, `some_property_reduces_to_never`
+    /// tests the names in the port's faster order.
+    pub(crate) fast_never_order: bool,
 
     // Arenas (PORTING.md "Checker data"). Index 0 of each is a dummy entry
     // so handle value 0 stays nil.
@@ -1457,6 +1533,8 @@ impl Checker {
             external_module_containers: None,
             source_file_links: LinkStore::default(),
             pattern_for_type: FxHashMap::default(),
+            lazy_member_tables: Default::default(),
+            lazy_members: crate::checker::lazy_members::lazy_members_from_env(),
             context_free_types: FxHashMap::default(),
             any_type: TypeId::NIL,
             auto_type: TypeId::NIL,
@@ -1560,7 +1638,6 @@ impl Checker {
             last_get_combined_modifier_flags_node: Node::NIL,
             last_get_combined_modifier_flags_result: ModifierFlags::default(),
             freeinference_state: None,
-            free_flow_state: None,
             flow_loop_cache: FxHashMap::default(),
             flow_loop_stack: Vec::new(),
             shared_flows: Vec::new(),
@@ -1669,6 +1746,7 @@ impl Checker {
             flow_skip: Default::default(),
             merge_version: 0,
             union_subset_answers: FxHashMap::default(),
+            fast_never_order: crate::checker::checker_p24::fast_never_order_from_env(),
             symbols,
             types: ChunkedArena::with_nil(Type::default()),
             object_type_instantiations: vec![InstantiationMap::default()],

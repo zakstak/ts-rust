@@ -149,7 +149,8 @@ impl Checker {
         if source.is_nil() || target.is_nil() || constraint.is_nil() {
             // Go reads `source.id`, `target.id` and `constraint.id`: a
             // reverse mapped symbol of another checker has no links here.
-            go_nil_dereference();
+            // Go N' loads `id` (offset 8) of each: addr=0x8 (inference.go:1078).
+            crate::core::go_nil_dereference_at(0x8);
         }
         let key = ReverseMappedTypeKey {
             source_id: source,
@@ -1338,6 +1339,8 @@ pub fn clone_inference_info(info: &InferenceInfo) -> InferenceInfo {
     InferenceInfo {
         type_parameter: info.type_parameter,
         candidate_lists: info.candidate_lists.clone(),
+        first_candidate: info.first_candidate,
+        first_is_contra: info.first_is_contra,
         inferred_type: info.inferred_type,
         priority: info.priority,
         top_level: info.top_level,

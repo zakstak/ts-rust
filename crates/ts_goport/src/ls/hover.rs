@@ -57,7 +57,7 @@ impl LanguageService {
             // end of the iteration.
             let (checker, done) = ls_program::get_type_checker_for_file(program, ctx, file);
             let c = &mut *checker.borrow_mut();
-            let range_node = get_node_for_quick_info(node);
+            let mut range_node = get_node_for_quick_info(node);
             let symbol = get_symbol_at_location_for_quick_info(c, range_node);
 
             // Always create VerbosityContext for hover so that canExpandSymbol can signal
@@ -74,7 +74,7 @@ impl LanguageService {
             };
 
             let vs_capability = caps.vs_supports_visual_studio_extensions;
-            let (quick_info, documentation, vs_documentation, quick_info_runs) = self
+            let (mut quick_info, mut documentation, vs_documentation, quick_info_runs) = self
                 .get_quick_info_and_documentation_for_symbol(
                     c,
                     symbol,
@@ -83,6 +83,28 @@ impl LanguageService {
                     Some(&vc),
                     vs_capability,
                 );
+
+            // EFFECT HOOK (Effect-TS/tsgo patch 012): Allow Effect to enrich hover responses.
+            // PORT: Go calls `AfterQuickInfoCallback(program, c, file, rangeNode,
+            // symbol, ...)`; the port's hook takes the checker's program and does
+            // not take the symbol, which Effect does not read.
+            {
+                let is_markdown = content_format == lsproto::MarkupKind::MARKDOWN;
+                let hook_range_node;
+                (quick_info, documentation, hook_range_node) =
+                    crate::effect::ls::hover::after_quick_info(
+                        c,
+                        file,
+                        range_node,
+                        quick_info,
+                        documentation,
+                        is_markdown,
+                    );
+                if hook_range_node.is_some() {
+                    range_node = hook_range_node;
+                }
+            }
+
             if quick_info.is_empty() {
                 continue;
             }
@@ -732,6 +754,11 @@ impl QuickInfoWriter<'_> {
             return;
         }
         let emit_context = self.get_emit_context();
+        // PORT: Go N' (ts#64649) calls `emitContext.Factory.ReleaseArenas()` in a defer (hover.go:458).
+        // It only lets the GC take nodes that nothing reaches. Here these nodes
+        // belong to the program version of the request and go with it
+        // (`ast::synthetic` owners); only the checker's to-string builder frees
+        // its nodes per call (`PrintScope` in checker/printer_impl.rs).
         // PORT: Go shares one idToSymbol map between the node builder and the
         // printer. The Rust builder owns the map; it is moved into the printer
         // after the node is built.
@@ -802,6 +829,8 @@ impl QuickInfoWriter<'_> {
             SyntaxKind::CallSignature
         };
         let emit_context = self.get_emit_context();
+        // PORT: Go N' (ts#64649) defers `emitContext.Factory.ReleaseArenas()`
+        // here too (hover.go:497); see write_type_classified.
         // PORT: shared idToSymbol map, see write_type_classified.
         let nb = Rc::new(RefCell::new(new_node_builder_ex(
             self.c,

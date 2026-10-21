@@ -276,8 +276,11 @@ impl Checker {
 
     // Returns the effective arguments for an expression that works like a function invocation.
     // Go: checker/checker.go:30591 getEffectiveCallArguments
+    // PERF: portonly1 item 5. Go tests the kind with `ast.IsX(node)`, a field
+    // read each. Here each test was a store read, so the kind is read once.
     pub fn get_effective_call_arguments(&mut self, node: Node) -> EffectiveArgs {
-        if is_jsx_opening_fragment(node) {
+        let kind = node.kind();
+        if kind == SyntaxKind::JsxOpeningFragment {
             // This attributes Type does not include a children property yet, the same way a fragment created with <React.Fragment> does not at this stage
             let empty_fresh_jsx_object_type = self.empty_fresh_jsx_object_type;
             return EffectiveArgs::Owned(vec![self.create_synthetic_expression(
@@ -286,7 +289,7 @@ impl Checker {
                 false,
                 Node::NIL,
             )]);
-        } else if is_tagged_template_expression(node) {
+        } else if kind == SyntaxKind::TaggedTemplateExpression {
             let template = node.template();
             let get_global_template_strings_array_type =
                 self.get_global_template_strings_array_type.clone();
@@ -307,14 +310,18 @@ impl Checker {
                 args.push(span.expression());
             }
             return EffectiveArgs::Owned(args);
-        } else if is_decorator(node) {
+        } else if kind == SyntaxKind::Decorator {
             return EffectiveArgs::Owned(self.get_effective_decorator_arguments(node));
-        } else if is_binary_expression(node) {
+        } else if kind == SyntaxKind::BinaryExpression {
             // Handles instanceof operator
             return EffectiveArgs::Owned(vec![node.left()]);
-        } else if is_jsx_opening_like_element(node) {
+        } else if matches!(
+            kind,
+            SyntaxKind::JsxOpeningElement | SyntaxKind::JsxSelfClosingElement
+        ) {
             if node.attributes().properties().len() != 0
-                || (is_jsx_opening_element(node) && node.parent().children().nodes().len() != 0)
+                || (kind == SyntaxKind::JsxOpeningElement
+                    && node.parent().children().nodes().len() != 0)
             {
                 return EffectiveArgs::Owned(vec![node.attributes()]);
             }
@@ -376,8 +383,14 @@ impl Checker {
 }
 
 // Go: checker/checker.go:30661 isSpreadArgument
+// PERF: portonly1 item 5. Go reads `arg.Kind` twice as a field; here the
+// kind is one store read.
 pub fn is_spread_argument(arg: Node) -> bool {
-    is_spread_element(arg) || is_synthetic_expression(arg) && arg.is_spread()
+    match arg.kind() {
+        SyntaxKind::SpreadElement => true,
+        SyntaxKind::SyntheticExpression => arg.is_spread(),
+        _ => false,
+    }
 }
 
 impl Checker {
@@ -1064,17 +1077,25 @@ impl Checker {
     }
 
     // Go: checker/checker.go:31100 getTypeOfPropertyOfContextualType
-    pub fn get_type_of_property_of_contextual_type(&mut self, t: TypeId, name: &str) -> TypeId {
+    pub fn get_type_of_property_of_contextual_type<'a>(
+        &mut self,
+        t: TypeId,
+        name: impl Into<TableKey<'a>>,
+    ) -> TypeId {
         self.get_type_of_property_of_contextual_type_ex(t, name, TypeId::NIL)
     }
 
     // Go: checker/checker.go:31104 getTypeOfPropertyOfContextualTypeEx
-    pub fn get_type_of_property_of_contextual_type_ex(
+    // PERF: intern1 fix 7. A `Name` key looks the properties up by id
+    // (`get_type_of_concrete_property_of_contextual_type`); the text is read
+    // only for a mapped type or an index info.
+    pub fn get_type_of_property_of_contextual_type_ex<'a>(
         &mut self,
         t: TypeId,
-        name: &str,
+        name: impl Into<TableKey<'a>>,
         name_type: TypeId,
     ) -> TypeId {
+        let key: TableKey<'a> = name.into();
         self.map_type_ex(
             t,
             &mut |c: &mut Checker, t: TypeId| -> TypeId {
@@ -1094,7 +1115,7 @@ impl Checker {
                             let substituted_type = c
                                 .get_indexed_mapped_type_substituted_type_of_contextual_type(
                                     constituent_type,
-                                    name,
+                                    key.text(),
                                     name_type,
                                 );
                             types = c.append_contextual_property_type_constituent(
@@ -1105,7 +1126,7 @@ impl Checker {
                         }
                         let property_type = c.get_type_of_concrete_property_of_contextual_type(
                             constituent_type,
-                            name,
+                            key,
                         );
                         if property_type.is_nil() {
                             if !ignore_index_infos {
@@ -1119,7 +1140,9 @@ impl Checker {
                     }
                     for candidate in index_info_candidates {
                         let index_info_type = c.get_type_from_index_infos_of_contextual_type(
-                            candidate, name, name_type,
+                            candidate,
+                            key.text(),
+                            name_type,
                         );
                         types =
                             c.append_contextual_property_type_constituent(types, index_info_type);
@@ -1139,14 +1162,16 @@ impl Checker {
                     && c.get_mapped_type_name_type_kind(t) != MappedTypeNameTypeKind::REMAPPING
                 {
                     return c.get_indexed_mapped_type_substituted_type_of_contextual_type(
-                        t, name, name_type,
+                        t,
+                        key.text(),
+                        name_type,
                     );
                 }
-                let result = c.get_type_of_concrete_property_of_contextual_type(t, name);
+                let result = c.get_type_of_concrete_property_of_contextual_type(t, key);
                 if result.is_some() {
                     return result;
                 }
-                c.get_type_from_index_infos_of_contextual_type(t, name, name_type)
+                c.get_type_from_index_infos_of_contextual_type(t, key.text(), name_type)
             },
             true, /*noReductions*/
         )
@@ -1221,9 +1246,12 @@ impl Checker {
     pub fn get_type_of_concrete_property_of_contextual_type(
         &mut self,
         t: TypeId,
-        name: &str,
+        name: TableKey<'_>,
     ) -> TypeId {
-        let prop = self.get_property_of_type(t, name);
+        let prop = self.get_property_of_type_ex(
+            t, name, false, /*skipObjectFunctionPropertyAugment*/
+            false, /*includeTypeOnlyMembers*/
+        );
         if prop.is_nil() || self.is_circular_mapped_property(prop) {
             return TypeId::NIL;
         }
@@ -1367,14 +1395,12 @@ impl Discriminator for ObjectLiteralDiscriminator {
     }
 
     // Go: checker/checker.go:31272 ObjectLiteralDiscriminator.name
-    fn name(&self, c: &Checker, index: i32) -> String {
+    fn name(&self, c: &Checker, index: i32) -> Name {
         let index = index as usize;
         if index < self.props.len() {
-            return c.sym(self.props[index].symbol()).name.to_string();
+            return c.sym(self.props[index].symbol()).name.clone();
         }
-        c.sym(self.members[index - self.props.len()])
-            .name
-            .to_string()
+        c.sym(self.members[index - self.props.len()]).name.clone()
     }
 
     // Go: checker/checker.go:31279 ObjectLiteralDiscriminator.matches
@@ -1448,7 +1474,7 @@ impl Checker {
             for s in self.get_properties_of_type(contextual_type) {
                 let name = self.sym(s).name.clone();
                 if self.sym(s).flags.intersects(SymbolFlags::OPTIONAL)
-                    && self.symbols.get(node_members, &name).is_nil()
+                    && self.symbols.get_name(node_members, &name).is_nil()
                     && self.is_discriminant_property_key(contextual_type, TableKey::Name(&name))
                 {
                     discriminant_members.push(s);

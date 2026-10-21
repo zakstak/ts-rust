@@ -278,7 +278,7 @@ impl PendingEmitBatch {
         };
         let mut results = match files {
             PendingFiles::Pool(pool) => pool.wait(),
-            PendingFiles::Checkers(jobs) => jobs.wait(),
+            PendingFiles::Checkers(jobs) => wait_emit_jobs(|| jobs.wait()),
         }
         .into_iter();
 
@@ -419,7 +419,8 @@ pub fn emit_can_start_with_check() -> bool {
 /// The option part of `emit_can_start_with_check`. False with `noEmit`,
 /// `--listFilesOnly` (Go emits nothing with either), `noEmitOnError` (the
 /// emit needs every diagnostic first), `--singleThreaded`, a trace,
-/// `preserveSymlinks` (F4), `outFile`, and `GOPORT_EARLY_EMIT=0`. Then
+/// `preserveSymlinks` (F4), `outFile`, `GOPORT_EARLY_EMIT=0`, and a check
+/// that steals files (fast mode, `crate::program::stealing_check`). Then
 /// `tsc -p` keeps Go's order exactly: it does not start the check early
 /// either. `tsc -b` starts each check early in
 /// any case. When these rules and `check_cannot_see_outputs` allow it, it
@@ -429,6 +430,7 @@ pub fn emit_can_start_with_check() -> bool {
 pub fn early_emit_options_allow() -> bool {
     let options = options();
     early_emit_enabled()
+        && !crate::program::stealing_check()
         && !options.no_emit.is_true()
         && !options.list_files_only.is_true()
         && !options.no_emit_on_error.is_true()
@@ -526,11 +528,29 @@ fn run_emit_jobs(
     if last_queued_first {
         queued.reverse();
     }
-    let mut results = run_on_checker_threads_for_files(&queued, job);
+    let mut results = wait_emit_jobs(|| run_on_checker_threads_for_files(&queued, job));
     if last_queued_first {
         results.reverse();
     }
     results
+}
+
+/// Runs `wait`, a wait for emit jobs, and returns its result. Go
+/// `Program.Emit` queues each file's emit on
+/// `core.NewWorkGroup(p.SingleThreaded())` (compiler/program.go:1913,
+/// :1929). On a parallel group the emit is a `sync.WaitGroup.Go`
+/// goroutine, so a Go panic in it ends the process with
+/// ` [recovered, repanicked]`, and no `recover` of the caller sees it (Go
+/// N' fed0bf24149f: the d.ts signature after a failed write,
+/// incremental/snapshot.go:411). The port gets a job's panic where it
+/// waits for the job, so the wait runs under `core::go_work_group_task`.
+/// Single-threaded, Go runs the emit on the caller's goroutine.
+fn wait_emit_jobs<R>(wait: impl FnOnce() -> R) -> R {
+    if single_threaded() {
+        wait()
+    } else {
+        crate::core::go_work_group_task(wait)
+    }
 }
 
 /// The `wrap` of `emit_with` and `emit_batch_with`.
@@ -736,8 +756,14 @@ struct PendingPoolEmit {
 
 impl PendingPoolEmit {
     /// Waits for every job and returns one result per file, in file order.
-    /// Every pool and twin job ends before a panic goes on.
+    /// Every pool and twin job ends before a panic goes on
+    /// (`wait_emit_jobs`).
     fn wait(self) -> Vec<EmitResult> {
+        wait_emit_jobs(|| self.wait_here())
+    }
+
+    /// `wait` without `wait_emit_jobs`.
+    fn wait_here(self) -> Vec<EmitResult> {
         let checker_results = self.checker.map(|jobs| {
             jobs.wait_all()
                 .into_iter()

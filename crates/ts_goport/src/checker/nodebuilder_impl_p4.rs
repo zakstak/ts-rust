@@ -159,7 +159,7 @@ impl Checker {
             // Growing type arguments can prevent a reverse mapped type from repeating.
             // Bound expansion by its mapped declaration as well as its type identity.
             let mapped_type = self.ty(t).as_reverse_mapped_type().mapped_type;
-            let declaration = self.ty(mapped_type).as_mapped_type().declaration;
+            let declaration = self.ty(mapped_type).as_mapped_type().declaration();
             let origin = CompositeSymbolIdentity {
                 is_constructor_node: false,
                 symbol_id: 0,
@@ -217,6 +217,15 @@ impl Checker {
             )
         };
         if can_use_cache && !reported_diagnostic && !encountered_error {
+            // PORT: a later call with this enclosing declaration reads the
+            // node (`deep_clone_node` above), so an open print call keeps its
+            // nodes (`PrintScope` in printer_impl.rs). A nil key is never
+            // read, and a key that the call made (a fake scope) dies with it.
+            if enclosing_declaration.is_some()
+                && !crate::ast::synthetic::is_print_node(enclosing_declaration)
+            {
+                crate::ast::synthetic::pin_print_scope();
+            }
             // PORT: Go creates the map when nil; the Rust map always exists.
             b.borrow_mut()
                 .links
