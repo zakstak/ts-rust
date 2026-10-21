@@ -604,38 +604,18 @@ impl Checker {
                 return symbol;
             }
         }
-        if self
-            .sym(symbol)
-            .check_flags
-            .intersects(CheckFlags::INSTANTIATED)
-        {
+        // PERF (instfast1): the source symbol is read once for the test and
+        // the copy when it is not an instantiation itself (99% of the calls).
+        let source = self.sym(symbol);
+        let full = if source.check_flags.intersects(CheckFlags::INSTANTIATED) {
             // If symbol being instantiated is itself a instantiation, fetch the original target and combine the
             // type mappers. This ensures that original type identities are properly preserved and that aliases
             // always reference a non-aliases.
             symbol = links_target;
             m = self.combine_type_mappers(links_mapper, m);
-        }
-        // Keep the flags from the symbol we're instantiating.  Mark that is instantiated, and
-        // also transient so that we can just store data on it directly.
-        // PORT: Go calls newSymbol and then sets the fields. This builds the
-        // full symbol and pushes it once; `symbol_count` and TRANSIENT match
-        // `Checker::new_symbol`.
-        let full = {
-            let s = self.sym(symbol);
-            Symbol {
-                flags: s.flags | SymbolFlags::TRANSIENT,
-                name: s.name.clone(),
-                check_flags: CheckFlags::INSTANTIATED
-                    | s.check_flags
-                        & (CheckFlags::READONLY
-                            | CheckFlags::LATE
-                            | CheckFlags::OPTIONAL_PARAMETER
-                            | CheckFlags::REST_PARAMETER),
-                declarations: s.declarations.clone(),
-                parent: s.parent,
-                value_declaration: s.value_declaration,
-                ..Symbol::default()
-            }
+            instantiated_symbol_of(self.sym(symbol))
+        } else {
+            instantiated_symbol_of(source)
         };
         self.symbol_count += 1;
         let result = self.symbols.push_symbol(full);
@@ -684,6 +664,28 @@ impl Checker {
             }
         }
         false
+    }
+}
+
+/// The new symbol of Go `instantiateSymbol` for source `s`: its flags with
+/// TRANSIENT, its name, declarations, parent and value declaration, and the
+/// check flags it keeps with INSTANTIATED. Go calls newSymbol and then sets
+/// the fields; the port builds the full symbol and pushes it once.
+#[inline(always)]
+fn instantiated_symbol_of(s: &Symbol) -> Symbol {
+    Symbol {
+        flags: s.flags | SymbolFlags::TRANSIENT,
+        name: s.name.clone(),
+        check_flags: CheckFlags::INSTANTIATED
+            | s.check_flags
+                & (CheckFlags::READONLY
+                    | CheckFlags::LATE
+                    | CheckFlags::OPTIONAL_PARAMETER
+                    | CheckFlags::REST_PARAMETER),
+        declarations: s.declarations.clone(),
+        parent: s.parent,
+        value_declaration: s.value_declaration,
+        ..Symbol::default()
     }
 }
 
@@ -892,7 +894,9 @@ impl Checker {
                         // String enum members from separate enums with identical values
                         // are distinct types with the same property name. Make the resulting
                         // property symbol's name type be the union of those enum member types.
-                        let existing_prop = c.symbols.get(members, &prop_name);
+                        // PERF: intern1 fix 3. Lookups by `Name`: an id
+                        // compare with the hash the interner keeps.
+                        let existing_prop = c.symbols.get_name(members, &prop_name);
                         if existing_prop.is_some() {
                             let existing_name_type = c
                                 .value_symbol_links
@@ -911,7 +915,8 @@ impl Checker {
                             let mut modifiers_prop = SymbolId::NIL;
                             if c.is_type_usable_as_property_name(key_type) {
                                 let key_name = c.get_property_name_from_type_as_name(key_type);
-                                modifiers_prop = c.get_property_of_type(modifiers_type, &key_name);
+                                modifiers_prop =
+                                    c.get_property_of_type_name(modifiers_type, &key_name);
                             }
                             let is_optional = template_modifiers
                                 .intersects(MappedTypeModifiers::INCLUDE_OPTIONAL)
@@ -1066,7 +1071,9 @@ impl Checker {
             if mapped_type.is_nil() {
                 // Go reads `mappedType.AsMappedType()` on both branches: a
                 // symbol of another checker has no links here.
-                go_nil_dereference();
+                // Go N' loads the type word of `t.data` in `AsMappedType` (offset 0x28): addr=0x28
+                // (types.go:716).
+                crate::core::go_nil_dereference_at(0x28);
             }
             if !pushed {
                 self.ty_mut(mapped_type).as_mapped_type_mut().contains_error = true;

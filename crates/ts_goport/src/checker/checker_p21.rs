@@ -145,6 +145,30 @@ impl Checker {
         (Cow::Borrowed(""), false)
     }
 
+    /// `get_effective_property_name_for_property_name_node` as the interned
+    /// `Name` of Go's string, or `None` when Go's `ok` is false. Equal texts
+    /// give equal names, so `a`, `"a"`, `["a"]` and a computed name whose
+    /// type is the literal "a" give one key, as Go's string does.
+    // PERF: parentname1. An Identifier or PrivateIdentifier reads the name
+    // interned with its store slot (`text_name`): no text read and no
+    // intern. The other names intern Go's string.
+    pub fn get_effective_property_name_key(&mut self, node: Node) -> Option<Name> {
+        if matches!(
+            node.kind(),
+            SyntaxKind::Identifier | SyntaxKind::PrivateIdentifier
+        ) {
+            // PORT: Go tests the text against `InternalSymbolNameMissing`
+            // first. An identifier's text never has its U+FDD0 (not an
+            // identifier character; a missing identifier has the text ""),
+            // so the identifier name is always Go's `(name, true)`.
+            let name = node.text_name();
+            debug_assert_ne!(name.as_str(), INTERNAL_SYMBOL_NAME_MISSING);
+            return Some(name);
+        }
+        let (text, ok) = self.get_effective_property_name_for_property_name_node(node);
+        ok.then(|| Name::from(text.as_ref()))
+    }
+
     // Go: checker/checker.go:19129 tryGetNameFromType
     pub fn try_get_name_from_type(&mut self, t: TypeId) -> (String, bool) {
         let flags = self.ty(t).flags;
@@ -257,15 +281,11 @@ impl Checker {
                 .get(as_symbol(r.target))
                 .declared_type
                 .is_some(),
-            TypeSystemPropertyName::RESOLVED_TYPE_ARGUMENTS => {
-                // PORT: Go checks `resolvedTypeArguments != nil`. The Rust field
-                // is a `SharedList`, so an empty list reads as unresolved.
-                !self
-                    .ty(as_type(r.target))
-                    .as_type_reference()
-                    .resolved_type_arguments
-                    .is_empty()
-            }
+            TypeSystemPropertyName::RESOLVED_TYPE_ARGUMENTS => !self
+                .ty(as_type(r.target))
+                .as_type_reference()
+                .resolved_type_arguments
+                .is_nil(),
             TypeSystemPropertyName::RESOLVED_BASE_TYPES => {
                 self.ty(as_type(r.target))
                     .as_interface_type()
@@ -407,14 +427,11 @@ impl Checker {
     /// The body of Go `getPropertiesOfUnionOrIntersectionType`. It stores the
     /// list in `resolved_properties`.
     fn resolve_properties_of_union_or_intersection_type(&mut self, t: TypeId) {
-        // PORT: Go checks `resolvedProperties == nil`. The Rust field is a
-        // `SharedList`, so an empty result is recomputed; the recomputation is
-        // idempotent because the property lookups are cached.
         if self
             .ty(t)
             .as_union_or_intersection_type()
             .resolved_properties
-            .is_empty()
+            .is_nil()
         {
             let mut checked: FxHashSet<Name> = FxHashSet::default();
             let mut props: Vec<SymbolId> = Vec::new();
@@ -451,12 +468,18 @@ impl Checker {
             }
             self.ty_mut(t)
                 .as_union_or_intersection_type_mut()
-                .resolved_properties = props.into();
+                .resolved_properties = SharedList::non_nil(&props);
         }
     }
 
     // Go: checker/checker.go:19294 getPropertyOfType
-    pub fn get_property_of_type(&mut self, t: TypeId, name: &str) -> SymbolId {
+    // PORT: `name` is a `&str` or a `&Name` (`TableKey`), as in
+    // `get_property_of_type_ex`.
+    pub fn get_property_of_type<'a>(
+        &mut self,
+        t: TypeId,
+        name: impl Into<TableKey<'a>>,
+    ) -> SymbolId {
         self.get_property_of_type_ex(
             t, name, false, /*skipObjectFunctionPropertyAugment*/
             false, /*includeTypeOnlyMembers*/
@@ -492,8 +515,25 @@ impl Checker {
         let t = self.get_reduced_apparent_type(t);
         let flags = self.ty(t).flags;
         if flags.intersects(TypeFlags::OBJECT) {
-            let members = self.resolve_structured_type_members(t).members;
-            let mut symbol = self.symbols.get_key(members, name);
+            // Go (#64475) reads the member with getMemberOfStructuredType and
+            // the signatures with getSignaturesOfStructuredType. A type with a
+            // ready lazy member table takes that path out of line
+            // (lazy_members.rs); any other type is resolved here, as before.
+            let Some(resolved) = self.resolve_structured_type_members_unless_lazy(t) else {
+                let lazy = crate::checker::lazy_members::opaque(
+                    Self::get_property_of_unresolved_object_type_lazy
+                        as fn(&mut Self, TypeId, TableKey<'a>, bool, bool) -> SymbolId,
+                );
+                return lazy(
+                    self,
+                    t,
+                    name,
+                    skip_object_function_property_augment,
+                    include_type_only_members,
+                );
+            };
+            let members = resolved.members;
+            let mut symbol = self.symbols.get(members, name);
             if symbol.is_some() {
                 let t_symbol = self.ty(t).symbol;
                 if !include_type_only_members
@@ -618,7 +658,7 @@ impl Checker {
     /// did not see: they were set before the checker set the global, or
     /// the type has no table. False while the type is nil or not resolved.
     #[inline]
-    fn augment_filter_rejects(&mut self, slot: usize, bits: (usize, usize)) -> bool {
+    pub(crate) fn augment_filter_rejects(&mut self, slot: usize, bits: (usize, usize)) -> bool {
         let g = self.augment_globals()[slot];
         if g.is_nil() {
             return false;
@@ -651,7 +691,7 @@ impl Checker {
     /// needs `t`) sets members that the outer one then replaces, so each
     /// set builds again.
     #[inline]
-    fn augment_members_set(&mut self, t: TypeId) {
+    pub(crate) fn augment_members_set(&mut self, t: TypeId) {
         if self.augment_globals().contains(&t) {
             self.build_augment_filter(t);
         }
@@ -730,8 +770,16 @@ impl Checker {
 
     // Go: checker/checker.go:19358 getTypeOfPropertyOfType
     // Return the type of the given property in the given type, or nil if no such property exists
-    pub fn get_type_of_property_of_type(&mut self, t: TypeId, name: &str) -> TypeId {
-        let prop = self.get_property_of_type(t, name);
+    // PERF: intern1 fix 7. A `Name` key looks the property up by id.
+    pub fn get_type_of_property_of_type<'a>(
+        &mut self,
+        t: TypeId,
+        name: impl Into<TableKey<'a>>,
+    ) -> TypeId {
+        let prop = self.get_property_of_type_ex(
+            t, name, false, /*skipObjectFunctionPropertyAugment*/
+            false, /*includeTypeOnlyMembers*/
+        );
         if prop.is_some() {
             return self.get_type_of_symbol(prop);
         }
@@ -754,10 +802,47 @@ impl Checker {
         t: TypeId,
         kind: SignatureKind,
     ) -> SharedList<SignatureId> {
-        if !self.ty(t).flags.intersects(TypeFlags::STRUCTURED_TYPE) {
+        let ty = self.ty(t);
+        if !ty.flags.intersects(TypeFlags::STRUCTURED_TYPE) {
             return SharedList::default();
         }
-        let Some(d) = &self.resolve_structured_type_members(t).signatures_data else {
+        // PERF: Go reads a ready lazy member table first (#64475). A type
+        // with one is not resolved, so a resolved type reads its members
+        // here and the rest is out of line.
+        if !ty.object_flags.intersects(ObjectFlags::MEMBERS_RESOLVED) {
+            return self.get_signatures_of_unresolved_structured_type(t, kind);
+        }
+        Self::signatures_of_resolved(ty.as_structured_type(), kind)
+    }
+
+    /// `get_signatures_of_structured_type` of a type whose members are not
+    /// resolved: its lazy member table, else its resolved members.
+    #[inline(never)]
+    fn get_signatures_of_unresolved_structured_type(
+        &mut self,
+        t: TypeId,
+        kind: SignatureKind,
+    ) -> SharedList<SignatureId> {
+        if self.lazy_members {
+            let lazy = crate::checker::lazy_members::opaque(
+                Self::lazy_signatures_of_structured_type
+                    as fn(&mut Self, TypeId, SignatureKind) -> Option<SharedList<SignatureId>>,
+            );
+            if let Some(signatures) = lazy(self, t, kind) {
+                return signatures;
+            }
+        }
+        let resolved = self.resolve_structured_type_members(t);
+        Self::signatures_of_resolved(resolved, kind)
+    }
+
+    /// The signatures of `kind` of resolved members.
+    #[inline(always)]
+    fn signatures_of_resolved(
+        resolved: &StructuredType,
+        kind: SignatureKind,
+    ) -> SharedList<SignatureId> {
+        let Some(d) = &resolved.signatures_data else {
             return SharedList::default();
         };
         let call_count = d.call_signature_count as usize;
@@ -803,10 +888,34 @@ impl Checker {
 
     // Go: checker/checker.go:19385 getIndexInfosOfStructuredType
     pub fn get_index_infos_of_structured_type(&mut self, t: TypeId) -> SharedList<IndexInfoId> {
-        if self.ty(t).flags.intersects(TypeFlags::STRUCTURED_TYPE) {
-            return self.resolve_structured_type_members(t).index_infos_list();
+        let ty = self.ty(t);
+        if ty.flags.intersects(TypeFlags::STRUCTURED_TYPE) {
+            // PERF: as in `get_signatures_of_structured_type`.
+            if !ty.object_flags.intersects(ObjectFlags::MEMBERS_RESOLVED) {
+                return self.get_index_infos_of_unresolved_structured_type(t);
+            }
+            return ty.as_structured_type().index_infos_list();
         }
         SharedList::default()
+    }
+
+    /// `get_index_infos_of_structured_type` of a type whose members are not
+    /// resolved: its lazy member table, else its resolved members.
+    #[inline(never)]
+    fn get_index_infos_of_unresolved_structured_type(
+        &mut self,
+        t: TypeId,
+    ) -> SharedList<IndexInfoId> {
+        if self.lazy_members {
+            let lazy = crate::checker::lazy_members::opaque(
+                Self::lazy_index_infos_of_structured_type
+                    as fn(&mut Self, TypeId) -> Option<SharedList<IndexInfoId>>,
+            );
+            if let Some(index_infos) = lazy(self, t) {
+                return index_infos;
+            }
+        }
+        self.resolve_structured_type_members(t).index_infos_list()
     }
 
     // Go: checker/checker.go:19394 getIndexInfoOfType
@@ -949,6 +1058,42 @@ impl Checker {
         self.resolve_structured_type_members_slow(t)
     }
 
+    /// `resolve_structured_type_members`, or `None` when `t` has a ready lazy
+    /// member table (lazy_members.rs). Same shape as the former, so the
+    /// resolved case costs the same.
+    #[inline]
+    pub(crate) fn resolve_structured_type_members_unless_lazy(
+        &mut self,
+        t: TypeId,
+    ) -> Option<&StructuredType> {
+        if self
+            .ty(t)
+            .object_flags
+            .intersects(ObjectFlags::MEMBERS_RESOLVED)
+        {
+            return Some(self.ty(t).as_structured_type());
+        }
+        self.resolve_structured_type_members_unless_lazy_slow(t)
+    }
+
+    #[inline(never)]
+    fn resolve_structured_type_members_unless_lazy_slow(
+        &mut self,
+        t: TypeId,
+    ) -> Option<&StructuredType> {
+        if self.lazy_members
+            && crate::checker::lazy_members::opaque(
+                Self::has_ready_lazy_member_table as fn(&mut Self, TypeId) -> bool,
+            )(self, t)
+        {
+            return None;
+        }
+        // The first read can prepare the table, and the prepare step can
+        // resolve `t`: then this reads those members (Go
+        // getMemberOfUnresolvedStructuredType calls resolveStructuredTypeMembers).
+        Some(self.resolve_structured_type_members(t))
+    }
+
     /// The member resolution dispatch of `resolve_structured_type_members`.
     #[inline(never)]
     fn resolve_structured_type_members_slow(&mut self, t: TypeId) -> &StructuredType {
@@ -985,6 +1130,14 @@ impl Checker {
 
     // Go: checker/checker.go:19502 resolveTypeReferenceMembers
     pub fn resolve_type_reference_members(&mut self, t: TypeId) {
+        // Go (#64475): a ready lazy member table gives the full table.
+        if self.lazy_members
+            && crate::checker::lazy_members::opaque(
+                Self::resolve_type_reference_members_lazy as fn(&mut Self, TypeId) -> bool,
+            )(self, t)
+        {
+            return;
+        }
         let source = self.ty(t).target();
         let type_parameters = self
             .ty(source)
@@ -1584,22 +1737,61 @@ impl Checker {
         kind: SignatureKind,
         allow_members: bool,
     ) -> SignatureId {
-        if self.ty(t).flags.intersects(TypeFlags::OBJECT) {
-            let resolved = self.resolve_structured_type_members(t);
-            if allow_members || resolved.properties.is_empty() && resolved.index_infos().is_empty()
+        let ty = self.ty(t);
+        if ty.flags.intersects(TypeFlags::OBJECT) {
+            // PERF: a resolved type reads its members here; the rest is out
+            // of line (with the switch on, the Go body of #64475).
+            if !ty.object_flags.intersects(ObjectFlags::MEMBERS_RESOLVED) {
+                return self.get_single_signature_of_unresolved(t, kind, allow_members);
+            }
+            return Self::single_signature_of_resolved(
+                ty.as_structured_type(),
+                kind,
+                allow_members,
+            );
+        }
+        SignatureId::NIL
+    }
+
+    /// `get_single_signature` of an object type whose members are not
+    /// resolved.
+    #[inline(never)]
+    fn get_single_signature_of_unresolved(
+        &mut self,
+        t: TypeId,
+        kind: SignatureKind,
+        allow_members: bool,
+    ) -> SignatureId {
+        if self.lazy_members {
+            let lazy = crate::checker::lazy_members::opaque(
+                Self::get_single_signature_lazy
+                    as fn(&mut Self, TypeId, SignatureKind, bool) -> SignatureId,
+            );
+            return lazy(self, t, kind, allow_members);
+        }
+        let resolved = self.resolve_structured_type_members(t);
+        Self::single_signature_of_resolved(resolved, kind, allow_members)
+    }
+
+    /// The object type case of `get_single_signature` on resolved members.
+    #[inline(always)]
+    fn single_signature_of_resolved(
+        resolved: &StructuredType,
+        kind: SignatureKind,
+        allow_members: bool,
+    ) -> SignatureId {
+        if allow_members || resolved.properties.is_empty() && resolved.index_infos().is_empty() {
+            if kind == SignatureKind::CALL
+                && resolved.call_signatures().len() == 1
+                && resolved.construct_signatures().is_empty()
             {
-                if kind == SignatureKind::CALL
-                    && resolved.call_signatures().len() == 1
-                    && resolved.construct_signatures().is_empty()
-                {
-                    return resolved.call_signatures()[0];
-                }
-                if kind == SignatureKind::CONSTRUCT
-                    && resolved.construct_signatures().len() == 1
-                    && resolved.call_signatures().is_empty()
-                {
-                    return resolved.construct_signatures()[0];
-                }
+                return resolved.call_signatures()[0];
+            }
+            if kind == SignatureKind::CONSTRUCT
+                && resolved.construct_signatures().len() == 1
+                && resolved.call_signatures().is_empty()
+            {
+                return resolved.construct_signatures()[0];
             }
         }
         SignatureId::NIL
@@ -1944,14 +2136,14 @@ pub const AUGMENT_OBJECT: usize = 3;
 /// The two bits of `name` in an `AugmentFilters` filter, from its id.
 /// Equal texts have one id.
 #[inline]
-fn augment_filter_bits(name: &Name) -> (usize, usize) {
+pub(crate) fn augment_filter_bits(name: &Name) -> (usize, usize) {
     let mixed = name.id().wrapping_mul(0x9E37_79B9);
     ((mixed >> 24) as usize, ((mixed >> 16) & 255) as usize)
 }
 
 /// False when `filter` rejects the name with `bits`.
 #[inline]
-fn augment_filter_has(filter: &[u64; 4], (a, b): (usize, usize)) -> bool {
+pub(crate) fn augment_filter_has(filter: &[u64; 4], (a, b): (usize, usize)) -> bool {
     filter[a >> 6] & (1 << (a & 63)) != 0 && filter[b >> 6] & (1 << (b & 63)) != 0
 }
 
@@ -1981,7 +2173,7 @@ type T9 = string;
     /// `a.ts`, and calls `f` on its checker with the codes of its
     /// diagnostics and the types of its type aliases. Each call writes its
     /// files in a temp dir of its own.
-    fn with_checked_a<R: Send + 'static>(
+    pub(super) fn with_checked_a<R: Send + 'static>(
         files: &[(&str, String)],
         options: &str,
         f: impl FnOnce(&mut Checker, Vec<i32>, Vec<TypeId>) -> R + Send + 'static,
@@ -2725,5 +2917,79 @@ export = o.s;
         // in `y.ts` only TS7053 for `missingY`.
         assert_eq!(a_codes, [2671, 2671]);
         assert_eq!(y_codes, [7053]);
+    }
+}
+
+#[cfg(test)]
+mod object_literal_name_tests {
+    use super::augment_filter_tests::with_checked_a;
+    use super::*;
+
+    /// Duplicate names in object literals (`check_grammar_object_literal_expression`
+    /// keyed by `get_effective_property_name_key`): an identifier, a string,
+    /// a numeric name, a computed literal, a computed const name and a
+    /// unique symbol with one text are one key, with up to 8 names inline
+    /// (o11) and after the ninth name (o12).
+    #[test]
+    fn object_literal_duplicate_names_are_one_key() {
+        let a = r#"const K = "c";
+const K2 = "k8";
+declare const sym: unique symbol;
+const h = 1;
+export const o1 = { a: 1, "a": 2 };
+export const o2 = { "b": 1, ["b"]: 2 };
+export const o3 = { c: 1, [K]: 2 };
+export const o4 = { 1: 0, "1": 0, [1]: 0 };
+export const o5 = { get d() { return 1; }, set "d"(v: number) {} };
+export const o6 = { get ["e"]() { return 1; }, get e() { return 2; } };
+export const o7 = { f() {}, ["f"]() {} };
+export const o8 = { g: 1, get "g"() { return 1; } };
+export const o9 = { [sym]: 1, [sym]: 2 };
+export const o10 = { h, h };
+export const o11 = { m0: 0, m1: 0, m2: 0, m3: 0, m4: 0, m5: 0, m6: 0, m7: 0, "m0": 0 };
+export const o12 = { k0: 0, k1: 0, k2: 0, k3: 0, k4: 0, k5: 0, k6: 0, k7: 0, k8: 0, k9: 0, "k2": 0, [K2]: 0 };
+"#;
+        let files = [("a.ts", a.to_string())];
+        let options = r#""strict": true, "noEmit": true, "target": "es2022", "module": "commonjs""#;
+        let lines = with_checked_a(&files, options, |c, _, _| {
+            let file = c
+                .files
+                .iter()
+                .copied()
+                .find(|&file| source_file_file_name(file).ends_with("/a.ts"))
+                .expect("a.ts is not in the program");
+            let ctx = crate::gostd::context::background();
+            let diags = crate::program::get_semantic_diagnostics_with_checker(&ctx, c, file);
+            crate::program::sort_and_deduplicate_diagnostics(diags)
+                .iter()
+                .map(|d| {
+                    let text = crate::program::format_diagnostic(d);
+                    text[text.find("a.ts(").expect("a.ts diagnostic")..]
+                        .trim_end()
+                        .to_string()
+                })
+                .collect::<Vec<_>>()
+        });
+        // Go: `tsgo-oracle-fed0bf24149f -p tsconfig.json --pretty false` on
+        // a.ts with these options.
+        let go = [
+            "a.ts(5,27): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(6,29): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(7,27): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(8,27): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(8,35): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(10,25): error TS2300: Duplicate identifier '[\"e\"]'.",
+            "a.ts(10,52): error TS1118: An object literal cannot have multiple get/set accessors with the same name.",
+            "a.ts(10,52): error TS2300: Duplicate identifier 'e'.",
+            "a.ts(11,21): error TS2300: Duplicate identifier 'f'.",
+            "a.ts(11,29): error TS2300: Duplicate identifier '[\"f\"]'.",
+            "a.ts(12,31): error TS1119: An object literal cannot have property and accessor with the same name.",
+            "a.ts(13,31): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(14,25): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(15,78): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(16,92): error TS1117: An object literal cannot have multiple properties with the same name.",
+            "a.ts(16,101): error TS1117: An object literal cannot have multiple properties with the same name.",
+        ];
+        assert_eq!(lines, go);
     }
 }

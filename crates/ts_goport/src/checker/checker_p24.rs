@@ -5,6 +5,28 @@
 use crate::checker::utilities_p1::{NO_SORT_ORDER, SymbolSortKey};
 use crate::prelude::*;
 use smallvec::SmallVec;
+use std::sync::OnceLock;
+
+/// `GOPORT_FAST_NEVER_ORDER`, read once per process. `1` turns on the
+/// faster name order of `some_property_reduces_to_never`
+/// (`some_property_reduces_to_never_fast`), `0` turns it off; else it
+/// follows fast mode (`crate::fast_mode`). `Checker::new` stores it in
+/// `Checker::fast_never_order`. Off by default, so the output, counts
+/// included, equals Go.
+// PORT: not in Go. An environment variable, not a tsconfig option: the
+// tsconfig is shared with Go, which reports an unknown option (TS5023), and
+// the option table is output too (`--showConfig`, `--help --all`, the build
+// info options, the API `parseCommandLine` result). The switch changes how
+// much work the checker does, for every checker of the process (tsc, the LSP
+// and the API server), as `GOPORT_FLOWSKIP` does. That can also change the
+// output near the TS2589 limit (5,000,000 instantiations in one statement or
+// expression, `instantiate_type_with_alias`): with fewer instantiations, a
+// TS2589 that Go reports can go away, and the types after it can change
+// (nevfast1 skeptic repro r02-ts2589-count).
+pub fn fast_never_order_from_env() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| crate::fast_mode::part("GOPORT_FAST_NEVER_ORDER"))
+}
 
 /// Reusable buffers of `get_named_members` (the `Checker` field
 /// `named_members_scratch`), so a call allocates only its result.
@@ -101,8 +123,13 @@ impl Checker {
      * return the symbol for that property. Otherwise return undefined.
      */
     // Go: checker/checker.go:21807 getPropertyOfObjectType
-    pub fn get_property_of_object_type(&mut self, t: TypeId, name: &str) -> SymbolId {
-        self.get_property_of_object_type_key(t, TableKey::Text(name))
+    // PORT: `name` is a `&str` or a `&Name` (`TableKey`).
+    pub fn get_property_of_object_type<'a>(
+        &mut self,
+        t: TypeId,
+        name: impl Into<TableKey<'a>>,
+    ) -> SymbolId {
+        self.get_property_of_object_type_key(t, name.into())
     }
 
     /// `get_property_of_object_type` by `TableKey`. A `Name` key compares
@@ -110,7 +137,7 @@ impl Checker {
     pub fn get_property_of_object_type_key(&mut self, t: TypeId, name: TableKey<'_>) -> SymbolId {
         if self.ty(t).flags.intersects(TypeFlags::OBJECT) {
             let members = self.resolve_structured_type_members(t).members;
-            let symbol = self.symbols.get_key(members, name);
+            let symbol = self.symbols.get(members, name);
             if symbol.is_some() && self.symbol_is_value(symbol) {
                 return symbol;
             }
@@ -119,15 +146,16 @@ impl Checker {
     }
 
     // Go: checker/checker.go:21818 getPropertyOfUnionOrIntersectionType
-    pub fn get_property_of_union_or_intersection_type(
+    // PORT: `name` is a `&str` or a `&Name` (`TableKey`).
+    pub fn get_property_of_union_or_intersection_type<'a>(
         &mut self,
         t: TypeId,
-        name: &str,
+        name: impl Into<TableKey<'a>>,
         skip_object_function_property_augment: bool,
     ) -> SymbolId {
         self.get_property_of_union_or_intersection_type_key(
             t,
-            TableKey::Text(name),
+            name.into(),
             skip_object_function_property_augment,
         )
     }
@@ -162,15 +190,16 @@ impl Checker {
     // these partial properties when identifying discriminant properties, but otherwise they are filtered out
     // and do not appear to be present in the union type.
     // Go: checker/checker.go:21832 getUnionOrIntersectionProperty
-    pub fn get_union_or_intersection_property(
+    // PORT: `name` is a `&str` or a `&Name` (`TableKey`).
+    pub fn get_union_or_intersection_property<'a>(
         &mut self,
         t: TypeId,
-        name: &str,
+        name: impl Into<TableKey<'a>>,
         skip_object_function_property_augment: bool,
     ) -> SymbolId {
         self.get_union_or_intersection_property_key(
             t,
-            TableKey::Text(name),
+            name.into(),
             skip_object_function_property_augment,
         )
     }
@@ -185,7 +214,7 @@ impl Checker {
         skip_object_function_property_augment: bool,
     ) -> SymbolId {
         let cache = self.property_cache_table(t, skip_object_function_property_augment);
-        let prop = self.symbols.get_key(cache, name);
+        let prop = self.symbols.get(cache, name);
         if prop.is_some() {
             return prop;
         }
@@ -270,7 +299,12 @@ impl Checker {
         // of `name` for each constituent that lacks the property. Here the
         // test is made once, and the type at the first such constituent,
         // where Go first makes it; later constituents use it.
-        let late_bound_name = is_late_bound_name(name.text());
+        // PERF: intern1 fix 1. A `Name` that is not internal is not late
+        // bound, with no text read.
+        let late_bound_name = match name {
+            TableKey::Name(name) if !name.is_internal() => false,
+            _ => is_late_bound_name(name.text()),
+        };
         let mut name_literal_type = TypeId::NIL;
         for &current in types.iter() {
             let t = self.get_apparent_type(current);
@@ -706,7 +740,7 @@ impl Checker {
                 && self
                     .ty(object_type)
                     .as_mapped_type()
-                    .declaration
+                    .declaration()
                     .name_type()
                     .is_nil();
         }
@@ -790,7 +824,7 @@ impl Checker {
             && self
                 .ty(target)
                 .as_mapped_type()
-                .declaration
+                .declaration()
                 .name_type()
                 .is_nil()
         {
@@ -957,10 +991,15 @@ impl Checker {
     // property (a Symbol, and Types and Instantiations when a constituent
     // property type is new), and `--extendedDiagnostics` prints those
     // counts. So the port tests the names in Go's order too.
+    // With `GOPORT_FAST_NEVER_ORDER=1` the port uses its own faster order
+    // (`some_property_reduces_to_never_fast`).
     // PERF: the counts are keyed by the name id with FxHash, and each lookup
     // passes the `Name`, so no name text is hashed, compared or copied (Go
     // hashes the text).
     pub fn some_property_reduces_to_never(&mut self, t: TypeId) -> bool {
+        if self.fast_never_order {
+            return self.some_property_reduces_to_never_fast(t);
+        }
         // Collect declaration counts for each property across all constituent types of the intersection.
         let mut counts: FxIndexMap<u32, i32> = FxIndexMap::default();
         for i in 0..self.ty(t).types().len() {
@@ -986,6 +1025,111 @@ impl Checker {
             }
         }
         false
+    }
+
+    /// `some_property_reduces_to_never` in a faster order, used when
+    /// `GOPORT_FAST_NEVER_ORDER=1` (`Checker::fast_never_order`). The answer
+    /// is the same. It makes fewer synthetic properties, so the
+    /// `--extendedDiagnostics` Symbols, Types and Instantiations (and the
+    /// `--generateTrace` type ids) can be lower than Go's. Diagnostics and
+    /// emit equal Go, except near the TS2589 limit of 5,000,000
+    /// instantiations: there the lower count can remove a TS2589 that Go
+    /// reports, and change the types after it.
+    // PORT: not in Go. This is the port's order before ts#64521 was ported
+    // (int3 b78f6653b): first the names that are not a public method in
+    // some constituent, then the names that are a public method in every
+    // constituent, each group in the order in which the names are first
+    // seen (constituent order, then property order), and stop at the first
+    // name that reduces to never. A method's type is a function type, never
+    // a literal type, so a method is no discriminant. A method reduces to
+    // never only as a conflicting private member, so a method that can be
+    // private (the `getDeclarationModifierFlagsFromSymbol` test that sets
+    // `CheckFlagsContainsPrivate`) stays in the first group, and a
+    // conflicting private method is found as early as in first-seen order.
+    // A `#private` name sets no such flag and is unique to its class, so it
+    // is no conflicting private member. In first-seen order, the `length`
+    // of a tuple intersection (`[] & [a: A] & ...`) comes after the array
+    // methods: the mongodb test check makes 6.9 times the symbols and takes
+    // 5.7 times as long (Go N' makes as many symbols as first-seen order).
+    fn some_property_reduces_to_never_fast(&mut self, t: TypeId) -> bool {
+        // PORT: with each count, whether every declaration of the name is a
+        // public method (`is_public_method`), and the value declaration of
+        // the first property of the name.
+        // PERF: a name seen again with that value declaration is not tested
+        // again. That is almost always the same member (an instantiation of
+        // it). It can be another symbol: a union or intersection property of
+        // two or more properties is a property, not a method, with their
+        // value declaration when they have one and the same (Go
+        // `createUnionOrIntersectionProperty`, checker.go:21888 and :22055).
+        // So in `A<string> & T`, where `T extends A<string> | A<number>` and
+        // `A.m` is a public method, the `m` of `T` (a property of its
+        // apparent type `A<string> | A<number>`, checker.go:19254) is
+        // skipped, and `m` stays with the public methods
+        // (`tests::fast_never_order_can_skip_a_union_property`). An
+        // intersection has no union constituent: Go distributes
+        // `A & (A | B)` over the union (checker.go:26577), so that type is
+        // the union `A | (A & B)`. That changes only the order of the tests
+        // below, not the answer: both groups are tested. The tuples of an
+        // intersection share the lib declarations of their array methods,
+        // so this saves a test for each method of each tuple (mongodb test
+        // check: the test cost 6.5% more instructions, 1.6% with the parent
+        // of the first declaration as the key). The key is not the parent:
+        // an instance and a static member of one class have the same
+        // parent, so in `A & typeof A` a `private static m()` after a public
+        // `m()` went last, after every property of the class.
+        let mut counts: FxIndexMap<u32, (i32, bool, Node)> = FxIndexMap::default();
+        for i in 0..self.ty(t).types().len() {
+            let u = self.type_at(t, i);
+            let props = self.get_properties_of_type(u);
+            for &prop in props.iter() {
+                let symbol = self.sym(prop);
+                match counts.entry(symbol.name.id()) {
+                    indexmap::map::Entry::Occupied(entry) => {
+                        let entry = entry.into_mut();
+                        entry.0 += 1;
+                        if entry.1 && symbol.value_declaration != entry.2 {
+                            entry.1 = self.is_public_method(prop);
+                        }
+                    }
+                    indexmap::map::Entry::Vacant(entry) => {
+                        entry.insert((1, self.is_public_method(prop), symbol.value_declaration));
+                    }
+                }
+            }
+        }
+        for public_methods in [false, true] {
+            for (&id, &(count, all_public_methods, _)) in &counts {
+                if count > 1 && all_public_methods == public_methods {
+                    let prop_name = Name::from_id(id);
+                    let prop = self.get_property_of_union_or_intersection_type_key(
+                        t,
+                        TableKey::Name(&prop_name),
+                        true, /*skipObjectFunctionPropertyAugment*/
+                    );
+                    if prop.is_some() && self.is_never_reduced_property(prop) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Whether `prop` is a method that cannot be private, for the name order
+    /// of `some_property_reduces_to_never_fast`.
+    // PORT: no Go counterpart. A method is never synthetic, and Go
+    // `getDeclarationModifierFlagsFromSymbol` drops the accessibility
+    // modifiers of a member whose parent is no class, so only a class method
+    // needs the modifier test. A method that is also a property takes the
+    // property's type, so it does not count as a method.
+    fn is_public_method(&self, prop: SymbolId) -> bool {
+        let symbol = self.sym(prop);
+        symbol.flags & (SymbolFlags::METHOD | SymbolFlags::PROPERTY) == SymbolFlags::METHOD
+            && !(symbol.parent.is_some()
+                && self.sym(symbol.parent).flags.intersects(SymbolFlags::CLASS)
+                && self
+                    .get_declaration_modifier_flags_from_symbol(prop)
+                    .intersects(ModifierFlags::PRIVATE))
     }
 
     // Go: checker/checker.go:22303 getReducedUnionType
@@ -1179,6 +1323,34 @@ impl Checker {
         None
     }
 
+    /// Go `core.SameMap` + `core.Same` of `instantiateType` over a stored
+    /// list that never changes (detached by the caller): each element is
+    /// instantiated once, in order, and `None` means no element changed.
+    /// The same calls as `map_stored_types_if_changed`, with direct reads.
+    pub fn instantiate_types_if_changed(
+        &mut self,
+        list: &[TypeId],
+        m: MapperId,
+    ) -> Option<SmallVec<[TypeId; 8]>> {
+        for (i, &value) in list.iter().enumerate() {
+            let mapped = self.instantiate_type(value, m);
+            if mapped != value {
+                let mut result: SmallVec<[TypeId; 8]> = SmallVec::with_capacity(list.len());
+                // PERF: a push loop; the prefix is short, and
+                // `extend_from_slice` calls memmove and memcpy.
+                for &value in &list[..i] {
+                    result.push(value);
+                }
+                result.push(mapped);
+                for &value in &list[i + 1..] {
+                    result.push(self.instantiate_type(value, m));
+                }
+                return Some(result);
+            }
+        }
+        None
+    }
+
     // Go: checker/checker.go:22352 getTypeArguments
     pub fn get_type_arguments(&mut self, t: TypeId) -> SharedList<TypeId> {
         if let Some(count) = self.resolve_type_arguments(t) {
@@ -1204,14 +1376,18 @@ impl Checker {
     /// resolve, it stores nothing and returns the count of error types that
     /// Go returns in place of the list.
     fn resolve_type_arguments(&mut self, t: TypeId) -> Option<usize> {
-        // PORT: Go tests `resolvedTypeArguments == nil`. The Rust field is a
-        // `SharedList`, so an empty list reads as unresolved. An empty list resolves
-        // to an empty list again, so the result is the same.
+        // PORT: Go tests `resolvedTypeArguments == nil`. The port stores a
+        // non-nil list (`SharedList::non_nil`), also for an empty result where
+        // Go stores nil and so resolves again on each call. The result is the
+        // same: an empty result has no node (a deferred reference has at
+        // least one type argument: see `getTypeFromClassOrInterfaceReference`
+        // and `getTypeFromArrayOrTupleTypeNode`), so nothing runs between the
+        // push and the pop, and the push finds no cycle.
         if self
             .ty(t)
             .as_type_reference()
             .resolved_type_arguments
-            .is_empty()
+            .is_nil()
         {
             let target = self.ty(t).as_type_reference().object.target;
             let type_parameter_count = self.ty(target).as_interface_type().type_parameters().len();
@@ -1257,25 +1433,26 @@ impl Checker {
                     .ty(t)
                     .as_type_reference()
                     .resolved_type_arguments
-                    .is_empty()
+                    .is_nil()
                 {
                     let mapper = self.ty(t).as_type_reference().object.mapper;
                     let resolved = self.instantiate_types(&type_arguments, mapper);
                     self.ty_mut(t)
                         .as_type_reference_mut()
-                        .resolved_type_arguments = resolved.into();
+                        .resolved_type_arguments = SharedList::non_nil(&resolved);
                 }
             } else {
                 if self
                     .ty(t)
                     .as_type_reference()
                     .resolved_type_arguments
-                    .is_empty()
+                    .is_nil()
                 {
                     let error_type = self.error_type;
                     self.ty_mut(t)
                         .as_type_reference_mut()
-                        .resolved_type_arguments = vec![error_type; type_parameter_count].into();
+                        .resolved_type_arguments =
+                        SharedList::non_nil(&vec![error_type; type_parameter_count]);
                 }
                 let error_node = if node.is_some() {
                     node
@@ -1422,6 +1599,12 @@ impl Checker {
     // Go: checker/checker.go:22466 getResolvedTypeParameterDefault
     pub fn get_resolved_type_parameter_default(&mut self, t: TypeId) -> TypeId {
         let resolved_default_type = self.ty(t).as_type_parameter().resolved_default_type;
+        // PERF: portonly1 item 6. Go reads `d.resolvedDefaultType` once
+        // (checker.go:22467) and returns it when it is set and not the
+        // resolving marker; the port read the type data again at the end.
+        if resolved_default_type.is_some() && resolved_default_type != self.resolving_default_type {
+            return resolved_default_type;
+        }
         if resolved_default_type.is_nil() {
             let target = self.ty(t).as_type_parameter().target;
             if target.is_some() {
@@ -1755,16 +1938,34 @@ impl Checker {
     }
 
     // Go: checker/checker.go:22559 instantiateType
+    // PERF (instfast1): a copy of `instantiate_type_with_alias` with no
+    // alias (all but a few hundred calls on T3 server), so it has no alias
+    // tests and no alias drop.
+    #[inline(never)]
     pub fn instantiate_type(&mut self, t: TypeId, m: MapperId) -> TypeId {
-        self.instantiate_type_with_alias(t, m, None /*alias*/)
+        self.instantiate_type_with_alias_impl(t, m, None /*alias*/)
     }
 
     // Go: checker/checker.go:22563 instantiateTypeWithAlias
+    #[inline(never)]
     pub fn instantiate_type_with_alias(
         &mut self,
         t: TypeId,
         m: MapperId,
         alias: Option<Rc<TypeAlias>>,
+    ) -> TypeId {
+        self.instantiate_type_with_alias_impl(t, m, alias.as_ref())
+    }
+
+    /// The body of `instantiate_type` and `instantiate_type_with_alias`.
+    /// The alias is borrowed (a plain pointer, so the no-alias copy folds
+    /// it away), and the worker gets its own `Rc`.
+    #[inline(always)]
+    fn instantiate_type_with_alias_impl(
+        &mut self,
+        t: TypeId,
+        m: MapperId,
+        alias: Option<&Rc<TypeAlias>>,
     ) -> TypeId {
         // Check for type variables in the alias, so things like `type Brand<T> = number & {}` can potentially be copied with new alias type args, despite them being unreferenced.
         // This is the behavior most people using aliases expect, and prevents the cache from leaking type parameters outside their scope of validity.
@@ -1772,6 +1973,10 @@ impl Checker {
         if t.is_nil() || m.is_nil() {
             return t;
         }
+        // PERF: read before the `could_contain_type_variables` call, so the
+        // type parameter test below needs no second read (a type's flags
+        // never change).
+        let is_type_parameter = self.ty(t).flags.intersects(TypeFlags::TYPE_PARAMETER);
         let could_contain = self.could_contain_type_variables(t) || {
             // PORT: the alias list does not change after the type is made, so
             // it is read by index instead of copied.
@@ -1785,88 +1990,116 @@ impl Checker {
             return t;
         }
         if self.instantiation_stack.len() == 100 || self.instantiation_count >= 5_000_000 {
-            // We have reached 100 recursive type instantiations, or 5M type instantiations caused by the same statement
-            // or expression. There is a very high likelihood we're dealing with a combination of infinite generic types
-            // that perpetually generate new type identities, so we stop the recursion here by yielding the error type.
-            if let Some(tr) = self.tracer {
-                tr.instant(
-                    crate::tracing::Phase::CheckTypes,
-                    "instantiateType_DepthLimit",
-                    vec![
-                        ("typeId", t.into()),
-                        (
-                            "instantiationDepth",
-                            (self.instantiation_stack.len() as u32).into(),
-                        ),
-                        ("instantiationCount", self.instantiation_count.into()),
-                    ],
-                );
-            }
-            let circular_type_names = self.get_circular_type_names();
-            let current_node = self.current_node;
-            if circular_type_names.len() == 1 {
-                self.error(
-                    current_node,
-                    diag::Instantiations_of_type_0_appear_infinitely_circular,
-                    args![circular_type_names[0].clone()],
-                );
-            } else if circular_type_names.len() > 1 {
-                self.error(
-                    current_node,
-                    diag::Instantiations_of_the_following_types_appear_infinitely_circular_Colon_0,
-                    args![quoted_and_comma_separated(&circular_type_names)],
-                );
-            } else {
-                self.error(
-                    current_node,
-                    diag::Type_instantiation_is_excessively_deep_and_possibly_infinite,
-                    args![],
-                );
-            }
-            return self.error_type;
+            return self.instantiation_depth_limit(t);
         }
         let index = self.find_active_mapper(m);
         if index == -1 {
             self.push_active_mapper(m);
         }
         // PERF: a key with no alias is `t` itself, in the `plain` map
-        // (`ActiveMapperCache`). `None` here means that key.
-        let alias_key = alias.as_deref().map(|alias| {
+        // (`ActiveMapperCache`). `None` here means that key. A key with an
+        // alias is made in Go's place even when no lookup follows: it gives
+        // the alias symbol its id (`get_symbol_id`).
+        let alias_key = alias.map(|alias| {
             let mut b = KeyBuilder::default();
             b.write_type(t);
             b.write_alias(&self.symbols, Some(alias));
             b.hash()
         });
-        let cache_index = if index != -1 {
-            index as usize
+        // PERF (instfast1): a mapper that was not active got a new cache at
+        // the top, and the caches past the active length are always empty
+        // (`pop_active_mapper`), so Go's lookup in it always misses and is
+        // skipped. Only an active mapper's cache gets the result.
+        let mut cache_key: Option<(usize, Option<CacheHashKey>)> = None;
+        if index == -1 {
+            debug_assert!(
+                self.active_type_mappers_caches[self.active_mappers.len() - 1].is_empty()
+            );
         } else {
-            self.active_mappers.len() - 1
-        };
-        let cache = &self.active_type_mappers_caches[cache_index];
-        let cached = match &alias_key {
-            None => cache.get_plain(t),
-            Some(key) => cache.aliased.get(key),
-        };
-        if let Some(&cached_type) = cached {
-            return cached_type;
+            let cache_index = index as usize;
+            let cache = &self.active_type_mappers_caches[cache_index];
+            let cached = match &alias_key {
+                None => cache.get_plain(t),
+                Some(key) => cache.aliased.get(key),
+            };
+            if let Some(&cached_type) = cached {
+                return cached_type;
+            }
+            cache_key = Some((cache_index, alias_key));
         }
         self.total_instantiation_count += 1;
         self.instantiation_count += 1;
         self.instantiation_stack.push(t);
-        let result = self.instantiate_type_worker(t, m, alias);
-        if index == -1 {
-            self.pop_active_mapper();
+        // PERF (instfast1): a type parameter (about 43% of the misses on T3
+        // server) is the first case of `instantiate_type_worker`, done here
+        // without its frame. The alias is not used there either.
+        let result = if is_type_parameter {
+            self.get_mapped_type(t, m)
         } else {
-            let cache = &mut self.active_type_mappers_caches[cache_index];
-            match alias_key {
-                None => cache.insert_plain(t, result),
-                Some(key) => {
-                    cache.aliased.insert(key, result);
+            self.instantiate_type_worker(t, m, alias.cloned())
+        };
+        match cache_key {
+            None => self.pop_active_mapper(),
+            Some((cache_index, alias_key)) => {
+                let cache = &mut self.active_type_mappers_caches[cache_index];
+                match alias_key {
+                    None => cache.insert_plain(t, result),
+                    Some(key) => {
+                        cache.aliased.insert(key, result);
+                    }
                 }
             }
         }
         self.instantiation_stack.pop();
         result
+    }
+
+    /// The depth and count limit of Go `instantiateTypeWithAlias`: reports
+    /// the circular types (or the depth) and gives the error type.
+    // PERF: out of line, so `instantiate_type_with_alias` keeps a small
+    // frame.
+    #[cold]
+    #[inline(never)]
+    fn instantiation_depth_limit(&mut self, t: TypeId) -> TypeId {
+        // We have reached 100 recursive type instantiations, or 5M type instantiations caused by the same statement
+        // or expression. There is a very high likelihood we're dealing with a combination of infinite generic types
+        // that perpetually generate new type identities, so we stop the recursion here by yielding the error type.
+        if let Some(tr) = self.tracer {
+            tr.instant(
+                crate::tracing::Phase::CheckTypes,
+                "instantiateType_DepthLimit",
+                vec![
+                    ("typeId", t.into()),
+                    (
+                        "instantiationDepth",
+                        (self.instantiation_stack.len() as u32).into(),
+                    ),
+                    ("instantiationCount", self.instantiation_count.into()),
+                ],
+            );
+        }
+        let circular_type_names = self.get_circular_type_names();
+        let current_node = self.current_node;
+        if circular_type_names.len() == 1 {
+            self.error(
+                current_node,
+                diag::Instantiations_of_type_0_appear_infinitely_circular,
+                args![circular_type_names[0].clone()],
+            );
+        } else if circular_type_names.len() > 1 {
+            self.error(
+                current_node,
+                diag::Instantiations_of_the_following_types_appear_infinitely_circular_Colon_0,
+                args![quoted_and_comma_separated(&circular_type_names)],
+            );
+        } else {
+            self.error(
+                current_node,
+                diag::Type_instantiation_is_excessively_deep_and_possibly_infinite,
+                args![],
+            );
+        }
+        self.error_type
     }
 
     // Go: checker/checker.go:22614 getCircularTypeNames
@@ -2066,13 +2299,29 @@ impl Checker {
                 {
                     // PORT: Go `core.Same` on the `instantiateTypes` result
                     // is "no element changed" (`None`) here.
-                    let count = self.ty(t).as_type_reference().resolved_type_arguments.len();
-                    let Some(new_type_arguments) = self.map_stored_types_if_changed(
-                        t,
-                        count,
-                        |c, t, i| c.ty(t).as_type_reference().resolved_type_arguments[i],
-                        &mut |c, a| c.instantiate_type(a, m),
-                    ) else {
+                    // PERF (instfast1): the stored list never changes, so it
+                    // is detached once (`instantiate_types_if_changed`). An
+                    // owned list (a multi-program process) is read in place.
+                    let mut buf = SharedListBuf::<TypeId>::default();
+                    let changed = match self
+                        .ty(t)
+                        .as_type_reference()
+                        .resolved_type_arguments
+                        .detach(&mut buf)
+                    {
+                        Some(list) => self.instantiate_types_if_changed(list, m),
+                        None => {
+                            let count =
+                                self.ty(t).as_type_reference().resolved_type_arguments.len();
+                            self.map_stored_types_if_changed(
+                                t,
+                                count,
+                                |c, t, i| c.ty(t).as_type_reference().resolved_type_arguments[i],
+                                &mut |c, a| c.instantiate_type(a, m),
+                            )
+                        }
+                    };
+                    let Some(new_type_arguments) = changed else {
                         return t;
                     };
                     let target = self.ty(t).target();
@@ -2097,17 +2346,35 @@ impl Checker {
                     source = origin;
                 }
             }
-            let count = self.ty(source).types().len();
-            let changed =
-                self.map_stored_types_if_changed(source, count, Checker::type_at, &mut |c, u| {
-                    c.instantiate_type(u, m)
-                });
+            // PERF (instfast1): the constituents never change, so the list
+            // is detached once (`instantiate_types_if_changed`). An owned
+            // list (a multi-program process) is read in place.
+            let mut buf = SharedListBuf::<TypeId>::default();
+            let detached = self
+                .ty(source)
+                .as_union_or_intersection_type()
+                .types
+                .detach(&mut buf);
+            let changed = match detached {
+                Some(list) => self.instantiate_types_if_changed(list, m),
+                None => {
+                    let count = self.ty(source).types().len();
+                    self.map_stored_types_if_changed(
+                        source,
+                        count,
+                        Checker::type_at,
+                        &mut |c, u| c.instantiate_type(u, m),
+                    )
+                }
+            };
             if changed.is_none() && alias.symbol() == self.ty(t).alias.symbol() {
                 return t;
             }
             let unchanged;
             let new_types: &[TypeId] = if let Some(types) = &changed {
                 types
+            } else if let Some(list) = detached {
+                list
             } else {
                 unchanged = self.ty(source).types_list();
                 &unchanged
@@ -2318,13 +2585,46 @@ mod tests {
     use super::*;
     use crate::checker::utilities_p1::union_sort_tests::with_alias_types;
 
+    /// An empty type argument list and an empty intersection property list
+    /// are resolved once: the resolver stores a non-nil empty list, so the
+    /// next call does not resolve again (Go `resolvedTypeArguments` and
+    /// `resolvedProperties` are `== nil` tests).
+    #[test]
+    fn empty_resolved_lists_are_not_nil() {
+        const SOURCE: &str = r#"
+type E = [];
+type I<T, U> = T & U;
+"#;
+        let got = with_alias_types(SOURCE, |c, types| {
+            let (e, i) = (types[0], types[1]);
+            let nil = |c: &Checker| {
+                [
+                    c.ty(e).as_type_reference().resolved_type_arguments.is_nil(),
+                    c.ty(i)
+                        .as_union_or_intersection_type()
+                        .resolved_properties
+                        .is_nil(),
+                ]
+            };
+            let before = nil(c);
+            let lens = [
+                c.get_type_arguments(e).len(),
+                c.get_properties_of_union_or_intersection_type(i).len(),
+            ];
+            (before, lens, nil(c))
+        });
+        assert_eq!(got, ([true, true], [0, 0], [false, false]));
+    }
+
     /// `some_property_reduces_to_never` tests the shared names in first-seen
     /// order, as Go N' does (ts#64521, checker.go:22283). In `A & B` the
     /// method `m` is seen first, so its synthetic property is made before
     /// `kind` (`"a" & "b"` is never, a discriminant, Go
     /// `isDiscriminantWithNeverType`, checker.go:22341) ends the test. In
     /// `C & D` `kind` is seen first, so the test ends before `m` is tested,
-    /// and the property cache of the intersection has no `m`.
+    /// and the property cache of the intersection has no `m`. The test
+    /// turns `fast_never_order` off itself, so it holds when the test run
+    /// sets `GOPORT_FAST_NEVER_ORDER=1`.
     #[test]
     fn never_reduction_tests_names_in_first_seen_order() {
         const SOURCE: &str = r#"
@@ -2336,6 +2636,7 @@ type MK = A & B;
 type KM = C & D;
 "#;
         let got = with_alias_types(SOURCE, |c, types| {
+            c.fast_never_order = false;
             types[..2]
                 .iter()
                 .map(|&i| {
@@ -2352,6 +2653,97 @@ type KM = C & D;
                 .collect::<Vec<_>>()
         });
         assert_eq!(got, vec![(true, [true, true]), (true, [true, false])]);
+    }
+
+    /// With `GOPORT_FAST_NEVER_ORDER=1`, `some_property_reduces_to_never`
+    /// tests the public methods last: in `A & B` and in `C & D` `kind` ends
+    /// the test before `m` is tested, so neither property cache has `m`.
+    #[test]
+    fn fast_never_order_tests_public_methods_last() {
+        const SOURCE: &str = r#"
+interface A { m(): string; kind: "a" }
+interface B { m(): number; kind: "b" }
+interface C { kind: "c"; m(): string }
+interface D { kind: "d"; m(): number }
+type MK = A & B;
+type KM = C & D;
+"#;
+        let got = with_alias_types(SOURCE, |c, types| {
+            c.fast_never_order = true;
+            types[..2]
+                .iter()
+                .map(|&i| {
+                    let reduces = c.some_property_reduces_to_never(i);
+                    let cache = c
+                        .ty(i)
+                        .as_union_or_intersection_type()
+                        .property_cache_without_function_property_augment;
+                    (
+                        reduces,
+                        ["kind", "m"].map(|name| c.symbols.get(cache, name).is_some()),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(got, vec![(true, [true, false]), (true, [true, false])]);
+    }
+
+    /// With `GOPORT_FAST_NEVER_ORDER=1`: in `A<string> & T & { kind: "b" }`,
+    /// where `T extends A<string> | A<number>`, the first `m` is the public
+    /// method of `A<string>`. The `m` of `T` comes next: the union property
+    /// of `A<string> | A<number>`, a property with the same value
+    /// declaration (Go `createUnionOrIntersectionProperty`, checker.go:21888
+    /// and :22055). So it is skipped, and `m` stays with the public methods:
+    /// `kind` (`"a" & "a" & "b"` is never) is tested first, though `m` is
+    /// seen first, and the test returns there. The property cache of the
+    /// intersection then has no `m`. Go keeps the order of an intersection
+    /// (`addTypeToIntersection`, checker.go:26792), and distributes an
+    /// intersection over a union (checker.go:26577), so
+    /// `A<string> & (A<string> | B)` is a union.
+    #[test]
+    fn fast_never_order_can_skip_a_union_property() {
+        const SOURCE: &str = r#"
+interface A<X> { m(): X; kind: "a" }
+interface B { m: number }
+type D = A<string> & (A<string> | B);
+type I<T extends A<string> | A<number>> = A<string> & T & { kind: "b" };
+"#;
+        let got = with_alias_types(SOURCE, |c, types| {
+            c.fast_never_order = true;
+            let (d, i) = (types[0], types[1]);
+            let constituents = c.ty(i).types().to_vec();
+            let props: Vec<SymbolId> = constituents[..2]
+                .iter()
+                .map(|&u| {
+                    let props = c.get_properties_of_type(u);
+                    props
+                        .iter()
+                        .copied()
+                        .find(|&p| c.sym(p).name == "m")
+                        .expect("A<string> and T have m")
+                })
+                .collect();
+            let public_methods: Vec<bool> = props.iter().map(|&p| c.is_public_method(p)).collect();
+            let reduces = c.some_property_reduces_to_never(i);
+            let cache = c
+                .ty(i)
+                .as_union_or_intersection_type()
+                .property_cache_without_function_property_augment;
+            (
+                c.ty(d).flags.intersects(TypeFlags::UNION),
+                c.ty(i).flags.intersects(TypeFlags::INTERSECTION),
+                constituents.len(),
+                c.sym(props[0]).value_declaration.is_some()
+                    && c.sym(props[0]).value_declaration == c.sym(props[1]).value_declaration,
+                public_methods,
+                reduces,
+                ["kind", "m"].map(|name| c.symbols.get(cache, name).is_some()),
+            )
+        });
+        assert_eq!(
+            got,
+            (true, true, 3, true, vec![true, false], true, [true, false])
+        );
     }
 
     /// `get_reduced_apparent_type` returns early for object types (plain,
